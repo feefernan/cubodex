@@ -1,4 +1,14 @@
-import { addToCart, cartCount, cartTotals, changeQty, type Destination, needsShipping } from '../domain/cart';
+import {
+  addToCart,
+  type CartLine,
+  cartCount,
+  cartTotals,
+  changeQty,
+  type Destination,
+  needsShipping,
+  resolveCart,
+  toEntry,
+} from '../domain/cart';
 import { brl, escapeHtml as esc } from '../domain/format';
 import { quoteCart } from '../domain/shipping';
 import { cepDigits, formatCep } from '../domain/validation';
@@ -35,7 +45,7 @@ const EMPTY = emptyState(
   'margin-top:24px',
 );
 
-const lineHtml = (l: (typeof S.cart)[number], i: number) => {
+const lineHtml = (l: CartLine, i: number) => {
   const c = l.color || '#7A8595';
   const dest =
     l.kind === 'item'
@@ -44,14 +54,15 @@ const lineHtml = (l: (typeof S.cart)[number], i: number) => {
   return `<div class="line"><div class="thumb ${l.color ? 'c' : 'ph'}" style="--c:${c}">${l.color ? cube(c) : ''}</div><div style="min-width:0"><h3>${esc(l.name)}</h3><p class="mono muted" style="margin-top:4px">${esc(l.sub || '')}</p>${dest}</div><div class="end"><span class="price num">${brl(l.price * l.qty)}</span><div class="qty"><button data-action="qty" data-i="${i}" data-d="-1" aria-label="Diminuir">−</button><span class="num">${l.qty}</span><button data-action="qty" data-i="${i}" data-d="1" aria-label="Aumentar">+</button></div><button class="linkbtn" data-action="remove" data-i="${i}">remover</button></div></div>`;
 };
 
-const shippingHtml = (shipped: boolean) => {
-  if (!shipped) return '<p class="soft">Tudo vai para o cofre. O frete é calculado quando você pedir o envio.</p>';
+const shippingHtml = (lines: CartLine[]) => {
+  if (!needsShipping(lines))
+    return '<p class="soft">Tudo vai para o cofre. O frete é calculado quando você pedir o envio.</p>';
   let html = cepForm('formFrete', 'cep', 'calcular frete pelo cep', S.cep);
   if (S.cep) {
     S.shipOpts = quoteCart(S.cep);
     html += shipOptionsHtml(S.shipOpts, 'ship', (i) => S.ship?.name === S.shipOpts[i].name);
   }
-  if (S.cart.some((l) => l.dest === 'vault'))
+  if (lines.some((l) => l.dest === 'vault'))
     html +=
       '<p class="muted" style="font-size:13px">Itens marcados para o cofre ficam guardados e não entram neste frete.</p>';
   return html;
@@ -62,15 +73,33 @@ const PAY_NOTE =
 
 const renderCart = () => {
   const b = $('#cartBody');
-  if (!S.cart.length) {
+  const lines = syncCart();
+  if (!lines.length) {
     b.innerHTML = EMPTY;
     return;
   }
-  const ship = shippingHtml(needsShipping(S.cart));
-  const tot = cartTotals(S.cart, S.ship?.price ?? null);
+  const ship = shippingHtml(lines);
+  const tot = cartTotals(lines, S.ship?.price ?? null);
   const canPay = !tot.needsShipping || !!S.ship;
   const shipLabel = !tot.needsShipping ? 'no cofre' : S.ship ? brl(tot.ship) : 'calcule acima';
-  b.innerHTML = `<div class="cart-grid"><div>${S.cart.map(lineHtml).join('')}</div><aside class="summary" aria-label="Resumo">${ship}<div class="sum-row"><span class="soft">subtotal</span><span class="num">${brl(tot.sub)}</span></div><div class="sum-row"><span class="soft">frete</span><span class="num">${shipLabel}</span></div><div class="sum-row total"><span>total</span><span class="num">${brl(tot.total)}</span></div><button class="btn btn--full" data-action="pay"${disabledAttr(!canPay)}>pagar com mercado pago</button>${S.payNote ? PAY_NOTE : ''}</aside></div>`;
+  b.innerHTML = `<div class="cart-grid"><div>${lines.map(lineHtml).join('')}</div><aside class="summary" aria-label="Resumo">${ship}<div class="sum-row"><span class="soft">subtotal</span><span class="num">${brl(tot.sub)}</span></div><div class="sum-row"><span class="soft">frete</span><span class="num">${shipLabel}</span></div><div class="sum-row total"><span>total</span><span class="num">${brl(tot.total)}</span></div><button class="btn btn--full" data-action="pay"${disabledAttr(!canPay)}>pagar com mercado pago</button>${S.payNote ? PAY_NOTE : ''}</aside></div>`;
+};
+
+/**
+ * Confere o carrinho salvo contra o catálogo atual: item que sumiu ou esgotou sai (com aviso) e a
+ * quantidade nunca passa do estoque. Devolve as linhas prontas para mostrar.
+ */
+const syncCart = (): CartLine[] => {
+  const { lines, dropped } = resolveCart(S.cart);
+  const entries = lines.map(toEntry);
+  if (dropped || JSON.stringify(entries) !== JSON.stringify(S.cart)) {
+    S.cart = entries;
+    persist();
+    updateBadge();
+    if (dropped)
+      toast(dropped === 1 ? 'um item esgotou e saiu do carrinho' : `${dropped} itens esgotaram e saíram do carrinho`);
+  }
+  return lines;
 };
 
 const changed = () => {
@@ -81,6 +110,7 @@ const changed = () => {
 
 export const initCart = () => {
   registerView('carrinho', renderCart);
+  syncCart();
   updateBadge();
   onAction('add', (el) => {
     const r = addToCart(S.cart, el.dataset.id ?? '');

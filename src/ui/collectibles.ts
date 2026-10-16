@@ -1,4 +1,4 @@
-import { packLine } from '../domain/cart';
+import { packEntry } from '../domain/cart';
 import { LAUNCH_DATE, MINIS, type Mini, PACK_PRICE, PACK_SIZE, productById, SERIES } from '../domain/catalog';
 import { type Dex, type DexFilter, type DexStatus, dexTotals, filterDex, toggleDex } from '../domain/collection';
 import { brl, escapeHtml as esc, pad3 } from '../domain/format';
@@ -115,7 +115,7 @@ export const initCollectibles = () => {
     renderSerie();
   });
   onAction('pack-buy', () => {
-    const line = packLine(S.pack, Date.now());
+    const line = packEntry(S.pack, Date.now());
     if (line) {
       S.cart.push(line);
       S.pack = [];

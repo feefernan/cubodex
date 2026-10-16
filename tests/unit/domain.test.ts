@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   addToCart,
-  type CartLine,
+  type CartEntry,
   cartCount,
   cartTotals,
   changeQty,
+  describeEntry,
   needsShipping,
-  packLine,
+  packEntry,
+  resolveCart,
+  toEntry,
 } from '../../src/domain/cart';
 import { ITEMS, itemName, productById, productSubtitle } from '../../src/domain/catalog';
 import {
@@ -20,7 +23,7 @@ import {
 import { brl, escapeHtml, normalize, pad3, uniq } from '../../src/domain/format';
 import { areaOf, isView, navGroup, subnavKey } from '../../src/domain/routes';
 import { quoteCart, quoteVault } from '../../src/domain/shipping';
-import { initialState, mergePersisted } from '../../src/domain/state';
+import { demoAccount, initialState, mergePersisted } from '../../src/domain/state';
 import { cardsOfSet, cardsOnSale, emptyFilters, filterItems, filterSets, itemsOfCard } from '../../src/domain/tcg';
 import { cepDigits, countdown, formatCep, isEmail } from '../../src/domain/validation';
 
@@ -92,18 +95,27 @@ describe('filtros do TCG', () => {
 
 describe('carrinho', () => {
   it('soma unidades e respeita o estoque das cartas', () => {
-    const cart: CartLine[] = [];
+    const cart: CartEntry[] = [];
     expect(addToCart(cart, 'i1')).toEqual({ ok: true, name: 'charizard 4/102' });
     expect(addToCart(cart, 'i1')).toEqual({ ok: false, error: 'só 1 un. em estoque' });
     expect(addToCart(cart, 'm1').ok).toBe(true);
     expect(addToCart(cart, 'm1').ok).toBe(true);
     expect(addToCart(cart, 'nao-existe')).toEqual({ ok: false, error: 'item indisponível' });
+    expect(addToCart(cart, 'i7')).toEqual({ ok: false, error: 'item indisponível' });
     expect(cartCount(cart)).toBe(3);
-    expect(cart[0]).toMatchObject({ kind: 'item', dest: 'send', color: null });
-    expect(cart[1]).toMatchObject({ kind: 'mini', dest: null, color: '#F42744' });
+    expect(cart).toEqual([
+      { id: 'i1', qty: 1, dest: 'send' },
+      { id: 'm1', qty: 2 },
+    ]);
+  });
+  it('pré-venda também respeita a quantidade disponível (#25)', () => {
+    const cart: CartEntry[] = [];
+    for (let i = 0; i < 10; i++) expect(addToCart(cart, 'i9').ok).toBe(true);
+    expect(addToCart(cart, 'i9')).toEqual({ ok: false, error: 'só 10 un. em estoque' });
+    expect(changeQty(cart[0], 1)).toEqual({ ok: false, error: 'só 10 un. em estoque' });
   });
   it('quantidade nunca fica abaixo de 1 nem acima do estoque', () => {
-    const cart: CartLine[] = [];
+    const cart: CartEntry[] = [];
     addToCart(cart, 'i2');
     expect(changeQty(cart[0], -1).ok).toBe(true);
     expect(cart[0].qty).toBe(1);
@@ -113,23 +125,45 @@ describe('carrinho', () => {
     for (let i = 0; i < 5; i++) changeQty(cart[1], 1);
     expect(cart[1].qty).toBe(6);
   });
-  it('pacote só sai com 3 miniaturas', () => {
-    expect(packLine(['m1', 'm2'], 1)).toBeNull();
-    expect(packLine(['m1', 'm2', 'm10'], 7)).toMatchObject({
-      id: 'pack-7',
+  it('preço, nome e cor vêm do catálogo, nunca do que foi salvo (#7)', () => {
+    const saved = [{ id: 'i2', qty: 1, price: 1, name: 'falso', color: 'red;}' }] as unknown as CartEntry[];
+    const { lines } = resolveCart(saved);
+    expect(lines[0]).toMatchObject({ name: 'blastoise 2/102', price: 420, color: null, dest: 'send', kind: 'item' });
+    expect(toEntry(lines[0])).toEqual({ id: 'i2', qty: 1, dest: 'send' });
+  });
+  it('item que sumiu ou esgotou sai do carrinho; quantidade acima do estoque é cortada', () => {
+    const { lines, dropped } = resolveCart([
+      { id: 'i7', qty: 1 },
+      { id: 'sumiu', qty: 1 },
+      { id: 'i1', qty: 5, dest: 'vault' },
+      { id: 'm3', qty: 2 },
+    ]);
+    expect(dropped).toBe(2);
+    expect(lines.map((l) => [l.id, l.qty, l.dest])).toEqual([
+      ['i1', 1, 'vault'],
+      ['m3', 2, undefined],
+    ]);
+    expect(lines[1]).toMatchObject({ color: '#3A434F', sub: 'colecionável #003', price: 22 });
+  });
+  it('pacote só sai com 3 miniaturas e é descrito pelo catálogo', () => {
+    expect(packEntry(['m1', 'm2'], 1)).toBeNull();
+    expect(packEntry(['m1', 'm2', 'i1'], 1)).toBeNull();
+    const pack = packEntry(['m1', 'm2', 'm10'], 7);
+    expect(pack).toEqual({ id: 'pack-7', qty: 1, pack: ['m1', 'm2', 'm10'] });
+    expect(describeEntry(pack as CartEntry)).toMatchObject({
       price: 54,
       sub: 'base, ciano, brilha no escuro',
+      kind: 'pack',
     });
+    expect(describeEntry({ id: 'pack-1', qty: 1, pack: ['m1'] })).toBeNull();
   });
   it('frete só conta quando algo não vai para o cofre', () => {
-    const cart: CartLine[] = [];
-    addToCart(cart, 'i2');
-    cart[0].dest = 'vault';
-    expect(needsShipping(cart)).toBe(false);
-    expect(cartTotals(cart, 20)).toEqual({ sub: 420, ship: 0, total: 420, needsShipping: false });
-    addToCart(cart, 'a1');
-    expect(cartTotals(cart, null).total).toBe(438);
-    expect(cartTotals(cart, 20).total).toBe(458);
+    const { lines } = resolveCart([{ id: 'i2', qty: 1, dest: 'vault' }]);
+    expect(needsShipping(lines)).toBe(false);
+    expect(cartTotals(lines, 20)).toEqual({ sub: 420, ship: 0, total: 420, needsShipping: false });
+    const both = resolveCart([...lines.map(toEntry), { id: 'a1', qty: 1 }]).lines;
+    expect(cartTotals(both, null).total).toBe(438);
+    expect(cartTotals(both, 20).total).toBe(458);
   });
   it('frete simulado depende do CEP e, no cofre, das unidades', () => {
     expect(quoteCart('01000000').map((o) => o.price)).toEqual([14.9, 27.5]);
@@ -201,13 +235,59 @@ describe('rotas', () => {
 });
 
 describe('estado salvo', () => {
-  it('aproveita só os campos com a forma certa', () => {
-    expect(mergePersisted(initialState(), null).user?.name).toBe('colecionador demo');
-    const s = mergePersisted(initialState(), { user: null, cart: 'x', dex: { m1: 'have' }, vault: [], hist: 3 });
+  it('visitante novo começa deslogado e sem dados de exemplo (#5)', () => {
+    const s = mergePersisted(initialState(), null);
     expect(s.user).toBeNull();
-    expect(s.cart).toEqual([]);
-    expect(s.dex).toEqual({ m1: 'have' });
+    expect(s.dex).toEqual({});
     expect(s.vault).toEqual([]);
-    expect(s.hist.length).toBeGreaterThan(0);
+    expect(s.hist).toEqual([]);
+  });
+  it('a conta demo traz Dex, cofre e histórico de exemplo', () => {
+    const demo = demoAccount();
+    expect(demo.user).toMatchObject({ name: 'colecionador demo', demo: true });
+    expect(Object.keys(demo.dex)).toHaveLength(7);
+    expect(demo.vault).toHaveLength(4);
+    expect(demoAccount().vault).not.toBe(demo.vault);
+  });
+  it('valida campo a campo o que veio do navegador (#9)', () => {
+    const s = mergePersisted(initialState(), {
+      user: { name: 'ana', email: 'a@b.co', demo: 'sim' },
+      cart: [
+        { id: 'm1', qty: 2, color: '"><img src=x onerror=alert(1)>' },
+        { id: 'i2', qty: 1, dest: 'vault' },
+        { id: 'i2', qty: 1, dest: 'lixo' },
+        { id: 'm2', qty: 1.5 },
+        { id: 'm2', qty: 0 },
+        { id: 'nao-existe', qty: 1 },
+        { id: 'pack-1', qty: 1, pack: ['m1', 'm2', 'm3'] },
+        { id: 'pack-2', qty: 1, pack: ['m1', 'x'] },
+        'lixo',
+      ],
+      dex: { m1: 'have', m2: 'talvez', zz: 'have' },
+      vault: [
+        { id: 'v1', name: 'a', meta: 'b', date: '1/1', qty: 1, st: 'cofre' },
+        { id: 'v2', name: 'a', meta: 'b', date: '1/1', qty: '1"><b>', st: 'cofre' },
+        { id: 'v3', name: 'a', meta: 'b', date: '1/1', qty: 1, st: 'perdido' },
+      ],
+      hist: [
+        { d: '1/1', t: 'ok' },
+        { d: 1, t: 'x' },
+      ],
+    });
+    expect(s.user).toEqual({ name: 'ana', email: 'a@b.co' });
+    expect(s.cart).toEqual([
+      { id: 'm1', qty: 2 },
+      { id: 'i2', qty: 1, dest: 'vault' },
+      { id: 'i2', qty: 1 },
+      { id: 'pack-1', qty: 1, pack: ['m1', 'm2', 'm3'] },
+    ]);
+    expect(s.dex).toEqual({ m1: 'have' });
+    expect(s.vault.map((v) => v.id)).toEqual(['v1']);
+    expect(s.hist).toEqual([{ d: '1/1', t: 'ok' }]);
+  });
+  it('ignora formatos errados sem quebrar', () => {
+    const s = mergePersisted(initialState(), { user: 'x', cart: 'x', dex: [], vault: {}, hist: 3 });
+    expect(s).toMatchObject({ user: null, cart: [], dex: {}, vault: [], hist: [] });
+    expect(mergePersisted(initialState(), [1, 2]).user).toBeNull();
   });
 });

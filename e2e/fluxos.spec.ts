@@ -32,6 +32,8 @@ test.describe('fluxos principais', () => {
     await page.locator('[data-action="pack-buy"]').click();
     await expect(page.locator('#cartCount')).toHaveText('1');
     await page.locator('#v-serie .colnav [data-view="dex"]').click();
+    // Visitante novo começa deslogado; a demo traz a Dex de exemplo.
+    await page.locator('#dexBody [data-action="login-demo"]').click();
     await page.locator('[data-action="dex"][data-id="m3"][data-st="have"]').click();
     await expect(page.locator('#dexBody .dex-count')).toContainText('6');
   });

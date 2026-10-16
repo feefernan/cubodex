@@ -150,6 +150,16 @@ describe('carrinho', () => {
     expect($('#cartCount').dataset.n).toBe('0');
   });
 
+  it('carrinho salvo com item esgotado é limpo ao abrir, com aviso (#7)', async () => {
+    const { S } = await import('../../src/ui/store');
+    S.cart.push({ id: 'i7', qty: 1 }, { id: 'a1', qty: 1 });
+    goTo('carrinho');
+    expect($('#toast').textContent).toBe('um item esgotou e saiu do carrinho');
+    expect(document.querySelectorAll('.line')).toHaveLength(1);
+    expect(saved().cart).toEqual([{ id: 'a1', qty: 1 }]);
+    click('[data-action="remove"]');
+  });
+
   it('monta o pacote de 3 miniaturas', () => {
     goTo('serie');
     expect($('[data-action="pack-buy"]').textContent).toBe('faltam 3');
@@ -170,10 +180,21 @@ describe('carrinho', () => {
 });
 
 describe('colecionáveis, dex e cofre', () => {
+  it('visitante novo começa deslogado: dex e cofre pedem login (#5)', () => {
+    expect(saved().user ?? null).toBeNull();
+    goTo('dex');
+    expect($('#dexBody [data-action="login-demo"]')).not.toBeNull();
+    goTo('cofre');
+    expect($('#cofreBody [data-action="login-demo"]')).not.toBeNull();
+    goTo('conta');
+    expect($('#formLogin')).not.toBeNull();
+  });
+
   it('séries, contagem da dex e marcações', () => {
     goTo('colecionaveis');
     expect(document.querySelectorAll('#seriesRow .series')).toHaveLength(2);
     goTo('dex');
+    click('#dexBody [data-action="login-demo"]');
     expect($('#dexBody .dex-count').textContent).toContain('5');
     click('[data-action="dex"][data-id="m3"][data-st="have"]');
     expect($('#dexBody .dex-count').textContent).toContain('6');
@@ -203,14 +224,15 @@ describe('colecionáveis, dex e cofre', () => {
 });
 
 describe('conta e formulários', () => {
-  it('sai, vê o login, cria conta e entra', () => {
+  it('a demo mostra pedidos de exemplo; ao sair, os dados de exemplo somem', () => {
     goTo('conta');
+    expect($('#contaBody').textContent).toContain('#1042');
     click('[data-action="logout"]');
     expect($('#formLogin')).not.toBeNull();
-    goTo('dex');
-    expect($('#dexBody [data-action="login-demo"]')).not.toBeNull();
-    goTo('cofre');
-    expect($('#cofreBody [data-action="login-demo"]')).not.toBeNull();
+    expect(saved()).toMatchObject({ user: null, dex: {}, vault: [], hist: [] });
+  });
+
+  it('cria conta e entra sem dados de exemplo', () => {
     goTo('conta');
     type('#cd-email', 'x');
     submit('#formCadastro');
@@ -221,6 +243,11 @@ describe('conta e formulários', () => {
     $<HTMLInputElement>('#cd-ok').checked = true;
     submit('#formCadastro');
     expect($('#contaBody').textContent).toContain('Olá, ana');
+    expect($('#contaBody').textContent).toContain('Nenhum pedido ainda');
+    expect($('#contaBody').textContent).not.toContain('#1042');
+    goTo('cofre');
+    expect($('#cofreBody').textContent).toContain('Nada guardado ainda');
+    goTo('conta');
     click('[data-action="logout"]');
     type('#lg-email', 'bia@exemplo.com');
     submit('#formLogin');
