@@ -1,0 +1,20 @@
+import './styles/main.css';
+import { initAccount } from './ui/account';
+import { initCart } from './ui/cart';
+import { initCollectibles } from './ui/collectibles';
+import { bindEvents } from './ui/dom';
+import { initPages } from './ui/pages';
+import { initRouter } from './ui/router';
+import { initTcg } from './ui/tcg';
+import { initTheme } from './ui/theme';
+import { initVault } from './ui/vault';
+
+bindEvents();
+initCart();
+initTcg();
+initVault();
+initCollectibles();
+initAccount();
+initPages();
+initTheme();
+initRouter();

@@ -1,0 +1,15 @@
+name: Bug
+description: Algo não funciona como deveria
+labels: [bug]
+body:
+  - type: textarea
+    id: problema
+    attributes: { label: O que acontece, description: Passos para reproduzir e o que se vê }
+    validations: { required: true }
+  - type: textarea
+    id: esperado
+    attributes: { label: O que deveria acontecer }
+    validations: { required: true }
+  - type: textarea
+    id: aceite
+    attributes: { label: Critérios de aceite }

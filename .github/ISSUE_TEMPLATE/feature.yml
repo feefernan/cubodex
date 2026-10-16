@@ -1,0 +1,14 @@
+name: Função nova
+description: Algo que o site ainda não faz
+labels: [feature]
+body:
+  - type: textarea
+    id: objetivo
+    attributes: { label: Objetivo, description: Que problema resolve e para quem }
+    validations: { required: true }
+  - type: textarea
+    id: escopo
+    attributes: { label: Escopo }
+  - type: textarea
+    id: aceite
+    attributes: { label: Critérios de aceite }

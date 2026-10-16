@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cubodex</title>
+<meta name="description" content="Cartas de pokémon originais, miniaturas Cubodex em séries numeradas e peças impressas em 3D sob medida.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+</head>
+<body>
+<div class="proto-bar mono">protótipo navegável · dados, preços, prazos e fotos de exemplo · nenhum pagamento real · botão de tema no canto da tela</div>
+
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="#home" data-action="go" data-view="home" aria-label="cubodex, página inicial">
+      <span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span>
+      <span class="wordmark">cubodex</span>
+    </a>
+    <nav class="main-nav" aria-label="Principal">
+      <a href="#colecionar" data-action="go" data-view="colecionar" data-nav="col">colecionar</a>
+      <a href="#criar" data-action="go" data-view="criar" data-nav="criar">criar</a>
+    </nav>
+    <div class="head-actions">
+      <a class="icon-link" href="#conta" data-action="go" data-view="conta" aria-label="Minha conta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+        <span class="lbl">conta</span>
+      </a>
+      <a class="icon-link" href="#carrinho" data-action="go" data-view="carrinho" aria-label="Carrinho">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H7"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
+        <span class="lbl">carrinho</span>
+        <span class="count num" id="cartCount" data-n="0">0</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="subnav" id="subnav" hidden>
+  <nav class="wrap" aria-label="Colecionar">
+    <a href="#colecionar" data-action="go" data-view="colecionar" data-sub="colecionar">visão geral</a>
+    <a href="#tcg" data-action="go" data-view="tcg" data-sub="tcg">tcg</a>
+    <a href="#colecionaveis" data-action="go" data-view="colecionaveis" data-sub="colecionaveis">colecionáveis cubodex</a>
+  </nav>
+</div>
+
+<main>
+
+<!-- HOME -->
+<section class="view" id="v-home">
+  <div class="wrap hero">
+    <span class="eyebrow mono">cartas de pokémon · impressão 3d</span>
+    <h1 class="display">colecione<span class="dot">.</span><br>crie<span class="dot">.</span></h1>
+    <p class="lead">Cards originais, miniaturas em séries numeradas e peças impressas em 3D sob medida. Escolha por onde começar.</p>
+  </div>
+  <div class="wrap">
+    <div class="doors">
+      <a class="door door-col" href="#colecionar" data-action="go" data-view="colecionar">
+        <div class="door-art" aria-hidden="true"><div class="stack"><i></i><i></i><i></i></div></div>
+        <h2 class="display">colecionar</h2>
+        <p>Cards de pokémon, miniaturas Cubodex em séries e a Dex para acompanhar o que falta.</p>
+        <div class="pills mono"><span class="pill">tcg</span><span class="pill">colecionáveis</span><span class="pill">dex</span></div>
+      </a>
+      <a class="door door-criar" href="#criar" data-action="go" data-view="criar">
+        <div class="door-art" aria-hidden="true">
+          <svg viewBox="0 0 220 150" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="30" y="30" width="150" height="86" fill="none"/><path d="M30 18v-8M180 18v-8M30 14h150M30 128h0M196 30h8M196 116h8M200 30v86"/><path d="M30 14l6-4M30 14l6 4M180 14l-6-4M180 14l-6 4M200 30l-4 6M200 30l4 6M200 116l-4-6M200 116l4-6"/><path d="M30 30l150 86M180 30L30 116" stroke-dasharray="4 5" opacity=".5"/><text x="105" y="9" fill="currentColor" stroke="none" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle">86 mm</text><text x="212" y="76" fill="currentColor" stroke="none" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" transform="rotate(90 212 76)">60 mm</text></svg>
+        </div>
+        <span class="mono kick">oficina 3d</span>
+        <h2 class="display">criar</h2>
+        <p class="soft">Organizadores, dados e itens de RPG, e encomendas sob medida com orçamento no WhatsApp.</p>
+        <div class="pills mono"><span class="pill">peças prontas</span><span class="pill">sob medida</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">novidades e lançamentos</h2><span class="mono muted">exemplos</span></div>
+    <div class="strip" id="news"></div>
+  </div>
+
+  <div class="wrap section a-tcg" style="background:transparent">
+    <div class="section-head"><h2 class="display">destaques · tcg</h2><a class="link-more" href="#tcg" data-action="go" data-view="tcg">ver tudo →</a></div>
+    <div class="grid" id="hl-tcg"></div>
+  </div>
+  <div class="wrap section a-col" style="background:transparent">
+    <div class="section-head"><h2 class="display">destaques · colecionáveis</h2><a class="link-more" href="#colecionaveis" data-action="go" data-view="colecionaveis">ver séries →</a></div>
+    <div class="grid" id="hl-col"></div>
+  </div>
+  <div class="wrap section a-criar" style="background:transparent">
+    <div class="section-head"><h2 class="display">destaques · criar</h2><a class="link-more" href="#criar" data-action="go" data-view="criar">ver tudo →</a></div>
+    <div class="grid" id="hl-criar"></div>
+  </div>
+
+  <div class="wrap section" id="avisos">
+    <div class="opt-in">
+      <div>
+        <span class="eyebrow mono">lista de avisos</span>
+        <h2 class="display">saiba antes quando sair a próxima série.</h2>
+      </div>
+      <form id="formAvisos" class="form-stack" novalidate>
+        <div class="field"><label for="av-email">e-mail</label><input class="input" id="av-email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></div>
+        <label class="check"><input type="checkbox" id="av-ok"><span>Aceito receber avisos de lançamento da Cubodex. Posso sair da lista quando quiser.</span></label>
+        <button class="btn" type="submit">entrar na lista</button>
+        <div id="av-msg" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- COLECIONAR (hub) -->
+<section class="view" id="v-colecionar" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar</span>
+    <h1 class="display">duas prateleiras.</h1>
+    <p>Cards de pokémon e miniaturas Cubodex ficam em áreas separadas. Escolha a sua.</p>
+  </div>
+  <div class="wrap">
+    <div class="choices">
+      <a class="choice choice--tcg" href="#tcg" data-action="go" data-view="tcg">
+        <span class="mono tag">cartas · sets · cofre</span>
+        <h2 class="display">tcg</h2>
+        <p class="soft">Cartas de pokémon originais com filtros, enciclopédia de sets e cofre virtual, e acessórios sem personagens.</p>
+        <span class="link-more">ver catálogo →</span>
+      </a>
+      <a class="choice choice--col" href="#colecionaveis" data-action="go" data-view="colecionaveis">
+        <span class="mono">miniaturas 3d · personagens originais</span>
+        <h2 class="display">colecionáveis cubodex</h2>
+        <p>Séries numeradas, pacote montado por você, lançamentos e a Dex para marcar o que já é seu.</p>
+        <span class="mono">ver séries →</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- TCG · cartas à venda -->
+<section class="view" id="v-tcg" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">cartas à venda.</h1>
+    <p>Cartas de pokémon originais. Cada item mostra set, número, idioma, variante e quantidade em estoque.</p>
+  </div>
+  <div class="wrap">
+    <div class="catalog">
+      <details class="filters" id="filtersBox" open>
+        <summary>filtros</summary>
+        <div class="filters-body">
+          <div class="field"><label for="f-set">set</label><select class="select" id="f-set" data-input="filter" data-f="set"></select></div>
+          <div class="field"><label for="f-rar">raridade</label><select class="select" id="f-rar" data-input="filter" data-f="rar"></select></div>
+          <div class="field"><label for="f-tipo">tipo ou tema</label><select class="select" id="f-tipo" data-input="filter" data-f="tipo"></select></div>
+          <div class="field"><label for="f-lang">idioma</label><select class="select" id="f-lang" data-input="filter" data-f="lang"></select></div>
+          <div class="field"><label for="f-var">variante</label><select class="select" id="f-var" data-input="filter" data-f="variant"></select></div>
+          <div class="field"><span class="lbl-t">faixa de preço (R$)</span>
+            <div class="price-range"><input class="input" id="f-min" data-input="filter" data-f="min" type="number" min="0" inputmode="decimal" placeholder="mín." aria-label="Preço mínimo"><input class="input" id="f-max" data-input="filter" data-f="max" type="number" min="0" inputmode="decimal" placeholder="máx." aria-label="Preço máximo"></div></div>
+          <label class="check"><input type="checkbox" id="f-grad" data-input="filter" data-f="graded"><span>só graduadas</span></label>
+          <label class="check"><input type="checkbox" id="f-stock" data-input="filter" data-f="stock"><span>só em estoque</span></label>
+          <button class="btn btn--ghost btn--sm" type="button" data-action="filters-clear">limpar filtros</button>
+        </div>
+      </details>
+      <div class="results">
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+            <input class="input" id="f-q" data-input="filter" data-f="q" type="search" placeholder="buscar por nome ou set" aria-label="Buscar carta">
+          </div>
+          <div class="field sort"><label for="f-sort">ordenar</label><select class="select" id="f-sort" data-input="filter" data-f="sort"></select></div>
+        </div>
+        <p class="mono muted" id="tcgCount" role="status"></p>
+        <div class="grid" id="tcgGrid" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TCG · acessórios -->
+<section class="view" id="v-acessorios" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">acessórios.</h1>
+    <p>Porta-cards, deck boxes e suportes impressos em 3D. Nenhum reproduz personagens.</p>
+  </div>
+  <div class="wrap section" style="padding-top:28px"><div class="grid" id="accGrid"></div></div>
+</section>
+
+<!-- TCG · enciclopédia de sets -->
+<section class="view" id="v-sets" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">enciclopédia de sets.</h1>
+    <p>Todos os sets, agrupados por série. As cartas que a Cubodex tem em estoque ficam destacadas.</p>
+  </div>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input class="input" id="s-q" data-input="sets-q" type="search" placeholder="buscar set" aria-label="Buscar set">
+      </div>
+      <div class="field sort"><label for="s-ano">ano</label><select class="select" id="s-ano" data-input="sets-year"></select></div>
+    </div>
+    <div class="todo">Exemplo com 4 sets. Na versão real, sets, cartas e imagens são importados do TCGdex para o banco da Cubodex.</div>
+    <div id="setsBody"></div>
+  </div>
+</section>
+
+<!-- TCG · página do set -->
+<section class="view" id="v-set" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap" id="setBody"></div>
+</section>
+
+<!-- TCG · página da carta -->
+<section class="view" id="v-carta" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap" id="cartaBody"></div>
+</section>
+
+<!-- TCG · cofre virtual -->
+<section class="view" id="v-cofre" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">cofre virtual.</h1>
+    <p>Guardamos as cartas que você comprou na Cubodex. Quando quiser, junte vários itens e peça um envio só.</p>
+  </div>
+  <div class="wrap" id="cofreBody"></div>
+</section>
+
+<!-- COLECIONÁVEIS (hub) -->
+<section class="view" id="v-colecionaveis" hidden>
+  <div class="wrap tcgwrap"><nav class="colnav" aria-label="Colecionáveis Cubodex"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · colecionáveis cubodex</span>
+    <h1 class="display">miniaturas em série.</h1>
+    <p>Miniaturas impressas em 3D com personagens originais. Cada série tem números fixos, e a Dex mostra o que você já tem.</p>
+  </div>
+  <div class="wrap section" style="padding-top:28px">
+    <div class="section-head"><h2 class="display">séries</h2></div>
+    <div class="series-row" id="seriesRow"></div>
+  </div>
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">jeitos de colecionar</h2></div>
+    <div class="mech">
+      <a href="#serie" data-action="go" data-view="serie"><span class="mono tag">disponível no protótipo</span><h3>monte seu pacote</h3><p>Escolha 3 miniaturas da série e leve juntas.</p></a>
+      <div><span class="mono muted">fase 3 · em breve</span><h3>caixa surpresa</h3><p>Caixa de valor garantido. Regras a definir, e só existe depois de validação jurídica.</p></div>
+      <div><span class="mono tag">próximo lançamento</span><h3>lançamentos</h3><p class="cd mono num" data-t="2026-11-14T12:00:00-03:00" style="color:var(--fg);font-size:16px">--</p><p class="muted" style="font-size:13px">data de exemplo</p></div>
+    </div>
+  </div>
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">dex</h2><a class="link-more" href="#dex" data-action="go" data-view="dex">abrir dex →</a></div>
+    <div id="dexTeaser"></div>
+  </div>
+</section>
+
+<!-- SÉRIE -->
+<section class="view" id="v-serie" hidden>
+  <div class="wrap tcgwrap"><nav class="colnav" aria-label="Colecionáveis Cubodex"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionáveis cubodex · série 01</span>
+    <h1 class="display">fiozinho.</h1>
+    <p>A primeira série da Cubodex. Cada miniatura é impressa em 3D, tem número na Dex e muda de cor ou acabamento.</p>
+  </div>
+  <div class="wrap">
+    <div class="pack" id="pack"></div>
+    <div class="section-head" style="margin-top:36px"><h2 class="display">todas da série</h2><span class="mono muted">12 miniaturas · exemplo</span></div>
+    <div class="grid a-col" id="serieGrid"></div>
+  </div>
+</section>
+
+<!-- DEX -->
+<section class="view" id="v-dex" hidden>
+  <div class="wrap tcgwrap"><nav class="colnav" aria-label="Colecionáveis Cubodex"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionáveis cubodex · dex</span>
+    <h1 class="display">sua dex.</h1>
+    <p>Marque o que você tem e o que quer. A coleção fica salva na sua conta.</p>
+  </div>
+  <div class="wrap" style="margin-top:20px"><div id="dexBody"></div></div>
+</section>
+
+<!-- CRIAR -->
+<section class="view" id="v-criar" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">criar · oficina 3d</span>
+    <h1 class="display">peças que você usa.</h1>
+    <p>Organizadores, dados e itens de RPG impressos em 3D. Material e medidas aparecem em cada peça. Não achou? Peça sob medida.</p>
+  </div>
+  <div class="wrap section" style="padding-top:28px">
+    <div class="grid" id="criarGrid"></div>
+  </div>
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">como funciona a encomenda</h2></div>
+    <ol class="steps" style="padding:0;list-style:none">
+      <li><span class="mono">passo 1</span><b>conte o que precisa</b><p>Medidas, uso e uma foto ou arquivo de referência.</p></li>
+      <li><span class="mono">passo 2</span><b>receba o orçamento</b><p>Resposta pelo WhatsApp, com material e prazo.</p></li>
+      <li><span class="mono">passo 3</span><b>aprove e pague</b><p>Você confirma antes de imprimir.</p></li>
+      <li><span class="mono">passo 4</span><b>imprimimos e enviamos</b><p>Frete calculado pelo seu CEP.</p></li>
+    </ol>
+  </div>
+  <div class="wrap section" id="encomenda">
+    <div class="order">
+      <div>
+        <h2 class="display" style="font-size:clamp(34px,5vw,56px)">peça sob medida.</h2>
+        <p class="soft" style="margin-top:14px;max-width:44ch">Descreva a peça. No site real, este formulário abre a conversa no WhatsApp da Cubodex com os dados já preenchidos.</p>
+      </div>
+      <div class="panel">
+        <form id="formEncomenda" class="form-grid" novalidate>
+          <div class="field"><label for="en-nome">nome</label><input class="input" id="en-nome" type="text" autocomplete="name" placeholder="seu nome"></div>
+          <div class="field"><label for="en-zap">whatsapp</label><input class="input" id="en-zap" type="tel" inputmode="tel" placeholder="(11) 90000-0000"></div>
+          <div class="field full"><label for="en-desc">o que você precisa</label><textarea class="textarea" id="en-desc" placeholder="Ex.: display para 12 cards gradados, com base inclinada"></textarea></div>
+          <div class="field"><label for="en-med">medidas (mm)</label><input class="input" id="en-med" type="text" placeholder="L × A × P"></div>
+          <div class="field"><label for="en-mat">material</label><select class="select" id="en-mat"><option>PLA</option><option>PETG</option><option>ainda não sei</option></select></div>
+          <div class="field full"><label for="en-arq">arquivo ou foto de referência</label><input class="input" id="en-arq" type="file"></div>
+          <div class="full"><button class="btn btn--full" type="submit">pedir orçamento</button></div>
+          <div class="full" id="en-msg" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTA -->
+<section class="view" id="v-conta" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">minha conta</span>
+    <h1 class="display">conta.</h1>
+  </div>
+  <div class="wrap" id="contaBody"></div>
+</section>
+
+<!-- CARRINHO -->
+<section class="view" id="v-carrinho" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">carrinho</span>
+    <h1 class="display">seu carrinho.</h1>
+  </div>
+  <div class="wrap" id="cartBody"></div>
+</section>
+
+<!-- APOIO -->
+<section class="view" id="v-apoio" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">apoio</span>
+    <h1 class="display">ajuda.</h1>
+  </div>
+  <div class="wrap">
+    <div class="tabs" role="tablist" aria-label="Apoio" id="apoioTabs">
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="sobre">sobre</button>
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="comprar">como comprar</button>
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="frete">frete e prazos</button>
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="contato">contato</button>
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="termos">termos de uso</button>
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="privacidade">privacidade</button>
+      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="faq">faq</button>
+    </div>
+    <div id="apoioBody"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <a class="brand" href="#home" data-action="go" data-view="home" aria-label="cubodex, página inicial"><span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span><span class="wordmark" style="color:var(--fg)">cubodex</span></a>
+      <p class="mono" style="margin-top:14px">@cubodex · instagram · tiktok</p>
+    </div>
+    <ul class="mono">
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="sobre">sobre</a></li>
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="comprar">como comprar</a></li>
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="frete">frete e prazos</a></li>
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="contato">contato</a></li>
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="termos">termos de uso</a></li>
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="privacidade">política de privacidade</a></li>
+      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="faq">faq</a></li>
+    </ul>
+  </div>
+  <div class="wrap"><p class="disclaimer">A Cubodex não é afiliada à The Pokémon Company.</p></div>
+</footer>
+
+<div class="themer" id="themer">
+  <fieldset class="themer-panel" id="themerPanel" aria-label="Tema de cores" hidden></fieldset>
+  <button class="themer-btn" id="themerBtn" data-action="themer" type="button" aria-expanded="false" aria-controls="themerPanel"><span class="sw" id="themerSw"></span><span id="themerLbl">tema</span></button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
