@@ -1,6 +1,5 @@
 import { type CartEntry, parseCartEntries } from './cart';
-import { MINIS } from './catalog';
-import type { Dex, DexFilter, HistoryEntry, VaultEntry } from './collection';
+import { type Dex, type DexFilter, type HistoryEntry, parseDex, type VaultEntry } from './collection';
 import type { ShippingOption } from './shipping';
 
 interface User {
@@ -17,6 +16,14 @@ export interface PersistedState {
   dex: Dex;
   vault: VaultEntry[];
   hist: HistoryEntry[];
+}
+
+interface AccountOrderView {
+  serial: string;
+  kind: 'compra' | 'envio';
+  status: string;
+  total: number;
+  summary: string;
 }
 
 export type BuyerField = 'name' | 'email' | 'street' | 'number' | 'complement' | 'district' | 'city' | 'uf';
@@ -49,6 +56,14 @@ export interface AppState extends PersistedState {
   vSel: Record<string, boolean>;
   vCep: string;
   vShipIdx: number | null;
+  /** Envio do cofre (conta real): opções cotadas, espera e erro. */
+  vOpts: ShippingOption[];
+  vBusy: string;
+  vError: string;
+  /** Pedidos da conta (vêm da API). */
+  orders: AccountOrderView[];
+  /** Mensagem da página da conta (link enviado, link expirado…). */
+  accountMsg: string;
 }
 
 const DEMO_USER: User = { name: 'colecionador demo', email: 'demo@exemplo.com', demo: true };
@@ -112,6 +127,11 @@ export const initialState = (): AppState => ({
   vSel: {},
   vCep: '',
   vShipIdx: null,
+  vOpts: [],
+  vBusy: '',
+  vError: '',
+  orders: [],
+  accountMsg: '',
 });
 
 // Stryker restore all
@@ -139,13 +159,6 @@ const parseVault = (v: unknown): VaultEntry[] =>
 
 const parseHist = (v: unknown): HistoryEntry[] =>
   isObj(v) && isText(v.d, 20) && isText(v.t) ? [{ d: v.d, t: v.t }] : [];
-
-const parseDex = (v: unknown): Dex => {
-  if (!isObj(v)) return {};
-  const dex: Dex = {};
-  for (const m of MINIS) if (v[m.id] === 'have' || v[m.id] === 'want') dex[m.id] = v[m.id] as Dex[string];
-  return dex;
-};
 
 /**
  * Junta o que veio salvo no navegador ao estado inicial. Tudo é validado campo a campo: o localStorage é

@@ -8,6 +8,7 @@ import { bindEvents } from './ui/dom';
 import { initOrder } from './ui/order';
 import { initPages } from './ui/pages';
 import { initRouter, refresh } from './ui/router';
+import { syncSession } from './ui/session';
 import { initTcg } from './ui/tcg';
 import { initTheme } from './ui/theme';
 import { initVault } from './ui/vault';
@@ -34,3 +35,6 @@ api
     refresh();
   })
   .catch((e) => console.warn('catálogo da API indisponível', e));
+
+// Conta: com sessão, Dex, cofre e pedidos vêm do servidor.
+void syncSession();

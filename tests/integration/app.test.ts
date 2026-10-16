@@ -29,6 +29,54 @@ const api = {
   checkoutUrl: 'https://mp.test/pagar' as string | null,
   status: 'Aguardando pagamento',
   products: [] as unknown[],
+  account: null as null | {
+    user: { name: string; email: string };
+    dex: Record<string, 'have' | 'want'>;
+    vault: {
+      id: string;
+      productId: string;
+      name: string;
+      meta: string;
+      date: string;
+      qty: number;
+      st: 'cofre' | 'envio' | 'enviado';
+    }[];
+    hist: { d: string; t: string }[];
+    orders: {
+      serial: string;
+      kind: 'compra' | 'envio';
+      status: string;
+      total: number;
+      summary: string;
+      created_at: string;
+    }[];
+  },
+};
+const ACCOUNT = {
+  user: { name: 'ana', email: 'ana@exemplo.com' },
+  dex: { m2: 'have' as const },
+  vault: [
+    {
+      id: 'u1',
+      productId: 'i2',
+      name: 'blastoise 2/102',
+      meta: 'EN · normal',
+      date: '16/10',
+      qty: 1,
+      st: 'cofre' as const,
+    },
+  ],
+  hist: [{ d: '16/10', t: 'guardado no cofre · blastoise 2/102' }],
+  orders: [
+    {
+      serial: 'CBX-20261016-AAAAAA',
+      kind: 'compra' as const,
+      status: 'Pago',
+      total: 420,
+      summary: '1× blastoise',
+      created_at: '',
+    },
+  ],
 };
 const SHIPPING = [
   { id: 1, name: 'PAC', company: 'Correios', price: 22.5, days: 7 },
@@ -47,6 +95,22 @@ const apiFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     return Response.json({ serial: 'CBX-20261016-ABCDEF', total: 1, checkoutUrl: api.checkoutUrl }, { status: 201 });
   if (url.endsWith('/status')) return Response.json({ status: api.status });
   if (url === '/api/avisos') return Response.json({ ok: true }, { status: 201 });
+  if (url === '/api/auth/request' || url === '/api/auth/logout') return Response.json({ ok: true });
+  if (url === '/api/me' && init?.method === 'DELETE')
+    return api.account?.vault.some((v) => v.st === 'cofre')
+      ? Response.json(
+          { error: 'Você ainda tem itens no cofre. Peça o envio antes de apagar a conta.' },
+          { status: 409 },
+        )
+      : Response.json({ ok: true });
+  if (url === '/api/me')
+    return api.account ? Response.json(api.account) : Response.json({ error: 'Entre' }, { status: 401 });
+  if (url === '/api/dex') return Response.json({ dex: body?.dex });
+  if (url === '/api/vault/ship')
+    return Response.json(
+      { serial: 'CBX-20261016-VAULT2', total: 22.5, checkoutUrl: 'https://mp.test/envio' },
+      { status: 201 },
+    );
   return Response.json({ error: 'não encontrado' }, { status: 404 });
 });
 const lastSent = (url: string) => [...api.sent].reverse().find((c) => c.url === url)?.body;
@@ -385,29 +449,82 @@ describe('conta e formulários', () => {
     expect(saved()).toMatchObject({ user: null, dex: {}, vault: [], hist: [] });
   });
 
-  it('cria conta e entra sem dados de exemplo', () => {
+  it('entrar pede só o e-mail e o aceite, e manda o link', async () => {
     goTo('conta');
-    type('#cd-email', 'x');
-    submit('#formCadastro');
-    expect($('#cd-msg').textContent).toContain('e-mail válido');
-    type('#cd-email', 'ana@exemplo.com');
-    submit('#formCadastro');
-    expect($('#cd-msg').textContent).toContain('obrigatório');
-    $<HTMLInputElement>('#cd-ok').checked = true;
-    submit('#formCadastro');
-    expect($('#contaBody').textContent).toContain('Olá, ana');
-    expect($('#contaBody').textContent).toContain('Nenhum pedido ainda');
-    expect($('#contaBody').textContent).not.toContain('#1042');
-    goTo('cofre');
-    expect($('#cofreBody').textContent).toContain('Nada guardado ainda');
-    goTo('conta');
-    click('[data-action="logout"]');
-    type('#lg-email', 'bia@exemplo.com');
+    type('#lg-email', 'x');
     submit('#formLogin');
-    expect($('#contaBody').textContent).toContain('Olá, bia');
-    click('[data-action="logout"]');
+    expect($('#lg-msg').textContent).toContain('e-mail válido');
+    type('#lg-email', 'ana@exemplo.com');
+    submit('#formLogin');
+    expect($('#lg-msg').textContent).toContain('obrigatório');
+    $<HTMLInputElement>('#lg-ok').checked = true;
+    submit('#formLogin');
+    await vi.waitFor(() => expect($('#lg-msg').textContent).toContain('Link enviado para ana@exemplo.com'));
+    expect(lastSent('/api/auth/request')).toEqual({ email: 'ana@exemplo.com' });
+    location.hash = '#/conta/link-expirado';
+    await vi.waitFor(() => expect($('#lg-msg').textContent).toContain('expirou'));
+  });
+
+  it('com sessão, a conta vem do servidor: pedidos, dex salva na conta e cofre real', async () => {
+    const { syncSession } = await import('../../src/ui/session');
+    const { nav } = await import('../../src/ui/cart');
+    const to = vi.spyOn(nav, 'to').mockImplementation(() => {});
+    api.account = structuredClone(ACCOUNT);
+    await syncSession();
+    goTo('conta');
+    expect($('#contaBody').textContent).toContain('Olá, ana');
+    expect($('#contaBody').textContent).toContain('CBX-20261016-AAAAAA');
+    expect($('#contaBody').textContent).not.toContain('#1042');
+
+    goTo('dex');
+    click('[data-action="dex"][data-id="m5"][data-st="want"]');
+    await vi.waitFor(() => expect(lastSent('/api/dex')).toEqual({ dex: { m2: 'have', m5: 'want' } }));
+
+    goTo('cofre');
+    expect($('#cofreBody').textContent).toContain('blastoise 2/102');
+    check('[data-input="vault-select"][data-id="u1"]', true);
+    type('#vcep', '20040020');
+    submit('#formVFrete');
+    await vi.waitFor(() => expect(document.querySelectorAll('#cofreBody .ship-opt')).toHaveLength(2));
+    expect(lastSent('/api/shipping/quote')).toEqual({ cep: '20040020', items: [{ id: 'i2', qty: 1 }] });
+    click('[data-action="vault-ship"][data-i="0"]');
+    expect($<HTMLInputElement>('#ck-street').value).toBe('Avenida Paulista');
+    type('#ck-number', '');
+    click('[data-action="vault-pay"]');
+    expect($('#ck-msg').textContent).toContain('número');
+    type('#ck-number', '7');
+    click('[data-action="vault-pay"]');
+    await vi.waitFor(() => expect(to).toHaveBeenCalledWith('https://mp.test/envio'));
+    expect(lastSent('/api/vault/ship')).toMatchObject({
+      items: ['u1'],
+      shipping: { serviceId: 1 },
+      address: { number: '7', cep: '20040020' },
+    });
+  });
+
+  it('apagar a conta com itens no cofre é recusado; sem itens, apaga', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    goTo('conta');
+    click('[data-action="delete-account"]');
+    await vi.waitFor(() => expect($('#acc-msg').textContent).toContain('itens no cofre'));
+    if (api.account) api.account.vault = [];
+    click('[data-action="delete-account"]');
+    await vi.waitFor(() => expect($('#contaBody').textContent).toContain('Conta apagada'));
+    expect(saved().user).toBeNull();
+    confirm.mockRestore();
+  });
+
+  it('sessão que expirou tira o usuário real deste navegador', async () => {
+    const { syncSession } = await import('../../src/ui/session');
+    api.account = structuredClone(ACCOUNT);
+    await syncSession();
+    api.account = null;
+    await syncSession();
+    expect(saved()).toMatchObject({ user: null, vault: [] });
+    goTo('conta');
     click('[data-action="login-demo"]');
     expect($('#contaBody').textContent).toContain('colecionador demo');
+    click('[data-action="logout"]');
   });
 
   it('lista de avisos vai para a API; encomenda monta o WhatsApp', async () => {

@@ -74,11 +74,13 @@ const shippingHtml = (lines: CartLine[]) => {
 const field = (name: BuyerField, label: string, attrs: string, full = false) =>
   `<div class="field${full ? ' full' : ''}"><label for="ck-${name}">${label}</label><input class="input" id="ck-${name}" name="${name}" data-input="buyer" ${attrs} value="${esc(S.buyer[name])}"></div>`;
 
+/** Campos de endereço (checkout e envio do cofre), preenchidos pelo ViaCEP quando possível. */
+export const addressFields = (cep: string) =>
+  `<p class="mono muted full">entrega no CEP ${esc(formatCep(cep))}</p>${field('street', 'rua', 'autocomplete="address-line1" maxlength="200"', true)}${field('number', 'número', 'inputmode="numeric" maxlength="20"')}${field('complement', 'complemento', 'autocomplete="address-line2" maxlength="100"')}${field('district', 'bairro', 'maxlength="100"')}${field('city', 'cidade', 'autocomplete="address-level2" maxlength="100"')}${field('uf', 'UF', 'autocomplete="address-level1" maxlength="2"')}`;
+
 const checkoutForm = (shipped: boolean) =>
   `<form id="formCheckout" class="form-grid" novalidate style="gap:10px"><h3 class="display full" style="font-size:24px">seus dados</h3>${field('name', 'nome', 'autocomplete="name" maxlength="120"', true)}${field('email', 'e-mail', 'type="email" autocomplete="email" maxlength="200"', true)}${
-    shipped
-      ? `<p class="mono muted full">entrega no CEP ${esc(formatCep(S.cep))}</p>${field('street', 'rua', 'autocomplete="address-line1" maxlength="200"', true)}${field('number', 'número', 'inputmode="numeric" maxlength="20"')}${field('complement', 'complemento', 'autocomplete="address-line2" maxlength="100"')}${field('district', 'bairro', 'maxlength="100"')}${field('city', 'cidade', 'autocomplete="address-level2" maxlength="100"')}${field('uf', 'UF', 'autocomplete="address-level1" maxlength="2"')}`
-      : ''
+    shipped ? addressFields(S.cep) : ''
   }<div class="full">${
     S.paying
       ? `<button class="btn btn--full" type="submit" disabled>registrando pedido…</button>`
@@ -175,16 +177,37 @@ const REQUIRED: [BuyerField, string][] = [
   ['uf', 'Digite a UF (2 letras).'],
 ];
 
-const submitOrder = async () => {
-  const shipped = needsShipping(resolveCart(S.cart).lines);
-  const msg = $('#ck-msg');
+/** Confere os campos visíveis do comprador, marcando o primeiro com erro; false = parar. */
+export const buyerValid = (fields: BuyerField[], msg: HTMLElement): boolean => {
   const b = S.buyer;
   for (const [k, text] of REQUIRED) {
-    if (!shipped && k !== 'name') continue;
+    if (!fields.includes(k)) continue;
     const ok = k === 'uf' ? /^[A-Za-z]{2}$/.test(b.uf.trim()) : b[k].trim().length > (k === 'name' ? 1 : 0);
-    if (!check($(`#ck-${k}`), msg, ok, alertMsg(text))) return;
+    if (!check($(`#ck-${k}`), msg, ok, alertMsg(text))) return false;
   }
-  if (!check($('#ck-email'), msg, isEmail(b.email.trim()), alertMsg('Digite um e-mail válido.'))) return;
+  return (
+    !fields.includes('email') ||
+    check($('#ck-email'), msg, isEmail(b.email.trim()), alertMsg('Digite um e-mail válido.'))
+  );
+};
+
+export const ADDRESS_FIELDS: BuyerField[] = ['street', 'number', 'city', 'uf'];
+
+/** Endereço do comprador no formato da API. */
+export const buyerAddress = (cep: string) => ({
+  cep,
+  street: S.buyer.street.trim(),
+  number: S.buyer.number.trim(),
+  complement: S.buyer.complement.trim(),
+  district: S.buyer.district.trim(),
+  city: S.buyer.city.trim(),
+  uf: S.buyer.uf.trim().toUpperCase(),
+});
+
+const submitOrder = async () => {
+  const shipped = needsShipping(resolveCart(S.cart).lines);
+  const b = S.buyer;
+  if (!buyerValid(['name', ...(shipped ? ADDRESS_FIELDS : []), 'email'], $('#ck-msg'))) return;
 
   S.paying = true;
   S.payError = '';
@@ -193,17 +216,7 @@ const submitOrder = async () => {
     const order = await api.order({
       items: S.cart,
       customer: { name: b.name.trim(), email: b.email.trim() },
-      address: shipped
-        ? {
-            cep: S.cep,
-            street: b.street.trim(),
-            number: b.number.trim(),
-            complement: b.complement.trim(),
-            district: b.district.trim(),
-            city: b.city.trim(),
-            uf: b.uf.trim().toUpperCase(),
-          }
-        : null,
+      address: shipped ? buyerAddress(S.cep) : null,
       shipping: shipped && S.ship ? { serviceId: S.ship.id } : null,
     });
     S.paying = false;

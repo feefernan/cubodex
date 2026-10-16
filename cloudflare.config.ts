@@ -27,6 +27,12 @@ export default defineConfig({
       MELHOR_ENVIO_TOKEN: bindings.secret(),
       MP_ACCESS_TOKEN: bindings.secret(),
       MP_WEBHOOK_SECRET: bindings.secret(),
+      // Contas (#29): Dex, cofre e pedidos. O CI cria o banco e aplica worker/migrations antes do deploy.
+      DB: bindings.d1({ name: 'cubodex-db' }),
+      // Link de login por e-mail (Cloudflare Email Service). Precisa de domínio verificado (#22);
+      // EMAIL_FROM vazio = login desligado em produção (em localhost o link vai para o log).
+      EMAIL: bindings.sendEmail(),
+      EMAIL_FROM: bindings.text(''),
       // 5 pedidos por minuto por IP: suficiente para quem compra, freia spam.
       ORDERS_LIMITER: bindings.rateLimit({ namespace: '2001', simple: { limit: 5, period: 60 } }),
       // Cotações, status e inscrições: o cliente pode testar alguns CEPs.

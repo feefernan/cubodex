@@ -43,6 +43,18 @@ jobs:
           fi
       - run: npm ci
       - run: npm run check
+      - name: Banco das contas (D1) e migrações
+        # Cria o banco na primeira vez e aplica worker/migrations antes do código novo entrar no ar.
+        if: steps.cred.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          uuid() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=s.match(/"uuid"\s*:\s*"([0-9a-f-]{36})"/);process.stdout.write(m?m[1]:"")})'; }
+          id=$(npx cf d1 list --name cubodex-db | uuid)
+          [ -n "$id" ] || id=$(npx cf d1 create --name cubodex-db | uuid)
+          [ -n "$id" ] || { echo "::error::não achei nem criei o banco cubodex-db"; exit 1; }
+          npx cf d1 migrations apply "$id" --dir worker/migrations
       - name: Publicar
         if: steps.cred.outputs.ready == 'true'
         env:

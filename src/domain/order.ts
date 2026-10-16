@@ -40,7 +40,7 @@ export interface ValidOrder {
 const cents = (n: number) => Math.round(n * 100) / 100;
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
-const parseAddress = (raw: unknown): Address | null => {
+export const parseAddress = (raw: unknown): Address | null => {
   const o = (raw ?? {}) as Record<string, unknown>;
   const a: Address = {
     cep: text(o.cep, 9).replace(/\D/g, ''),
