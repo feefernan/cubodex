@@ -1,0 +1,15 @@
+name: Melhoria
+description: Melhorar algo que já existe (UX, performance, qualidade, infraestrutura)
+labels: [melhoria]
+body:
+  - type: textarea
+    id: hoje
+    attributes: { label: Como é hoje }
+    validations: { required: true }
+  - type: textarea
+    id: proposta
+    attributes: { label: Proposta }
+    validations: { required: true }
+  - type: textarea
+    id: aceite
+    attributes: { label: Critérios de aceite }

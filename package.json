@@ -1,0 +1,50 @@
+{
+  "name": "cubodex",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Cubodex — cartas de pokémon, colecionáveis e peças impressas em 3D",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "knip": "knip",
+    "arch": "depcruise src --config .dependency-cruiser.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:mutation": "stryker run",
+    "check": "npm run typecheck && npm run lint && npm run arch && npm run knip && npm run test:coverage",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@cloudflare/vite-plugin": "^2.0.0-beta.v.1",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@playwright/test": "^1.64.1",
+    "@stryker-mutator/core": "^10.0.0",
+    "@stryker-mutator/typescript-checker": "^10.0.0",
+    "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "cf": "^1.0.0-beta.18",
+    "dependency-cruiser": "^18.6.0",
+    "husky": "^9.1.7",
+    "jsdom": "^30.1.3",
+    "knip": "^6.41.0",
+    "lint-staged": "^17.6.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.4",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "workerd@1.20261012.1": true
+  }
+}
