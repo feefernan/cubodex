@@ -1,6 +1,6 @@
 import { dexTotals } from '../domain/collection';
 import { escapeHtml as esc } from '../domain/format';
-import { DEMO_USER } from '../domain/state';
+import { demoAccount } from '../domain/state';
 import { isEmail } from '../domain/validation';
 import { dexBar } from './collectibles';
 import { $, onAction, onSubmit } from './dom';
@@ -13,11 +13,17 @@ const LOGGED_OUT =
   '<div class="card"><h2>criar conta</h2><form id="formCadastro" class="form-stack" novalidate><div class="field"><label for="cd-nome">nome</label><input class="input" id="cd-nome" type="text" autocomplete="name"></div><div class="field"><label for="cd-email">e-mail</label><input class="input" id="cd-email" type="email" autocomplete="email"></div><label class="check"><input type="checkbox" id="cd-ok"><span>Li os termos de uso e a política de privacidade, e autorizo o uso dos meus dados para pedidos e entrega. <em class="muted">(texto provisório, a versão final precisa de revisão jurídica)</em></span></label><button class="btn" type="submit">criar conta</button><div id="cd-msg" role="status" aria-live="polite"></div></form></div></div>' +
   '<p style="margin-top:20px"><button class="linkbtn" data-action="login-demo">entrar como demo</button></p>';
 
-// shortcut: pedidos e endereço fixos de exemplo até existir backend (#20).
+// Pedidos e endereço de exemplo só na conta de demonstração; contas reais vêm do backend (#20).
 const EXAMPLE_ORDERS =
   '<div class="order-row"><div><b>#1042 · torre de dados</b><br><span class="mono muted">exemplo</span></div><span class="mono status ok">enviado</span></div>' +
   '<div class="order-row"><div><b>#1051 · pacote fiozinho</b><br><span class="mono muted">exemplo</span></div><span class="mono status">pago</span></div>' +
   '<div class="order-row" style="border:0"><div><b>#1057 · charizard holo 1ª edição</b><br><span class="mono muted">exemplo</span></div><span class="mono status">aguardando pagamento</span></div>';
+
+const NO_ORDERS = '<p class="soft">Nenhum pedido ainda.</p>';
+const EXAMPLE_ADDRESS =
+  '<div class="card"><h3>endereços</h3><p class="soft">Rua Exemplo, 123 · apto 45<br>São Paulo / SP · CEP 01000-000</p><span class="mono muted">endereço de exemplo</span></div>';
+const NO_ADDRESS =
+  '<div class="card"><h3>endereços</h3><p class="soft">O endereço é pedido no primeiro pagamento.</p></div>';
 
 const renderConta = () => {
   const b = $('#contaBody');
@@ -29,22 +35,24 @@ const renderConta = () => {
   const inVault = S.vault.filter((v) => v.st === 'cofre').length;
   b.innerHTML =
     `<p class="soft" style="margin-top:8px">Olá, <b style="color:var(--fg)">${esc(S.user.name)}</b>. <button class="linkbtn" data-action="logout">sair</button></p>` +
-    `<div class="cols-2"><div class="card"><h3>pedidos</h3>${EXAMPLE_ORDERS}</div>` +
+    `<div class="cols-2"><div class="card"><h3>pedidos</h3>${S.user.demo ? EXAMPLE_ORDERS : NO_ORDERS}</div>` +
     `<div class="card"><h3>minha dex</h3><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p>${dexBar(S.dex)}<a class="btn btn--ghost" href="#dex" data-action="go" data-view="dex">abrir dex</a></div>` +
     `<div class="card"><h3>cofre</h3><p class="dex-count num">${inVault}<small>itens guardados</small></p><a class="btn btn--ghost" href="#cofre" data-action="go" data-view="cofre">abrir cofre</a></div>` +
-    '<div class="card"><h3>endereços</h3><p class="soft">Rua Exemplo, 123 · apto 45<br>São Paulo / SP · CEP 01000-000</p><span class="mono muted">endereço de exemplo</span></div>' +
+    (S.user.demo ? EXAMPLE_ADDRESS : NO_ADDRESS) +
     `<div class="card"><h3>dados e privacidade</h3><p class="soft">${esc(S.user.email || '')}</p><p class="muted" style="font-size:14px">Aqui o cliente pede cópia ou exclusão dos dados (LGPD). Tela a definir com apoio jurídico.</p></div></div>`;
 };
 
 export const initAccount = () => {
   registerView('conta', renderConta);
   onAction('login-demo', () => {
-    S.user = { ...DEMO_USER };
+    Object.assign(S, demoAccount());
     persist();
     refresh();
     toast('entrou como demo');
   });
   onAction('logout', () => {
+    // Os dados de exemplo da demonstração não ficam para o próximo visitante.
+    if (S.user?.demo) Object.assign(S, { dex: {}, vault: [], hist: [] });
     S.user = null;
     persist();
     refresh();
@@ -52,7 +60,7 @@ export const initAccount = () => {
   // shortcut: login sem senha de verdade, só no navegador — contas reais em #20.
   onSubmit('formLogin', () => {
     const email = $<HTMLInputElement>('#lg-email').value.trim();
-    S.user = { name: email ? email.split('@')[0] : DEMO_USER.name, email: email || DEMO_USER.email };
+    S.user = { name: email ? email.split('@')[0] : 'colecionador', email: email || '' };
     persist();
     renderConta();
     toast('você entrou');

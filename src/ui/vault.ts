@@ -34,17 +34,21 @@ const renderCofre = () => {
     return;
   }
   const units = selectedInVault(S.vault, S.vSel).reduce((a, v) => a + v.qty, 0);
-  const rows = S.vault
-    .map((v) => {
-      const on = v.st === 'cofre';
-      const [label, cls] = STATUS[v.st];
-      return `<label class="vrow${on ? '' : ' off'}"><input type="checkbox" data-input="vault-select" data-id="${v.id}"${S.vSel[v.id] ? ' checked' : ''}${on ? '' : ' disabled'} aria-label="Selecionar ${esc(v.name)}"><span class="vph ph"></span><span style="min-width:0"><b style="text-transform:lowercase">${esc(v.name)}</b><br><span class="mono muted">${esc(v.meta)} · ${esc(v.date)} · ${v.qty} un.</span></span><span class="mono ${cls}">${label}</span></label>`;
-    })
-    .join('');
+  const rows =
+    S.vault
+      .map((v) => {
+        const on = v.st === 'cofre';
+        const [label, cls] = STATUS[v.st];
+        return `<label class="vrow${on ? '' : ' off'}"><input type="checkbox" data-input="vault-select" data-id="${v.id}"${S.vSel[v.id] ? ' checked' : ''}${on ? '' : ' disabled'} aria-label="Selecionar ${esc(v.name)}"><span class="vph ph"></span><span style="min-width:0"><b style="text-transform:lowercase">${esc(v.name)}</b><br><span class="mono muted">${esc(v.meta)} · ${esc(v.date)} · ${v.qty} un.</span></span><span class="mono ${cls}">${label}</span></label>`;
+      })
+      .join('') ||
+    '<p class="soft" style="padding:14px 0">Nada guardado ainda. No carrinho, escolha “guardar no cofre” nas cartas.</p>';
   const opts =
     S.vCep && units > 0 ? shipOptionsHtml(quoteVault(S.vCep, units), 'vault-ship', (i) => S.vShipIdx === i) : '';
   const ready = units > 0 && S.vShipIdx !== null;
-  const hist = S.hist.map((h) => `<li><span class="mono muted">${esc(h.d)}</span><br>${esc(h.t)}</li>`).join('');
+  const hist =
+    S.hist.map((h) => `<li><span class="mono muted">${esc(h.d)}</span><br>${esc(h.t)}</li>`).join('') ||
+    '<li>sem movimentações</li>';
   const inVault = S.vault.filter((v) => v.st === 'cofre').length;
   b.innerHTML =
     `<div class="vault-grid"><div><div class="section-head" style="margin-bottom:6px"><h2 class="display" style="font-size:28px">seus itens</h2><span class="mono muted">${inVault} no cofre · exemplo</span></div>${rows}` +
