@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 // API da loja e ViaCEP simulados: respondem como os reais (o Worker local não tem tokens).
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/catalog', (route) => route.fulfill({ json: { products: [] } }));
+  await page.route('**/api/me', (route) => route.fulfill({ status: 401, json: { error: 'Entre na sua conta.' } }));
   await page.route('**/api/shipping/quote', (route) =>
     route.fulfill({
       json: {
@@ -78,6 +79,15 @@ test.describe('fluxos principais', () => {
     await expect(page.locator('#cartaBody h1')).toHaveText('charizard');
     await page.goForward();
     await expect(page.locator('#setBody h1')).toHaveText('Base Set');
+  });
+
+  test('entrar: pede o link por e-mail', async ({ page }) => {
+    await page.route('**/api/auth/request', (route) => route.fulfill({ json: { ok: true } }));
+    await page.goto('/#/conta');
+    await page.locator('#lg-email').fill('ana@exemplo.com');
+    await page.locator('#lg-ok').check();
+    await page.locator('#formLogin button[type="submit"]').click();
+    await expect(page.locator('#lg-msg')).toContainText('Link enviado para ana@exemplo.com');
   });
 
   test('carrinho e dex sobrevivem a recarregar a página', async ({ page }) => {

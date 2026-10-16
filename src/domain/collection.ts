@@ -6,6 +6,8 @@ export type DexFilter = 'todos' | 'tenho' | 'quero' | 'faltam';
 
 export interface VaultEntry {
   id: string;
+  /** Produto do catálogo (contas reais); a demo não tem. */
+  productId?: string;
   name: string;
   meta: string;
   date: string;
@@ -57,4 +59,13 @@ export const requestShipment = (
     hist.unshift({ d: date, t: `pedido de envio · ${v.name}` });
   }
   return chosen.length;
+};
+
+/** Dex vinda de fora (navegador ou API): só miniaturas que existem e status conhecidos. */
+export const parseDex = (v: unknown): Dex => {
+  const dex: Dex = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return dex;
+  const o = v as Record<string, unknown>;
+  for (const m of MINIS) if (o[m.id] === 'have' || o[m.id] === 'want') dex[m.id] = o[m.id] as DexStatus;
+  return dex;
 };

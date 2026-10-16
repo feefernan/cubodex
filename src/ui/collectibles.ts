@@ -7,6 +7,7 @@ import { cube, emptyState } from './art';
 import { updateBadge } from './cart';
 import { $, $$, disabledAttr, onAction } from './dom';
 import { registerView } from './router';
+import { pushDex } from './session';
 import { persist, S } from './store';
 import { productTile } from './tiles';
 import { toast } from './toast';
@@ -128,6 +129,7 @@ export const initCollectibles = () => {
   onAction('dex', (el) => {
     toggleDex(S.dex, el.dataset.id ?? '', el.dataset.st as DexStatus);
     persist();
+    pushDex();
     renderDex();
   });
   onAction('dex-series', (el) => {

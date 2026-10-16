@@ -46,6 +46,7 @@ issues `precisa-de-você`.
 | End-to-end | `npm run test:e2e` (Playwright, desktop + mobile) |
 | Testes de mutação | `npm run test:mutation` (Stryker, só `src/domain`) |
 | API local (Worker junto do site) | `npm run dev` (o plugin do Cloudflare roda o Worker em `/api/*`) |
+| Banco das contas local (D1) | `npm run db:local` (aplica `worker/migrations`; o link de login aparece no log do `npm run dev`) |
 | Tipos do Worker | `npm run typecheck` (inclui `cf workers types` + `tsc -p worker`) |
 | Deploy (só pelo CI) | `npx cf deploy` com `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` da conta do Cubodex |
 
@@ -63,6 +64,9 @@ worker/src/ API da loja (mesmo Worker do site, só /api/*)
   notion.ts         bancos Produtos, Pedidos e Avisos do Notion do Cubodex
   mercado-pago.ts   Checkout Pro: preferência, consulta de pagamento, assinatura do webhook
   melhor-envio.ts   cotação de frete
+  accounts.ts       contas no D1: link mágico, sessões (só hash), Dex, cofre, espelho dos pedidos, LGPD
+  account-routes.ts /api/auth/*, /api/me, /api/dex; email.ts manda o link (Cloudflare Email Service)
+worker/migrations/  esquema do D1 (o CI cria o banco e aplica antes do deploy)
   entry.ts          ponto de entrada; confere o Env local contra os tipos gerados
 legacy/     o protótipo original em um único HTML, só para consulta (não é publicado)
 cloudflare.config.ts   Worker + assets + bindings (CLI `cf`)
@@ -78,6 +82,12 @@ cloudflare.config.ts   Worker + assets + bindings (CLI `cf`)
    esvazia o carrinho. O aviso `POST /api/mp/webhook` (URL cadastrada no **painel** da aplicação, nunca como
    `notification_url`) confere a assinatura, muda o status e dá baixa no estoque das cartas.
 Dinheiro, frete e serial **nunca** são decididos no navegador.
+
+**Contas:** login por link mágico (sem senha). `POST /api/auth/request` manda o link; o link abre uma página com botão
+(verificadores de e-mail não gastam o token) e o `POST` cria a sessão em cookie `HttpOnly; Secure; SameSite=Lax`.
+Dex e cofre ficam no D1. Item comprado com "guardar no cofre" só entra no cofre com o pagamento confirmado; o envio do
+cofre é cobrado no Mercado Pago (`POST /api/vault/ship`). A conta não pode ser apagada com itens no cofre (são bens do
+cliente). O login em produção depende do domínio verificado no Email Service (#22) e de `EMAIL_FROM`.
 
 - `domain/` **não importa** `infra/` nem `ui/` e não toca no DOM. Toda regra de negócio nova nasce aqui, com teste.
 - `infra/` **não importa** `ui/`.

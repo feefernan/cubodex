@@ -1,9 +1,10 @@
 /** Cliente da API da loja (mesma origem, /api/*) e do ViaCEP. Erros viram ApiError com a mensagem para o cliente. */
 import type { CartEntry } from '../domain/cart';
+import type { Dex, HistoryEntry, VaultEntry } from '../domain/collection';
 import type { Address } from '../domain/order';
 import type { ShippingOption } from '../domain/shipping';
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
@@ -24,8 +25,26 @@ const call = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return data as T;
 };
 
-const post = <T>(path: string, body: unknown) =>
-  call<T>(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const send = <T>(method: string, path: string, body: unknown) =>
+  call<T>(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const post = <T>(path: string, body: unknown) => send<T>('POST', path, body);
+
+interface AccountOrder {
+  serial: string;
+  kind: 'compra' | 'envio';
+  status: string;
+  total: number;
+  summary: string;
+  created_at: string;
+}
+
+export interface Account {
+  user: { name: string; email: string };
+  dex: Dex;
+  vault: VaultEntry[];
+  hist: HistoryEntry[];
+  orders: AccountOrder[];
+}
 
 export interface OrderRequest {
   items: CartEntry[];
@@ -43,6 +62,13 @@ export const api = {
   status: (serial: string) =>
     call<{ status: string }>(`/api/orders/${encodeURIComponent(serial)}/status`).then((d) => d.status),
   subscribe: (email: string) => post<{ ok: true }>('/api/avisos', { email, consent: true }),
+  requestLogin: (email: string) => post<{ ok: true }>('/api/auth/request', { email }),
+  logout: () => post<{ ok: true }>('/api/auth/logout', {}),
+  me: () => call<Account>('/api/me'),
+  saveDex: (dex: Dex) => send<{ dex: Dex }>('PUT', '/api/dex', { dex }),
+  deleteMe: () => send<{ ok: true }>('DELETE', '/api/me', {}),
+  shipVault: (body: { items: string[]; address: Address; shipping: { serviceId: number } }) =>
+    post<{ serial: string; total: number; checkoutUrl: string }>('/api/vault/ship', body),
 };
 
 /** Endereço pelo CEP (ViaCEP); null se o CEP não existe ou o serviço falhou — o cliente digita à mão. */
