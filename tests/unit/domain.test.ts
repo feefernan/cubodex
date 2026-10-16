@@ -22,7 +22,6 @@ import {
 } from '../../src/domain/collection';
 import { brl, escapeHtml, normalize, pad3, uniq } from '../../src/domain/format';
 import { areaOf, isView, navGroup, parseRoute, routeHref, subnavKey } from '../../src/domain/routes';
-import { quoteCart, quoteVault } from '../../src/domain/shipping';
 import { demoAccount, initialState, mergePersisted } from '../../src/domain/state';
 import { cardsOfSet, cardsOnSale, emptyFilters, filterItems, filterSets, itemsOfCard } from '../../src/domain/tcg';
 import { cepDigits, countdown, formatCep, isEmail } from '../../src/domain/validation';
@@ -164,11 +163,6 @@ describe('carrinho', () => {
     const both = resolveCart([...lines.map(toEntry), { id: 'a1', qty: 1 }]).lines;
     expect(cartTotals(both, null).total).toBe(438);
     expect(cartTotals(both, 20).total).toBe(458);
-  });
-  it('frete simulado depende do CEP e, no cofre, das unidades', () => {
-    expect(quoteCart('01000000').map((o) => o.price)).toEqual([14.9, 27.5]);
-    expect(quoteCart('90000000').map((o) => o.price)).toEqual([24.8, 41.9]);
-    expect(quoteVault('01000000', 2).map((o) => o.price)).toEqual([15.9, 28.5]);
   });
 });
 

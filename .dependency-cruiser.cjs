@@ -22,6 +22,13 @@ module.exports = {
       to: { path: '^src/ui' },
     },
     {
+      name: 'worker-so-usa-dominio',
+      severity: 'error',
+      comment: 'worker/ (API da loja) só pode reaproveitar src/domain/ — nada de DOM, ui/ ou infra/ do site.',
+      from: { path: '^worker/src' },
+      to: { path: '^src/(?!domain/)' },
+    },
+    {
       name: 'ninguem-importa-main',
       severity: 'error',
       from: {},

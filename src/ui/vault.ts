@@ -1,6 +1,6 @@
 import { requestShipment, selectedInVault } from '../domain/collection';
 import { escapeHtml as esc } from '../domain/format';
-import { quoteVault } from '../domain/shipping';
+import type { ShippingOption } from '../domain/shipping';
 import { cepDigits } from '../domain/validation';
 import { emptyState } from './art';
 import { cepForm, shipOptionsHtml } from './cart';
@@ -8,6 +8,16 @@ import { $, check, disabledAttr, onAction, onInput, onSubmit } from './dom';
 import { registerView } from './router';
 import { persist, S } from './store';
 import { toast } from './toast';
+
+// shortcut: cofre da demonstração com frete simulado e sem cobrança; envio real com conta e Mercado Pago em #29.
+const demoQuote = (cep: string, units: number): ShippingOption[] => {
+  const d = Number.parseInt(cep.charAt(0), 10) || 0;
+  const price = (base: number, perCep: number) => Math.round((base + d * perCep + units * 1.5) * 100) / 100;
+  return [
+    { id: 1, name: 'econômico (simulado)', company: '', price: price(12.9, 1.1), days: 9 },
+    { id: 2, name: 'expresso (simulado)', company: '', price: price(25.5, 1.6), days: 4 },
+  ];
+};
 
 const STATUS = {
   cofre: ['no cofre', 'status ok'],
@@ -44,7 +54,7 @@ const renderCofre = () => {
       .join('') ||
     '<p class="soft" style="padding:14px 0">Nada guardado ainda. No carrinho, escolha “guardar no cofre” nas cartas.</p>';
   const opts =
-    S.vCep && units > 0 ? shipOptionsHtml(quoteVault(S.vCep, units), 'vault-ship', (i) => S.vShipIdx === i) : '';
+    S.vCep && units > 0 ? shipOptionsHtml(demoQuote(S.vCep, units), 'vault-ship', (i) => S.vShipIdx === i) : '';
   const ready = units > 0 && S.vShipIdx !== null;
   const hist =
     S.hist.map((h) => `<li><span class="mono muted">${esc(h.d)}</span><br>${esc(h.t)}</li>`).join('') ||

@@ -112,3 +112,20 @@ export const cartTotals = (lines: CartLine[], shipPrice: number | null) => {
   const ship = ns && shipPrice !== null ? shipPrice : 0;
   return { sub, ship, total: sub + ship, needsShipping: ns };
 };
+
+const isQty = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 99;
+
+/** Carrinho vindo de fora (localStorage ou corpo do pedido): só entradas com forma e ids válidos. */
+export const parseCartEntries = (raw: unknown): CartEntry[] =>
+  Array.isArray(raw)
+    ? raw.flatMap((v): CartEntry[] => {
+        const o = v as Record<string, unknown>;
+        if (!o || typeof o !== 'object' || typeof o.id !== 'string' || o.id.length > 40 || !isQty(o.qty)) return [];
+        if (Array.isArray(o.pack)) {
+          const pack = o.pack.filter((id): id is string => typeof id === 'string' && isMini(id));
+          return pack.length === o.pack.length ? [{ id: o.id, qty: o.qty, pack }] : [];
+        }
+        const dest = o.dest === 'vault' || o.dest === 'send' ? o.dest : undefined;
+        return productById[o.id] ? [{ id: o.id, qty: o.qty, ...(dest ? { dest } : {}) }] : [];
+      })
+    : [];

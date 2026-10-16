@@ -2,7 +2,7 @@
 import { pad3 } from './format';
 
 type Rarity = 'comum' | 'rara' | 'especial';
-type StockStatus = 'estoque' | 'esgotado' | 'prevenda';
+export type StockStatus = 'estoque' | 'esgotado' | 'prevenda';
 
 interface Grade {
   co: string;

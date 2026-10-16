@@ -9,8 +9,10 @@ Loja da **Cubodex** — uma loja, duas portas: **colecionar** (cartas de pokémo
 cofre virtual; miniaturas Cubodex impressas em 3D em séries numeradas, com a Dex) e **criar** (peças impressas em 3D,
 prontas ou sob medida com orçamento no WhatsApp). Instagram/TikTok `@cubodex`.
 
-Site estático (Vite + TypeScript, sem framework) publicado no **Cloudflare**. Hoje é um **protótipo navegável**:
-dados, preços e prazos de exemplo, sem pagamento real. O que falta para virar loja está nas issues `precisa-de-você`.
+Site (Vite + TypeScript, sem framework) e API da loja (`worker/`, em `/api/*`) num único Worker no **Cloudflare**.
+Preço e estoque vêm do Notion, frete do Melhor Envio, pagamento do Checkout Pro do Mercado Pago. Cada integração
+liga quando o segredo existe; sem ele a rota responde 503 e o site explica. O que falta para abrir a loja está nas
+issues `precisa-de-você`.
 
 **Contas próprias:** Cloudflare, Notion e Melhor Envio do Cubodex são contas **novas, separadas do Hortelã**. Só o
 **Mercado Pago é o mesmo** do Hortelã. Nunca publique nem grave nada do Cubodex com credenciais do Hortelã (exceto MP).
@@ -43,23 +45,43 @@ dados, preços e prazos de exemplo, sem pagamento real. O que falta para virar l
 | Unidade + integração | `npm test` · `npm run test:coverage` |
 | End-to-end | `npm run test:e2e` (Playwright, desktop + mobile) |
 | Testes de mutação | `npm run test:mutation` (Stryker, só `src/domain`) |
+| API local (Worker junto do site) | `npm run dev` (o plugin do Cloudflare roda o Worker em `/api/*`) |
+| Tipos do Worker | `npm run typecheck` (inclui `cf workers types` + `tsc -p worker`) |
 | Deploy (só pelo CI) | `npx cf deploy` com `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` da conta do Cubodex |
 
 ## Arquitetura (contratos verificados no CI)
 
 ```
 src/
-  domain/   regras puras: catálogo, filtros do TCG, carrinho, frete simulado, Dex e cofre, validação, rotas, estado
-  infra/    integrações: armazenamento no navegador (localStorage)
-  ui/       DOM e interação, um módulo por área: tcg, cart, vault, collectibles, account, pages, theme, router
+  domain/   regras puras: catálogo, estoque, filtros do TCG, carrinho, pedido, frete, Dex e cofre, validação, rotas
+  infra/    integrações do navegador: localStorage, cliente da API (/api/*) e ViaCEP
+  ui/       DOM e interação, um módulo por área: tcg, cart, order, vault, collectibles, account, pages, theme, router
   styles/   CSS
   main.ts   composição/bootstrap — ninguém importa main.ts
+worker/src/ API da loja (mesmo Worker do site, só /api/*)
+  app.ts            rotas, limite por IP, CSRF (só JSON); catálogo, frete, pedido, webhook, status, avisos
+  notion.ts         bancos Produtos, Pedidos e Avisos do Notion do Cubodex
+  mercado-pago.ts   Checkout Pro: preferência, consulta de pagamento, assinatura do webhook
+  melhor-envio.ts   cotação de frete
+  entry.ts          ponto de entrada; confere o Env local contra os tipos gerados
 legacy/     o protótipo original em um único HTML, só para consulta (não é publicado)
-cloudflare.config.ts   site estático no Cloudflare (CLI `cf`)
+cloudflare.config.ts   Worker + assets + bindings (CLI `cf`)
 ```
+
+**Fluxo do pedido:**
+1. O site aplica preço e estoque de `GET /api/catalog` (Notion) sobre o catálogo do código.
+2. No carrinho, o CEP vira opções de frete por `POST /api/shipping/quote` (Melhor Envio). O endereço vem do ViaCEP.
+3. "Finalizar compra" envia só ids, quantidades, destino (enviar/cofre), cliente, endereço e o serviço de frete para
+   `POST /api/orders`. O Worker recalcula preço e estoque com `src/domain`, **recota o frete**, gera o serial, cria a
+   cobrança no Mercado Pago (aplicação própria do Cubodex) e grava em **Pedidos** no Notion → `{ serial, checkoutUrl }`.
+4. O Mercado Pago devolve para `#/pedido/<serial>`, que mostra o status (`GET /api/orders/:serial/status`) e, pago,
+   esvazia o carrinho. O aviso `POST /api/mp/webhook` (URL cadastrada no **painel** da aplicação, nunca como
+   `notification_url`) confere a assinatura, muda o status e dá baixa no estoque das cartas.
+Dinheiro, frete e serial **nunca** são decididos no navegador.
 
 - `domain/` **não importa** `infra/` nem `ui/` e não toca no DOM. Toda regra de negócio nova nasce aqui, com teste.
 - `infra/` **não importa** `ui/`.
+- `worker/src` **só importa** `src/domain/` (nada de DOM, `ui/` ou `infra/` do site).
 - Sem dependências circulares. O `router` não importa telas: cada tela se registra com `registerView`.
 - Eventos: o HTML declara `data-action="nome"` (clique), `data-input="nome"` (digitação) ou um `id` de formulário,
   e o módulo registra `onAction` / `onInput` / `onSubmit` (`src/ui/dom.ts`).
@@ -73,7 +95,8 @@ cloudflare.config.ts   site estático no Cloudflare (CLI `cf`)
 - **Knip**: não deixe exports, arquivos ou dependências sem uso.
 - **Testes**: todo bug corrigido ganha um teste que falharia antes da correção.
   - `tests/unit` — domínio e infra (ambiente node).
-  - `tests/integration` — monta o `index.html` real no jsdom e exercita a UI.
+  - `tests/integration` — monta o `index.html` real no jsdom e exercita a UI (API e ViaCEP simulados).
+  - `tests/worker` — rotas do Worker com Notion, Mercado Pago e Melhor Envio simulados.
   - `e2e/` — Playwright contra o build de produção, em desktop e mobile.
 - **Cobertura** é catraca: os limites em `vitest.config.ts` só sobem. Relatório vai para o Codecov.
 - **Mutação**: score mínimo 60% (`stryker.config.json`). Vitest fica fixado na v4 até o runner do Stryker
@@ -115,6 +138,10 @@ Regras:
 - Deploy: secrets `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` **da conta Cloudflare do Cubodex**. Para
   cadastrar, a pessoa roda `bash scripts/ligar-cloudflare.sh` no próprio terminal — chaves nunca passam pelo chat
   nem por arquivos versionados.
+- API: `NOTION_TOKEN`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e `MELHOR_ENVIO_TOKEN` são secrets (`bindings.secret()`),
+  enviados no deploy via `cf deploy --secrets-file` a partir dos GitHub Secrets de mesmo nome. Para cadastrar, a
+  pessoa roda `bash scripts/ligar-integracoes.sh` (cria os bancos no Notion e grava os IDs, que não são segredo, em
+  `cloudflare.config.ts`). Nunca rode `cf deploy` local: o login `cf` desta máquina é de outra conta.
 - O protótipo original está em `legacy/index.html` (commit de baseline), se precisar consultar.
 
 ## Idioma
