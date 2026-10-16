@@ -11,3 +11,6 @@ playwright-report/
 .DS_Store
 .wrangler/
 .cloudflare/
+# cópias de conflito do iCloud (pasta Documentos sincronizada)
+* 2
+* 2.*

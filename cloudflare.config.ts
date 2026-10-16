@@ -13,7 +13,7 @@ export default defineConfig({
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*'] },
     observability: { enabled: true, logs: { enabled: true } },
     env: {
-      SITE_URL: bindings.text('https://cubodex.workers.dev'),
+      SITE_URL: bindings.text('https://cubodex.contato-3dcubo.workers.dev'),
       CONTACT_EMAIL: bindings.text('contato@cubodex.com.br'),
       // IDs dos bancos do Notion do Cubodex (preencher ao criar o workspace; vazio = rota responde 503).
       NOTION_PRODUCTS_DB: bindings.text(''),
