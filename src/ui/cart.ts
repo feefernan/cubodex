@@ -1,4 +1,4 @@
-import { addToCart, cartCount, cartTotals, changeQty, type Destination } from '../domain/cart';
+import { addToCart, cartCount, cartTotals, changeQty, type Destination, needsShipping } from '../domain/cart';
 import { brl, escapeHtml as esc } from '../domain/format';
 import { quoteCart } from '../domain/shipping';
 import { cepDigits, formatCep } from '../domain/validation';
@@ -67,7 +67,7 @@ const renderCart = () => {
     b.innerHTML = EMPTY;
     return;
   }
-  const ship = shippingHtml(cartTotals(S.cart, null).needsShipping);
+  const ship = shippingHtml(needsShipping(S.cart));
   const tot = cartTotals(S.cart, S.ship?.price ?? null);
   const canPay = !tot.needsShipping || !!S.ship;
   const shipLabel = !tot.needsShipping ? 'no cofre' : S.ship ? brl(tot.ship) : 'calcule acima';
