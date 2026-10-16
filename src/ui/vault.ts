@@ -4,7 +4,7 @@ import { quoteVault } from '../domain/shipping';
 import { cepDigits } from '../domain/validation';
 import { emptyState } from './art';
 import { cepForm, shipOptionsHtml } from './cart';
-import { $, disabledAttr, onAction, onInput, onSubmit } from './dom';
+import { $, check, disabledAttr, onAction, onInput, onSubmit } from './dom';
 import { registerView } from './router';
 import { persist, S } from './store';
 import { toast } from './toast';
@@ -19,7 +19,7 @@ export const loginPrompt = (title: string, text: string, style = '') =>
   emptyState(
     title,
     text,
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn" data-action="login-demo">entrar como demo</button><a class="btn btn--ghost" href="#conta" data-action="go" data-view="conta">ir para a conta</a></div>',
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn" data-action="login-demo">entrar como demo</button><a class="btn btn--ghost" href="#/conta" data-action="go" data-view="conta">ir para a conta</a></div>',
     style,
   );
 
@@ -83,10 +83,7 @@ export const initVault = () => {
   });
   onSubmit('formVFrete', () => {
     const c = cepDigits($<HTMLInputElement>('#vcep').value);
-    if (c.length !== 8) {
-      $('#vcep-msg').textContent = 'CEP com 8 dígitos, por favor.';
-      return;
-    }
+    if (!check($('#vcep'), $('#vcep-msg'), c.length === 8, 'CEP com 8 dígitos, por favor.')) return;
     S.vCep = c;
     S.vShipIdx = null;
     renderCofre();

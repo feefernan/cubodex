@@ -19,7 +19,8 @@ img{max-width:100%}
   --grid:color-mix(in srgb,var(--fg) 5%,var(--bg));
   --ph-a:color-mix(in srgb,var(--fg) 3%,var(--surface));
   --ph-b:color-mix(in srgb,var(--fg) 7%,var(--surface));
-  --action:var(--cubo-red); --action-hover:var(--cubo-shadow);
+  /* ação: vermelho um tom abaixo do da marca para texto branco passar AA (5,25:1); a marca fica nos elementos grandes */
+  --action:#D21F3C; --action-hover:var(--cubo-shadow);
   /* tipo */
   --f-display:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
   --f-body:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
@@ -35,6 +36,8 @@ img{max-width:100%}
 /* temas claros: Design cubodex v2, variações 1a a 1d.
    Ciano vira fundo de tag; o texto de link e tag usa o azul-petróleo de cada variação. */
 :root[data-tema="1a"],:root[data-tema="1b"],:root[data-tema="1c"],:root[data-tema="1d"]{color-scheme:light;--media-base:var(--surface-2)}
+/* 1b e 1c já têm vermelho com contraste AA para texto branco */
+:root[data-tema="1b"],:root[data-tema="1c"]{--action:var(--cubo-red)}
 :root[data-tema="1a"]{--cubo-red:#F42744;--cubo-cyan:#3ED9F0;--cubo-shadow:#C0223B;--tag:#086E7E;--bg:#EEF1F4;--surface:#FFFFFF;--fg:#101419;--muted:#5B6576}
 :root[data-tema="1b"]{--cubo-red:#E5233F;--cubo-cyan:#3ED9F0;--cubo-shadow:#B01E35;--tag:#086A79;--bg:#F5F2EC;--surface:#FFFDF9;--fg:#1E1B18;--muted:#6B645B}
 :root[data-tema="1c"]{--cubo-red:#D9384F;--cubo-cyan:#8ADCE8;--cubo-shadow:#A82A3D;--tag:#145F6B;--bg:#E9EAEC;--surface:#F6F6F7;--fg:#23262B;--muted:#5E646D}
@@ -92,7 +95,8 @@ button{font:inherit;color:inherit}
 
 /* botões e chips */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 20px;border:0;border-radius:var(--btn-r);background:var(--action);color:#fff;font:800 15px/1 var(--f-body);cursor:pointer;text-decoration:none;transition:background .15s}
-.btn:hover{background:var(--action-hover)}
+.btn:hover:not(:disabled){background:var(--action-hover)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
 .btn--ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
 .btn--ghost:hover{background:var(--surface-2)}
 .btn--sm{min-height:36px;padding:8px 14px;font-size:13px}
@@ -266,7 +270,7 @@ button{font:inherit;color:inherit}
 .tog{min-height:38px;border-radius:999px;border:1px solid var(--line);background:transparent;cursor:pointer;font:700 13px/1 var(--f-body);text-transform:lowercase;color:var(--soft)}
 .tog:hover{background:var(--surface-2)}
 .tog[data-st="have"][aria-pressed="true"]{background:var(--cubo-cyan);border-color:var(--cubo-cyan);color:var(--ink)}
-.tog[data-st="want"][aria-pressed="true"]{background:var(--cubo-red);border-color:var(--cubo-red);color:#fff}
+.tog[data-st="want"][aria-pressed="true"]{background:var(--action);border-color:var(--action);color:#fff}
 .dex-locked .dex-art{background:var(--surface-2);color:var(--faint);font:900 64px/1 var(--f-display)}
 .dex-locked{border-style:dashed;opacity:.75}
 
@@ -300,7 +304,7 @@ button{font:inherit;color:inherit}
 .sum-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
 .sum-row.total{font:900 26px/1 var(--f-display);letter-spacing:-.03em;padding-top:12px;border-top:1px solid var(--line)}
 .ship-opt{display:flex;justify-content:space-between;gap:10px;align-items:center;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;text-align:left}
-.ship-opt[aria-pressed="true"]{border-color:var(--paper);background:var(--surface-2)}
+.ship-opt[aria-pressed="true"]{border-color:var(--fg);background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--fg)}
 .ship-opt b{font-weight:700}
 
 /* conta e apoio */

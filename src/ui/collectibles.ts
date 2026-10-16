@@ -28,7 +28,7 @@ const renderColecionaveis = () => {
   const t = dexTotals(S.dex);
   $('#seriesRow').innerHTML = SERIES.map((s) =>
     s.open
-      ? `<a class="series" href="#serie" data-action="go" data-view="serie"><div class="thumb">${cube('#F42744')}</div><div><span class="mono tag">${s.label} · disponível</span><h3>${s.name}</h3><p class="muted" style="font-size:14px">${t.total} miniaturas · ${t.have} na sua dex</p></div></a>`
+      ? `<a class="series" href="#/serie" data-action="go" data-view="serie"><div class="thumb">${cube('#F42744')}</div><div><span class="mono tag">${s.label} · disponível</span><h3>${s.name}</h3><p class="muted" style="font-size:14px">${t.total} miniaturas · ${t.have} na sua dex</p></div></a>`
       : `<div class="series locked"><div class="thumb mono muted" style="font-size:22px">?</div><div><span class="mono muted">${s.label} · em breve</span><h3>${s.name}</h3><p class="muted" style="font-size:14px">avise-me no lançamento</p></div></div>`,
   ).join('');
   $('#dexTeaser').innerHTML =
@@ -48,7 +48,7 @@ const renderSerie = () => {
   $('#pack').innerHTML =
     `<div class="slots">${slots}</div>` +
     `<div><h3 class="display" style="font-size:28px">monte seu pacote</h3><p class="soft" style="font-size:15px;margin-top:4px">Toque em “+ pacote” nas miniaturas abaixo. Pacote de ${PACK_SIZE}: <b class="num" style="color:var(--fg)">${brl(PACK_PRICE)}</b> <span class="muted">(preço de exemplo)</span></p></div>` +
-    `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--ghost btn--sm" data-action="pack-clear"${S.pack.length ? '' : ' disabled style="opacity:.4"'}>esvaziar</button><button class="btn" data-action="pack-buy"${disabledAttr(!full, '.4')}>${full ? 'adicionar pacote' : `faltam ${PACK_SIZE - S.pack.length}`}</button></div>`;
+    `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--ghost btn--sm" data-action="pack-clear"${disabledAttr(!S.pack.length)}>esvaziar</button><button class="btn" data-action="pack-buy"${disabledAttr(!full)}>${full ? 'adicionar pacote' : `faltam ${PACK_SIZE - S.pack.length}`}</button></div>`;
   $('#serieGrid').innerHTML = MINIS.map(productTile).join('');
 };
 

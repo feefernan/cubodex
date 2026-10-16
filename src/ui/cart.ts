@@ -13,7 +13,7 @@ import { brl, escapeHtml as esc } from '../domain/format';
 import { quoteCart } from '../domain/shipping';
 import { cepDigits, formatCep } from '../domain/validation';
 import { cube, emptyState } from './art';
-import { $, disabledAttr, onAction, onInput, onSubmit } from './dom';
+import { $, check, disabledAttr, onAction, onInput, onSubmit } from './dom';
 import { registerView } from './router';
 import { persist, S } from './store';
 import { toast } from './toast';
@@ -41,7 +41,7 @@ export const cepForm = (formId: string, inputId: string, label: string, cep: str
 const EMPTY = emptyState(
   'carrinho vazio.',
   'Nada por aqui ainda. Comece por uma das duas portas.',
-  '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><a class="btn" href="#colecionar" data-action="go" data-view="colecionar">colecionar</a><a class="btn btn--ghost" href="#criar" data-action="go" data-view="criar">criar</a></div>',
+  '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><a class="btn" href="#/colecionar" data-action="go" data-view="colecionar">colecionar</a><a class="btn btn--ghost" href="#/criar" data-action="go" data-view="criar">criar</a></div>',
   'margin-top:24px',
 );
 
@@ -153,10 +153,7 @@ export const initCart = () => {
   });
   onSubmit('formFrete', () => {
     const c = cepDigits($<HTMLInputElement>('#cep').value);
-    if (c.length !== 8) {
-      $('#cep-msg').textContent = 'CEP com 8 dígitos, por favor.';
-      return;
-    }
+    if (!check($('#cep'), $('#cep-msg'), c.length === 8, 'CEP com 8 dígitos, por favor.')) return;
     S.cep = c;
     S.ship = null;
     renderCart();

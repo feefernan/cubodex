@@ -36,3 +36,19 @@ export const subnavKey = (v: View): string | null => {
 
 export const isTcgView = (v: View) => AREA[v] === 'tcg';
 export const isColView = (v: View) => AREA[v] === 'col';
+
+export interface Route {
+  view: View;
+  /** Set, carta ou aba da ajuda, conforme a tela. */
+  id: string | null;
+}
+
+/** `#/carta/base1-4` → { view: 'carta', id: 'base1-4' }. Aceita o formato antigo `#tcg`; tela desconhecida → home. */
+export const parseRoute = (hash: string): Route => {
+  const [view = '', id = ''] = hash.replace(/^#\/?/, '').split('/');
+  // Ids são [a-z0-9-]: o resto é descartado (nada vindo da URL chega cru ao HTML).
+  const clean = id.replace(/[^\w-]/g, '');
+  return isView(view) ? { view, id: clean || null } : { view: 'home', id: null };
+};
+
+export const routeHref = (view: View, id?: string | null): string => `#/${view}${id ? `/${id}` : ''}`;

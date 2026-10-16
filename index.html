@@ -15,20 +15,20 @@
 
 <header class="site-head">
   <div class="wrap head-row">
-    <a class="brand" href="#home" data-action="go" data-view="home" aria-label="cubodex, página inicial">
+    <a class="brand" href="#/home" data-action="go" data-view="home" aria-label="cubodex, página inicial">
       <span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span>
       <span class="wordmark">cubodex</span>
     </a>
     <nav class="main-nav" aria-label="Principal">
-      <a href="#colecionar" data-action="go" data-view="colecionar" data-nav="col">colecionar</a>
-      <a href="#criar" data-action="go" data-view="criar" data-nav="criar">criar</a>
+      <a href="#/colecionar" data-action="go" data-view="colecionar" data-nav="col">colecionar</a>
+      <a href="#/criar" data-action="go" data-view="criar" data-nav="criar">criar</a>
     </nav>
     <div class="head-actions">
-      <a class="icon-link" href="#conta" data-action="go" data-view="conta" aria-label="Minha conta">
+      <a class="icon-link" href="#/conta" data-action="go" data-view="conta" aria-label="Minha conta">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
         <span class="lbl">conta</span>
       </a>
-      <a class="icon-link" href="#carrinho" data-action="go" data-view="carrinho" aria-label="Carrinho">
+      <a class="icon-link" href="#/carrinho" data-action="go" data-view="carrinho" aria-label="Carrinho">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H7"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
         <span class="lbl">carrinho</span>
         <span class="count num" id="cartCount" data-n="0">0</span>
@@ -39,9 +39,9 @@
 
 <div class="subnav" id="subnav" hidden>
   <nav class="wrap" aria-label="Colecionar">
-    <a href="#colecionar" data-action="go" data-view="colecionar" data-sub="colecionar">visão geral</a>
-    <a href="#tcg" data-action="go" data-view="tcg" data-sub="tcg">tcg</a>
-    <a href="#colecionaveis" data-action="go" data-view="colecionaveis" data-sub="colecionaveis">colecionáveis cubodex</a>
+    <a href="#/colecionar" data-action="go" data-view="colecionar" data-sub="colecionar">visão geral</a>
+    <a href="#/tcg" data-action="go" data-view="tcg" data-sub="tcg">tcg</a>
+    <a href="#/colecionaveis" data-action="go" data-view="colecionaveis" data-sub="colecionaveis">colecionáveis cubodex</a>
   </nav>
 </div>
 
@@ -56,13 +56,13 @@
   </div>
   <div class="wrap">
     <div class="doors">
-      <a class="door door-col" href="#colecionar" data-action="go" data-view="colecionar">
+      <a class="door door-col" href="#/colecionar" data-action="go" data-view="colecionar">
         <div class="door-art" aria-hidden="true"><div class="stack"><i></i><i></i><i></i></div></div>
         <h2 class="display">colecionar</h2>
         <p>Cards de pokémon, miniaturas Cubodex em séries e a Dex para acompanhar o que falta.</p>
         <div class="pills mono"><span class="pill">tcg</span><span class="pill">colecionáveis</span><span class="pill">dex</span></div>
       </a>
-      <a class="door door-criar" href="#criar" data-action="go" data-view="criar">
+      <a class="door door-criar" href="#/criar" data-action="go" data-view="criar">
         <div class="door-art" aria-hidden="true">
           <svg viewBox="0 0 220 150" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="30" y="30" width="150" height="86" fill="none"/><path d="M30 18v-8M180 18v-8M30 14h150M30 128h0M196 30h8M196 116h8M200 30v86"/><path d="M30 14l6-4M30 14l6 4M180 14l-6-4M180 14l-6 4M200 30l-4 6M200 30l4 6M200 116l-4-6M200 116l4-6"/><path d="M30 30l150 86M180 30L30 116" stroke-dasharray="4 5" opacity=".5"/><text x="105" y="9" fill="currentColor" stroke="none" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle">86 mm</text><text x="212" y="76" fill="currentColor" stroke="none" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" transform="rotate(90 212 76)">60 mm</text></svg>
         </div>
@@ -80,15 +80,15 @@
   </div>
 
   <div class="wrap section a-tcg" style="background:transparent">
-    <div class="section-head"><h2 class="display">destaques · tcg</h2><a class="link-more" href="#tcg" data-action="go" data-view="tcg">ver tudo →</a></div>
+    <div class="section-head"><h2 class="display">destaques · tcg</h2><a class="link-more" href="#/tcg" data-action="go" data-view="tcg">ver tudo →</a></div>
     <div class="grid" id="hl-tcg"></div>
   </div>
   <div class="wrap section a-col" style="background:transparent">
-    <div class="section-head"><h2 class="display">destaques · colecionáveis</h2><a class="link-more" href="#colecionaveis" data-action="go" data-view="colecionaveis">ver séries →</a></div>
+    <div class="section-head"><h2 class="display">destaques · colecionáveis</h2><a class="link-more" href="#/colecionaveis" data-action="go" data-view="colecionaveis">ver séries →</a></div>
     <div class="grid" id="hl-col"></div>
   </div>
   <div class="wrap section a-criar" style="background:transparent">
-    <div class="section-head"><h2 class="display">destaques · criar</h2><a class="link-more" href="#criar" data-action="go" data-view="criar">ver tudo →</a></div>
+    <div class="section-head"><h2 class="display">destaques · criar</h2><a class="link-more" href="#/criar" data-action="go" data-view="criar">ver tudo →</a></div>
     <div class="grid" id="hl-criar"></div>
   </div>
 
@@ -117,13 +117,13 @@
   </div>
   <div class="wrap">
     <div class="choices">
-      <a class="choice choice--tcg" href="#tcg" data-action="go" data-view="tcg">
+      <a class="choice choice--tcg" href="#/tcg" data-action="go" data-view="tcg">
         <span class="mono tag">cartas · sets · cofre</span>
         <h2 class="display">tcg</h2>
         <p class="soft">Cartas de pokémon originais com filtros, enciclopédia de sets e cofre virtual, e acessórios sem personagens.</p>
         <span class="link-more">ver catálogo →</span>
       </a>
-      <a class="choice choice--col" href="#colecionaveis" data-action="go" data-view="colecionaveis">
+      <a class="choice choice--col" href="#/colecionaveis" data-action="go" data-view="colecionaveis">
         <span class="mono">miniaturas 3d · personagens originais</span>
         <h2 class="display">colecionáveis cubodex</h2>
         <p>Séries numeradas, pacote montado por você, lançamentos e a Dex para marcar o que já é seu.</p>
@@ -243,13 +243,13 @@
   <div class="wrap section">
     <div class="section-head"><h2 class="display">jeitos de colecionar</h2></div>
     <div class="mech">
-      <a href="#serie" data-action="go" data-view="serie"><span class="mono tag">disponível no protótipo</span><h3>monte seu pacote</h3><p>Escolha 3 miniaturas da série e leve juntas.</p></a>
+      <a href="#/serie" data-action="go" data-view="serie"><span class="mono tag">disponível no protótipo</span><h3>monte seu pacote</h3><p>Escolha 3 miniaturas da série e leve juntas.</p></a>
       <div><span class="mono muted">fase 3 · em breve</span><h3>caixa surpresa</h3><p>Caixa de valor garantido. Regras a definir, e só existe depois de validação jurídica.</p></div>
       <div><span class="mono tag">próximo lançamento</span><h3>lançamentos</h3><p class="cd mono num" data-t="2026-11-14T12:00:00-03:00" style="color:var(--fg);font-size:16px">--</p><p class="muted" style="font-size:13px">data de exemplo</p></div>
     </div>
   </div>
   <div class="wrap section">
-    <div class="section-head"><h2 class="display">dex</h2><a class="link-more" href="#dex" data-action="go" data-view="dex">abrir dex →</a></div>
+    <div class="section-head"><h2 class="display">dex</h2><a class="link-more" href="#/dex" data-action="go" data-view="dex">abrir dex →</a></div>
     <div id="dexTeaser"></div>
   </div>
 </section>
@@ -346,15 +346,15 @@
     <h1 class="display">ajuda.</h1>
   </div>
   <div class="wrap">
-    <div class="tabs" role="tablist" aria-label="Apoio" id="apoioTabs">
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="sobre">sobre</button>
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="comprar">como comprar</button>
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="frete">frete e prazos</button>
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="contato">contato</button>
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="termos">termos de uso</button>
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="privacidade">privacidade</button>
-      <button class="chip" type="button" role="tab" data-action="apoio-tab" data-tab="faq">faq</button>
-    </div>
+    <nav class="tabs" aria-label="Assuntos da ajuda" id="apoioTabs">
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="sobre">sobre</button>
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="comprar">como comprar</button>
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="frete">frete e prazos</button>
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="contato">contato</button>
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="termos">termos de uso</button>
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="privacidade">privacidade</button>
+      <button class="chip" type="button" data-action="apoio-tab" data-tab="faq">faq</button>
+    </nav>
     <div id="apoioBody"></div>
   </div>
 </section>
@@ -364,17 +364,17 @@
 <footer>
   <div class="wrap cols">
     <div>
-      <a class="brand" href="#home" data-action="go" data-view="home" aria-label="cubodex, página inicial"><span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span><span class="wordmark" style="color:var(--fg)">cubodex</span></a>
+      <a class="brand" href="#/home" data-action="go" data-view="home" aria-label="cubodex, página inicial"><span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span><span class="wordmark" style="color:var(--fg)">cubodex</span></a>
       <p class="mono" style="margin-top:14px">@cubodex · instagram · tiktok</p>
     </div>
     <ul class="mono">
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="sobre">sobre</a></li>
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="comprar">como comprar</a></li>
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="frete">frete e prazos</a></li>
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="contato">contato</a></li>
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="termos">termos de uso</a></li>
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="privacidade">política de privacidade</a></li>
-      <li><a href="#apoio" data-action="go" data-view="apoio" data-tab="faq">faq</a></li>
+      <li><a href="#/apoio/sobre" data-action="go" data-view="apoio" data-tab="sobre">sobre</a></li>
+      <li><a href="#/apoio/comprar" data-action="go" data-view="apoio" data-tab="comprar">como comprar</a></li>
+      <li><a href="#/apoio/frete" data-action="go" data-view="apoio" data-tab="frete">frete e prazos</a></li>
+      <li><a href="#/apoio/contato" data-action="go" data-view="apoio" data-tab="contato">contato</a></li>
+      <li><a href="#/apoio/termos" data-action="go" data-view="apoio" data-tab="termos">termos de uso</a></li>
+      <li><a href="#/apoio/privacidade" data-action="go" data-view="apoio" data-tab="privacidade">política de privacidade</a></li>
+      <li><a href="#/apoio/faq" data-action="go" data-view="apoio" data-tab="faq">faq</a></li>
     </ul>
   </div>
   <div class="wrap"><p class="disclaimer">A Cubodex não é afiliada à The Pokémon Company.</p></div>

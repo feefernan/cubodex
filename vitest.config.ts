@@ -14,8 +14,8 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/main.ts', 'src/**/*.d.ts'],
       reporter: ['text-summary', 'lcov', 'json-summary'],
-      // Catraca: só sobe. Hoje ~ lines 99, statements 98, functions 99, branches 90.
-      thresholds: { lines: 98, functions: 98, branches: 88, statements: 97 },
+      // Catraca: só sobe. Hoje ~ lines 99, statements 98, functions 99, branches 91.
+      thresholds: { lines: 98, functions: 98, branches: 90, statements: 97 },
     },
   },
 });
