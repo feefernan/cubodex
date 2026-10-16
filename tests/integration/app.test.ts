@@ -52,10 +52,32 @@ describe('navegação', () => {
     expect(visible()).toEqual(['v-tcg']);
     expect(document.body.className).toBe('a-tcg');
     expect($('#v-tcg .tcgnav [aria-current="page"]').textContent).toBe('cartas à venda');
-    expect(location.hash).toBe('#tcg');
+    expect(location.hash).toBe('#/tcg');
+    expect(document.activeElement).toBe($('#v-tcg h1'));
+    expect(document.title).toBe('cartas à venda · Cubodex');
     goTo('criar');
     expect($('#subnav').hidden).toBe(true);
     expect(document.querySelectorAll('#criarGrid .tile')).toHaveLength(6);
+  });
+
+  it('links com id vão para a URL e o voltar do navegador volta de tela (#8)', async () => {
+    goTo('sets');
+    click('.setcard[data-id="jungle"]');
+    expect(location.hash).toBe('#/set/jungle');
+    expect($('#setBody h1').textContent).toBe('Jungle');
+    click('#setGrid a.media[data-view="carta"]');
+    expect(location.hash).toMatch(/^#\/carta\/jungle-/);
+    history.back();
+    await vi.waitFor(() => expect(visible()).toEqual(['v-set']));
+    expect($('#setBody h1').textContent).toBe('Jungle');
+  });
+
+  it('URL editada à mão abre a tela certa; tela desconhecida cai na home (#8)', async () => {
+    location.hash = '#/carta/sv151-151';
+    await vi.waitFor(() => expect(visible()).toEqual(['v-carta']));
+    expect($('#cartaBody h1').textContent).toBe('mew ex');
+    location.hash = '#/nao-existe';
+    await vi.waitFor(() => expect(visible()).toEqual(['v-home']));
   });
 
   it('rola até a lista de avisos pelo card de novidades', () => {
@@ -128,6 +150,8 @@ describe('carrinho', () => {
     type('#cep', '1');
     submit('#formFrete');
     expect($('#cep-msg').textContent).toBe('CEP com 8 dígitos, por favor.');
+    expect($('#cep').getAttribute('aria-invalid')).toBe('true');
+    expect($('#cep').getAttribute('aria-describedby')).toBe('cep-msg');
     type('#cep', '01310100');
     expect($<HTMLInputElement>('#cep').value).toBe('01310-100');
     submit('#formFrete');
@@ -261,9 +285,11 @@ describe('conta e formulários', () => {
     type('#av-email', 'ruim');
     submit('#formAvisos');
     expect($('#av-msg').textContent).toContain('e-mail válido');
+    expect($('#av-email').getAttribute('aria-invalid')).toBe('true');
     type('#av-email', 'a@b.co');
     submit('#formAvisos');
     expect($('#av-msg').textContent).toContain('aceite');
+    expect($('#av-email').hasAttribute('aria-invalid')).toBe(false);
     $<HTMLInputElement>('#av-ok').checked = true;
     submit('#formAvisos');
     expect($('#av-msg').textContent).toContain('Na lista');
@@ -281,7 +307,8 @@ describe('conta e formulários', () => {
     expect($('#apoioBody h2').textContent).toBe('faq');
     click('[data-action="apoio-tab"][data-tab="termos"]');
     expect($('#apoioBody h2').textContent).toBe('termos de uso');
-    expect($('[data-tab="termos"][role="tab"]').getAttribute('aria-selected')).toBe('true');
+    expect($('#apoioTabs [data-tab="termos"]').getAttribute('aria-pressed')).toBe('true');
+    expect(location.hash).toBe('#/apoio/termos');
   });
 
   it('seletor de tema abre, troca, salva e fecha ao clicar fora', () => {

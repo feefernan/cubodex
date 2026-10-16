@@ -3,7 +3,7 @@ import { escapeHtml as esc } from '../domain/format';
 import { demoAccount } from '../domain/state';
 import { isEmail } from '../domain/validation';
 import { dexBar } from './collectibles';
-import { $, onAction, onSubmit } from './dom';
+import { $, check, onAction, onSubmit } from './dom';
 import { refresh, registerView } from './router';
 import { persist, S } from './store';
 import { toast } from './toast';
@@ -36,8 +36,8 @@ const renderConta = () => {
   b.innerHTML =
     `<p class="soft" style="margin-top:8px">Olá, <b style="color:var(--fg)">${esc(S.user.name)}</b>. <button class="linkbtn" data-action="logout">sair</button></p>` +
     `<div class="cols-2"><div class="card"><h3>pedidos</h3>${S.user.demo ? EXAMPLE_ORDERS : NO_ORDERS}</div>` +
-    `<div class="card"><h3>minha dex</h3><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p>${dexBar(S.dex)}<a class="btn btn--ghost" href="#dex" data-action="go" data-view="dex">abrir dex</a></div>` +
-    `<div class="card"><h3>cofre</h3><p class="dex-count num">${inVault}<small>itens guardados</small></p><a class="btn btn--ghost" href="#cofre" data-action="go" data-view="cofre">abrir cofre</a></div>` +
+    `<div class="card"><h3>minha dex</h3><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p>${dexBar(S.dex)}<a class="btn btn--ghost" href="#/dex" data-action="go" data-view="dex">abrir dex</a></div>` +
+    `<div class="card"><h3>cofre</h3><p class="dex-count num">${inVault}<small>itens guardados</small></p><a class="btn btn--ghost" href="#/cofre" data-action="go" data-view="cofre">abrir cofre</a></div>` +
     (S.user.demo ? EXAMPLE_ADDRESS : NO_ADDRESS) +
     `<div class="card"><h3>dados e privacidade</h3><p class="soft">${esc(S.user.email || '')}</p><p class="muted" style="font-size:14px">Aqui o cliente pede cópia ou exclusão dos dados (LGPD). Tela a definir com apoio jurídico.</p></div></div>`;
 };
@@ -69,15 +69,11 @@ export const initAccount = () => {
     const email = $<HTMLInputElement>('#cd-email').value.trim();
     const name = $<HTMLInputElement>('#cd-nome').value.trim();
     const msg = $('#cd-msg');
-    if (!isEmail(email)) {
-      msg.innerHTML = '<div class="msg">Digite um e-mail válido.</div>';
-      return;
-    }
-    if (!$<HTMLInputElement>('#cd-ok').checked) {
-      msg.innerHTML =
-        '<div class="msg">O aceite dos termos de uso e da política de privacidade é obrigatório para criar a conta.</div>';
-      return;
-    }
+    const ok = $<HTMLInputElement>('#cd-ok');
+    if (!check($('#cd-email'), msg, isEmail(email), '<div class="msg">Digite um e-mail válido.</div>')) return;
+    const consent =
+      '<div class="msg">O aceite dos termos de uso e da política de privacidade é obrigatório para criar a conta.</div>';
+    if (!check(ok, msg, ok.checked, consent)) return;
     S.user = { name: name || email.split('@')[0], email };
     S.dex = {};
     persist();

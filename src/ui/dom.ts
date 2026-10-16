@@ -41,6 +41,21 @@ export const bindEvents = (root: Document = document) => {
   });
 };
 
-/** Atributo de botão desabilitado (o protótipo também apaga visualmente). */
-export const disabledAttr = (on: boolean, opacity = '.45') =>
-  on ? ` disabled style="opacity:${opacity};cursor:not-allowed"` : '';
+/** Atributo de botão desabilitado; a aparência vem do CSS (`:disabled`). */
+export const disabledAttr = (on: boolean) => (on ? ' disabled' : '');
+
+/**
+ * Valida um campo: com erro, mostra `html` na mensagem e marca o campo para leitores de tela
+ * (`aria-invalid` + `aria-describedby`, foco no campo); sem erro, limpa a marca (#11).
+ */
+export const check = (input: HTMLElement, msgEl: HTMLElement, ok: boolean, html: string): boolean => {
+  if (ok) {
+    input.removeAttribute('aria-invalid');
+    return true;
+  }
+  msgEl.innerHTML = html;
+  input.setAttribute('aria-invalid', 'true');
+  input.setAttribute('aria-describedby', msgEl.id);
+  input.focus();
+  return false;
+};

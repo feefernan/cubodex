@@ -1,15 +1,15 @@
 import { ITEMS, LAUNCH_DATE } from '../domain/catalog';
 import { isEmail } from '../domain/validation';
 import { tickCountdowns } from './collectibles';
-import { $, $$, onAction, onSubmit } from './dom';
-import { registerView } from './router';
+import { $, $$, check, onAction, onSubmit } from './dom';
+import { go, registerView } from './router';
 import { S } from './store';
 import { fillProducts, itemTile } from './tiles';
 
 const NEWS =
-  `<a class="news news--hot" href="#serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega em</h3><span class="cd num" data-t="${LAUNCH_DATE}">--</span><span class="mono">data de exemplo</span></a>` +
-  '<a class="news" href="#tcg" data-action="go" data-view="tcg"><span class="mono tag">novidade · tcg</span><h3>charizard 4/102 · 1ª edição</h3><span class="mono soft">PSA 8 · última unidade</span></a>' +
-  '<a class="news" href="#criar" data-action="go" data-view="criar"><span class="mono tag">novo em criar</span><h3>torre de dados</h3><span class="mono soft">PETG · 80 × 80 × 160 mm</span></a>' +
+  `<a class="news news--hot" href="#/serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega em</h3><span class="cd num" data-t="${LAUNCH_DATE}">--</span><span class="mono">data de exemplo</span></a>` +
+  '<a class="news" href="#/tcg" data-action="go" data-view="tcg"><span class="mono tag">novidade · tcg</span><h3>charizard 4/102 · 1ª edição</h3><span class="mono soft">PSA 8 · última unidade</span></a>' +
+  '<a class="news" href="#/criar" data-action="go" data-view="criar"><span class="mono tag">novo em criar</span><h3>torre de dados</h3><span class="mono soft">PETG · 80 × 80 × 160 mm</span></a>' +
   '<a class="news" href="#avisos" data-action="scroll" data-target="avisos"><span class="mono tag">lista de avisos</span><h3>receba o próximo lançamento primeiro</h3><span class="mono soft">entrar na lista →</span></a>';
 
 const renderHome = () => {
@@ -44,34 +44,33 @@ const renderApoio = () => {
   for (const b of $$('#apoioTabs [data-tab]')) {
     const on = String(b.dataset.tab === S.apoio);
     b.setAttribute('aria-pressed', on);
-    b.setAttribute('aria-selected', on);
   }
   $('#apoioBody').innerHTML = `<div class="prose">${APOIO[S.apoio]}</div>`;
 };
 
+const msgHtml = (html: string) => `<div class="msg">${html}</div>`;
 const message = (el: HTMLElement, html: string) => {
-  el.innerHTML = `<div class="msg">${html}</div>`;
+  el.innerHTML = msgHtml(html);
 };
 
 export const initPages = () => {
   registerView('home', renderHome);
   registerView('criar', () => fillProducts($('#criarGrid'), ['k1', 'k2', 'k3', 'k4', 'k5', 'k6']));
   registerView('apoio', renderApoio);
-  onAction('apoio-tab', (el) => {
-    S.apoio = el.dataset.tab ?? 'sobre';
-    renderApoio();
-  });
+  onAction('apoio-tab', (el) => go('apoio', el.dataset.tab));
   // shortcut: os formulários só confirmam na tela — lista de avisos em #19, WhatsApp em #18.
   onSubmit('formAvisos', () => {
     const msg = $('#av-msg');
-    if (!isEmail($<HTMLInputElement>('#av-email').value.trim())) return message(msg, 'Digite um e-mail válido.');
-    if (!$<HTMLInputElement>('#av-ok').checked) return message(msg, 'Marque o aceite para entrar na lista.');
+    const email = $<HTMLInputElement>('#av-email');
+    const ok = $<HTMLInputElement>('#av-ok');
+    if (!check(email, msg, isEmail(email.value.trim()), msgHtml('Digite um e-mail válido.'))) return;
+    if (!check(ok, msg, ok.checked, msgHtml('Marque o aceite para entrar na lista.'))) return;
     message(msg, '<b>Na lista.</b> Neste protótipo o e-mail não é enviado a lugar nenhum.');
   });
   onSubmit('formEncomenda', () => {
     const msg = $('#en-msg');
-    if (!$<HTMLTextAreaElement>('#en-desc').value.trim())
-      return message(msg, 'Descreva o que você precisa para pedir o orçamento.');
+    const desc = $<HTMLTextAreaElement>('#en-desc');
+    if (!check(desc, msg, !!desc.value.trim(), msgHtml('Descreva o que você precisa para pedir o orçamento.'))) return;
     message(
       msg,
       '<b>Pedido registrado.</b> No site real, a conversa abriria no WhatsApp com estes dados. Aqui nada é enviado.',

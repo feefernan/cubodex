@@ -38,6 +38,18 @@ test.describe('fluxos principais', () => {
     await expect(page.locator('#dexBody .dex-count')).toContainText('6');
   });
 
+  test('link compartilhado abre a carta e o voltar do navegador volta de tela', async ({ page }) => {
+    await page.goto('/#/carta/base1-4');
+    await expect(page.locator('#cartaBody h1')).toHaveText('charizard');
+    await page.locator('#cartaBody a.link-more').click();
+    await expect(page).toHaveURL(/#\/set\/base1$/);
+    await expect(page.locator('#setBody h1')).toHaveText('Base Set');
+    await page.goBack();
+    await expect(page.locator('#cartaBody h1')).toHaveText('charizard');
+    await page.goForward();
+    await expect(page.locator('#setBody h1')).toHaveText('Base Set');
+  });
+
   test('carrinho e dex sobrevivem a recarregar a página', async ({ page }) => {
     await page.goto('/#acessorios');
     await page.locator('#accGrid [data-action="add"]').first().click();

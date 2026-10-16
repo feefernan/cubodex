@@ -21,7 +21,7 @@ import {
   type VaultEntry,
 } from '../../src/domain/collection';
 import { brl, escapeHtml, normalize, pad3, uniq } from '../../src/domain/format';
-import { areaOf, isView, navGroup, subnavKey } from '../../src/domain/routes';
+import { areaOf, isView, navGroup, parseRoute, routeHref, subnavKey } from '../../src/domain/routes';
 import { quoteCart, quoteVault } from '../../src/domain/shipping';
 import { demoAccount, initialState, mergePersisted } from '../../src/domain/state';
 import { cardsOfSet, cardsOnSale, emptyFilters, filterItems, filterSets, itemsOfCard } from '../../src/domain/tcg';
@@ -219,6 +219,16 @@ describe('validação', () => {
 });
 
 describe('rotas', () => {
+  it('lê e monta URLs com tela e id (#8)', () => {
+    expect(parseRoute('#/carta/base1-4')).toEqual({ view: 'carta', id: 'base1-4' });
+    expect(parseRoute('#/apoio/faq')).toEqual({ view: 'apoio', id: 'faq' });
+    expect(parseRoute('#tcg')).toEqual({ view: 'tcg', id: null });
+    expect(parseRoute('')).toEqual({ view: 'home', id: null });
+    expect(parseRoute('#/xyz/1')).toEqual({ view: 'home', id: null });
+    expect(parseRoute('#/set/"><img src=x>')).toEqual({ view: 'set', id: 'imgsrcx' });
+    expect(routeHref('set', 'jungle')).toBe('#/set/jungle');
+    expect(routeHref('dex')).toBe('#/dex');
+  });
   it('reconhece telas e mapeia ala, menu e subnavegação', () => {
     expect(isView('dex')).toBe(true);
     expect(isView('toString')).toBe(false);

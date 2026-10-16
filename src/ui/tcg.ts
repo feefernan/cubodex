@@ -67,7 +67,7 @@ const setCard = (x: TcgSet) => {
   const sale = n
     ? `<span class="mono tag">${n} à venda na cubodex</span>`
     : '<span class="mono muted">nenhuma à venda</span>';
-  return `<a class="setcard" href="#set" data-action="go" data-view="set" data-id="${x.id}"><span class="setlogo" style="background:${x.tone}"><b class="display">${esc(x.name)}</b></span><span style="min-width:0"><span class="mono muted">${x.year} · ${x.total} cartas</span><br>${sale}</span></a>`;
+  return `<a class="setcard" href="#/set/${x.id}" data-action="go" data-view="set" data-id="${x.id}"><span class="setlogo" style="background:${x.tone}"><b class="display">${esc(x.name)}</b></span><span style="min-width:0"><span class="mono muted">${x.year} · ${x.total} cartas</span><br>${sale}</span></a>`;
 };
 
 const renderSetsBody = () => {
@@ -114,7 +114,7 @@ const renderSet = () => {
     ? shown.map(cardTile).join('')
     : emptyState('nenhuma carta aqui.', 'Nenhuma carta com esse filtro neste set.', '', 'grid-column:1/-1');
   $('#setBody').innerHTML =
-    `<p style="padding-top:20px"><a class="link-more" href="#sets" data-action="go" data-view="sets">← todos os sets</a></p>` +
+    `<p style="padding-top:20px"><a class="link-more" href="#/sets" data-action="go" data-view="sets">← todos os sets</a></p>` +
     `<div class="page-title" style="padding-inline:0"><span class="eyebrow mono">${esc(x.serie)} · ${x.year}</span><h1 class="display">${esc(x.name)}</h1><p>${x.total} cartas no set. Idiomas: ${x.langs.join(', ')}.</p></div>` +
     `<div class="todo" style="margin-top:14px">Exemplo parcial: mostrando ${shown.length} de ${x.total} cartas. Na versão real, a lista completa vem do TCGdex.</div>` +
     `<div class="toolbar"><div class="chips" role="group" aria-label="Raridade">${chips}</div><button class="chip" data-action="set-only" aria-pressed="${S.setOnly}">só as que a cubodex tem</button></div>` +
@@ -130,7 +130,7 @@ const renderCarta = () => {
     ? its.map(saleRow).join('')
     : '<p class="soft">A Cubodex não tem item à venda desta carta agora.</p>';
   $('#cartaBody').innerHTML =
-    `<p style="padding-top:20px"><a class="link-more" href="#set" data-action="go" data-view="set" data-id="${x.id}">← ${esc(x.name)}</a></p>` +
+    `<p style="padding-top:20px"><a class="link-more" href="#/set/${x.id}" data-action="go" data-view="set" data-id="${x.id}">← ${esc(x.name)}</a></p>` +
     `<div class="cardpage"><div class="media media--card ph" style="margin:0;width:100%"><span class="mono ph-label">${imgLabel()}</span></div>` +
     `<div><span class="eyebrow mono">${esc(x.name)} · ${c.n}/${x.total}</span><h1 class="display" style="font-size:clamp(44px,7vw,84px)">${esc(c.name)}</h1>` +
     `<dl class="spec"><dt>set</dt><dd>${esc(x.name)}</dd><dt>número</dt><dd>${c.n}/${x.total}</dd><dt>raridade</dt><dd>${esc(c.rar)}</dd><dt>tipo</dt><dd>${esc(c.tipo)}</dd><dt>idiomas</dt><dd>${x.langs.join(', ')}</dd></dl>` +

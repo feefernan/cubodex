@@ -1,4 +1,15 @@
-import { areaOf, isColView, isTcgView, isView, navGroup, subnavKey, type View } from '../domain/routes';
+import {
+  areaOf,
+  isColView,
+  isTcgView,
+  isView,
+  navGroup,
+  parseRoute,
+  type Route,
+  routeHref,
+  subnavKey,
+  type View,
+} from '../domain/routes';
 import { $, $$, onAction } from './dom';
 import { S } from './store';
 
@@ -24,26 +35,20 @@ const navLinks = (items: [View, string][], active: string, extraClass: (v: View)
   items
     .map(
       ([v, label]) =>
-        `<a href="#${v}" data-action="go" data-view="${v}"${extraClass(v)}${v === active ? ' aria-current="page"' : ''}>${label}</a>`,
+        `<a href="${routeHref(v)}" data-action="go" data-view="${v}"${extraClass(v)}${v === active ? ' aria-current="page"' : ''}>${label}</a>`,
     )
     .join('');
 
 const setCurrent = (el: Element, on: boolean) =>
   on ? el.setAttribute('aria-current', 'page') : el.removeAttribute('aria-current');
 
-interface GoOptions {
-  tab?: string | null;
-  id?: string | null;
-  keepScroll?: boolean;
-}
-
-const go = (target: string, opt: GoOptions = {}) => {
-  const v: View = isView(target) ? target : 'home';
+/** Mostra a tela da rota: estado, menus, conteúdo. Não mexe na URL (quem muda a URL é `go`). */
+const show = ({ view: v, id }: Route, focus: boolean) => {
   current = v;
-  if (v === 'apoio' && opt.tab) S.apoio = opt.tab;
+  if (v === 'apoio' && id) S.apoio = id;
   if (v === 'carrinho') S.payNote = false;
-  if (opt.id && v === 'set') S.setId = opt.id;
-  if (opt.id && v === 'carta') S.cardId = opt.id;
+  if (id && v === 'set') S.setId = id;
+  if (id && v === 'carta') S.cardId = id;
 
   for (const s of $$('.view')) s.hidden = s.id !== `v-${v}`;
   document.body.className = `a-${areaOf(v)}`;
@@ -62,20 +67,42 @@ const go = (target: string, opt: GoOptions = {}) => {
     for (const n of $$('.colnav')) n.innerHTML = html;
   }
   renders.get(v)?.();
-  if (!opt.keepScroll) window.scrollTo(0, 0);
-  // shortcut: replaceState não cria histórico (voltar sai do site) e não guarda o id — rotas de verdade em #8.
-  try {
-    history.replaceState(null, '', `#${v}`);
-  } catch {
-    /* sandbox sem history */
+
+  const h1 = document.querySelector<HTMLElement>(`#v-${v} h1`);
+  document.title = h1 && v !== 'home' ? `${h1.textContent?.replace(/\.$/, '')} · Cubodex` : 'Cubodex';
+  if (!focus) return;
+  window.scrollTo(0, 0);
+  // Leitor de tela anuncia a tela nova; o foco não fica preso no link clicado (#11).
+  if (h1) {
+    h1.tabIndex = -1;
+    h1.focus({ preventScroll: true });
   }
 };
 
+let shownHref = '';
+
+const showHref = (href: string, focus: boolean) => {
+  shownHref = href;
+  show(parseRoute(href), focus);
+};
+
+/** Vai para uma tela: grava uma entrada no histórico (o voltar do navegador funciona) e mostra na hora. */
+export const go = (target: string, id?: string | null) => {
+  const href = routeHref(isView(target) ? target : 'home', id);
+  if (href !== location.hash) history.pushState(null, '', href);
+  showHref(href, true);
+};
+
 export const initRouter = () => {
-  onAction('go', (el) => go(el.dataset.view ?? 'home', { tab: el.dataset.tab, id: el.dataset.id }));
+  onAction('go', (el) => go(el.dataset.view ?? 'home', el.dataset.tab ?? el.dataset.id));
   onAction('scroll', (el) => {
     document.getElementById(el.dataset.target ?? '')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
-  const start = location.hash.replace('#', '');
-  go(isView(start) ? start : 'home', { keepScroll: true });
+  // Voltar/avançar e URL editada à mão. Os dois eventos podem vir juntos: só desenha se a URL mudou.
+  const onNavigate = () => {
+    if (location.hash !== shownHref) showHref(location.hash, true);
+  };
+  window.addEventListener('popstate', onNavigate);
+  window.addEventListener('hashchange', onNavigate);
+  showHref(location.hash, false);
 };
