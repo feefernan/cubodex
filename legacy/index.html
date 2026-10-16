@@ -1,0 +1,1402 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Cubodex</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: uma loja, duas portas. Cabeçalho fixo (colecionar | criar | carrinho).
+   Cada ala troca só raio, superfície e fundo, via classe a-tcg / a-col / a-criar. */
+:root{
+  /* cor: kit de marca */
+  --cubo-red:#F42744; --cubo-cyan:#3ED9F0; --cubo-shadow:#C0223B;
+  --ink:#101419; --paper:#EDEFF2; --dado:#7A8595;
+  /* papéis de cor (escuro original). Os temas claros trocam só estes */
+  --bg:var(--ink); --fg:var(--paper); --muted:var(--dado); --surface:#161C23;
+  --tag:var(--cubo-cyan); --media-base:var(--bg);
+  /* derivados de --fg, --bg e --surface */
+  --soft:color-mix(in srgb,var(--fg) 72%,var(--bg));
+  --line:color-mix(in srgb,var(--fg) 12%,var(--bg));
+  --line-strong:color-mix(in srgb,var(--fg) 22%,var(--bg));
+  --faint:color-mix(in srgb,var(--fg) 40%,var(--bg));
+  --surface-2:color-mix(in srgb,var(--fg) 5%,var(--surface));
+  --grid:color-mix(in srgb,var(--fg) 5%,var(--bg));
+  --ph-a:color-mix(in srgb,var(--fg) 3%,var(--surface));
+  --ph-b:color-mix(in srgb,var(--fg) 7%,var(--surface));
+  --action:var(--cubo-red); --action-hover:var(--cubo-shadow);
+  /* tipo */
+  --f-display:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-body:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  /* forma (muda por ala) */
+  --radius:10px; --btn-r:8px;
+  color-scheme:dark;
+}
+.a-tcg{--radius:3px;--btn-r:3px}
+.a-col{--radius:22px;--btn-r:999px}
+.a-criar{--radius:2px;--btn-r:2px}
+
+/* temas claros: Design cubodex v2, variações 1a a 1d.
+   Ciano vira fundo de tag; o texto de link e tag usa o azul-petróleo de cada variação. */
+:root[data-tema="1a"],:root[data-tema="1b"],:root[data-tema="1c"],:root[data-tema="1d"]{color-scheme:light;--media-base:var(--surface-2)}
+:root[data-tema="1a"]{--cubo-red:#F42744;--cubo-cyan:#3ED9F0;--cubo-shadow:#C0223B;--tag:#086E7E;--bg:#EEF1F4;--surface:#FFFFFF;--fg:#101419;--muted:#5B6576}
+:root[data-tema="1b"]{--cubo-red:#E5233F;--cubo-cyan:#3ED9F0;--cubo-shadow:#B01E35;--tag:#086A79;--bg:#F5F2EC;--surface:#FFFDF9;--fg:#1E1B18;--muted:#6B645B}
+:root[data-tema="1c"]{--cubo-red:#D9384F;--cubo-cyan:#8ADCE8;--cubo-shadow:#A82A3D;--tag:#145F6B;--bg:#E9EAEC;--surface:#F6F6F7;--fg:#23262B;--muted:#5E646D}
+:root[data-tema="1d"]{--cubo-red:#F42744;--cubo-cyan:#3ED9F0;--cubo-shadow:#C0223B;--tag:#07717F;--bg:#FFFFFF;--surface:#F2F4F6;--fg:#101419;--muted:#5F6877}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--f-body);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:60}
+a{color:inherit}
+h1,h2,h3,h4,p,dl,dd,ul{margin:0;padding:0}
+ul{list-style:none}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--tag);outline-offset:2px}
+.wrap{width:100%;max-width:1240px;margin-inline:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.mono{font-family:var(--f-mono);text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:400}
+.muted{color:var(--muted)}
+.soft{color:var(--soft)}
+.display{font-family:var(--f-display);font-weight:900;letter-spacing:-.04em;text-transform:lowercase;line-height:.95;text-wrap:balance}
+.tag{color:var(--tag)}
+.num{font-variant-numeric:tabular-nums}
+
+/* faixa de protótipo */
+.proto-bar{background:var(--surface);border-bottom:1px solid var(--line);color:var(--muted);text-align:center;padding:8px 16px;font-size:11px}
+
+/* cabeçalho */
+.site-head{position:sticky;top:env(safe-area-inset-top,0px);z-index:50;background:var(--bg);border-bottom:1px solid var(--line)}
+.head-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px 28px;padding-block:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo{width:40px;height:40px;border-radius:50%;background:var(--ink);border:1px solid var(--line);display:grid;place-items:center;flex:none}
+.logo svg{width:24px;height:24px;display:block}
+.wordmark{font:900 26px/1 var(--f-display);letter-spacing:-.04em}
+.main-nav{display:flex;gap:6px}
+.main-nav a{display:inline-flex;align-items:center;min-height:40px;padding:6px 16px;border-radius:999px;text-decoration:none;font:800 16px/1 var(--f-body);letter-spacing:-.02em;text-transform:lowercase;border:1px solid transparent}
+.main-nav a:hover{background:var(--surface)}
+.main-nav a[aria-current="page"]{background:var(--fg);color:var(--bg)}
+.head-actions{display:flex;align-items:center;gap:6px}
+.icon-link{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:6px 12px;border-radius:999px;text-decoration:none;border:1px solid var(--line);font:800 14px/1 var(--f-body);text-transform:lowercase}
+.icon-link:hover{background:var(--surface)}
+.icon-link svg{width:18px;height:18px;display:block;flex:none}
+.count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--action);color:#fff;font:600 12px/1 var(--f-mono)}
+.count[data-n="0"]{background:var(--surface-2);color:var(--muted)}
+@media (max-width:700px){
+  .head-row{grid-template-columns:1fr auto}
+  .main-nav{grid-column:1/-1;order:3}
+  .main-nav a{flex:1;justify-content:center}
+  .icon-link .lbl{display:none}
+}
+.subnav{background:var(--surface);border-bottom:1px solid var(--line)}
+.subnav .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;scrollbar-width:thin}
+.subnav a{flex:none;display:inline-flex;align-items:center;min-height:36px;padding:6px 14px;border-radius:999px;text-decoration:none;font:600 14px/1 var(--f-body);color:var(--soft);text-transform:lowercase}
+.subnav a:hover{color:var(--fg)}
+.subnav a[aria-current="page"]{color:var(--fg);box-shadow:inset 0 -2px 0 var(--tag);border-radius:0}
+
+/* botões e chips */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 20px;border:0;border-radius:var(--btn-r);background:var(--action);color:#fff;font:800 15px/1 var(--f-body);cursor:pointer;text-decoration:none;transition:background .15s}
+.btn:hover{background:var(--action-hover)}
+.btn--ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.btn--ghost:hover{background:var(--surface-2)}
+.btn--sm{min-height:36px;padding:8px 14px;font-size:13px}
+.btn--full{width:100%}
+.chip{display:inline-flex;align-items:center;min-height:34px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:transparent;cursor:pointer;font:600 14px/1 var(--f-body);text-transform:lowercase;color:var(--soft)}
+.chip:hover{background:var(--surface-2)}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.pill{display:inline-block;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--soft)}
+.price{display:inline-block;background:var(--action);color:#fff;padding:6px 10px;font:600 14px/1 var(--f-mono);letter-spacing:.02em;border-radius:var(--btn-r,4px)}
+.a-col .price{border-radius:8px}
+
+/* seções */
+.view{padding-bottom:64px}
+.section{padding-top:48px}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px 24px;flex-wrap:wrap;margin-bottom:20px}
+.section-head h2{font-size:clamp(28px,4vw,40px)}
+.link-more{color:var(--tag);text-decoration:none;font:600 14px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
+.link-more:hover{text-decoration:underline}
+.page-title{padding-top:40px;padding-bottom:8px}
+.page-title h1{font-size:clamp(44px,8vw,96px)}
+.page-title p{max-width:60ch;margin-top:14px;color:var(--soft);font-size:17px}
+.eyebrow{color:var(--tag);margin-bottom:14px;display:block}
+
+/* home */
+.hero{padding-top:44px;padding-bottom:28px}
+.hero h1{font-size:clamp(60px,12vw,160px)}
+.hero h1 .dot{color:var(--action)}
+.hero .lead{max-width:50ch;margin-top:22px;color:var(--soft);font-size:18px}
+.doors{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.doors{grid-template-columns:1fr}}
+.door{position:relative;display:flex;flex-direction:column;justify-content:flex-end;gap:22px;min-height:300px;padding:24px;border-radius:22px;text-decoration:none;overflow:hidden;min-width:0}
+.door h2{font-size:clamp(44px,6.5vw,80px);position:relative}
+.door p{max-width:34ch;position:relative}
+.door .pills{display:flex;flex-wrap:wrap;gap:6px;position:relative}
+.door-col{background:var(--cubo-red);color:#fff}
+.door-col p{color:var(--ink)}
+.door-col .pill{border-color:rgba(16,20,25,.45);color:var(--ink)}
+.door-criar{background:var(--surface);border:1px solid var(--line);border-radius:4px}
+.door-criar .mono.kick{color:var(--tag)}
+.door:hover{transform:translateY(-2px)}
+.door{transition:transform .18s}
+.door-art{position:absolute;top:20px;right:20px;width:46%;max-width:240px;pointer-events:none}
+.stack{position:relative;height:150px}
+.stack i{position:absolute;top:0;width:64px;aspect-ratio:63/88;border-radius:6px;border:1.5px solid rgba(16,20,25,.55);background:repeating-linear-gradient(135deg,rgba(16,20,25,.18) 0 6px,rgba(16,20,25,.08) 6px 12px)}
+.stack i:nth-child(1){right:92px;transform:rotate(-10deg)}
+.stack i:nth-child(2){right:46px;transform:rotate(-2deg);top:8px}
+.stack i:nth-child(3){right:0;transform:rotate(7deg);top:16px}
+.door-criar .door-art svg{width:100%;height:auto;display:block;color:var(--muted)}
+
+.strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px;scrollbar-width:thin}
+.news{display:flex;flex-direction:column;justify-content:space-between;gap:20px;min-height:190px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--surface);text-decoration:none;min-width:0}
+.news:hover{background:var(--surface-2)}
+.news h3{font-size:22px;line-height:1.05;letter-spacing:-.03em;font-weight:800;text-transform:lowercase}
+.news .cd{font:500 18px/1.2 var(--f-mono);letter-spacing:.04em;font-variant-numeric:tabular-nums;color:var(--fg)}
+.news--hot{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.news--hot:hover{background:var(--fg);filter:brightness(1.12)}
+.news--hot .mono{color:inherit;opacity:.75}
+.news--hot .cd{color:inherit}
+
+.opt-in{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;align-items:center;padding:32px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+@media (max-width:760px){.opt-in{grid-template-columns:1fr;padding:22px}}
+.opt-in h2{font-size:clamp(30px,4.4vw,48px)}
+
+/* formulários */
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field label,.lbl-t{font:500 12px/1.2 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.input,.select,.textarea{width:100%;min-height:44px;padding:10px 12px;background:var(--bg);color:var(--fg);border:1px solid var(--line-strong);border-radius:var(--btn-r,6px);font:400 16px/1.3 var(--f-body)}
+.a-col .input,.a-col .select,.a-col .textarea{border-radius:14px}
+.textarea{min-height:110px;resize:vertical}
+.input::placeholder,.textarea::placeholder{color:var(--faint)}
+.check{display:flex;gap:10px;align-items:flex-start;color:var(--soft);font-size:14px}
+.check input{margin-top:3px;width:18px;height:18px;accent-color:var(--cubo-cyan);flex:none}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid .full{grid-column:1/-1}
+@media (max-width:560px){.form-grid{grid-template-columns:1fr}}
+.msg{padding:14px 16px;border:1px solid var(--cubo-cyan);border-radius:var(--btn-r,8px);color:var(--fg);font-size:15px}
+.msg b{color:var(--tag)}
+.form-stack{display:flex;flex-direction:column;gap:14px}
+
+/* tiles de produto */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+@media (min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}
+.tile{display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.tile .body{display:flex;flex-direction:column;gap:8px;padding:14px;flex:1;min-width:0}
+.tile h3{font:800 18px/1.1 var(--f-body);letter-spacing:-.03em;text-transform:lowercase;text-wrap:balance}
+.tile .row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
+.tile .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.media{position:relative;display:grid;place-items:center;overflow:hidden}
+.ph{background:repeating-linear-gradient(135deg,var(--ph-a) 0 10px,var(--ph-b) 10px 20px)}
+.ph-label{color:var(--faint);font-size:11px;text-align:center;padding:8px}
+.media--card{aspect-ratio:63/88;margin:12px 12px 0;border:1px solid var(--line);border-radius:4px}
+.media--sq{aspect-ratio:1/1;border-bottom:1px solid var(--line)}
+.media--craft{aspect-ratio:4/3;border-bottom:1px solid var(--line);background:repeating-linear-gradient(0deg,var(--ph-a) 0 3px,var(--ph-b) 3px 6px)}
+.media--mini{aspect-ratio:1/1;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--c) 42%,var(--media-base)),var(--media-base) 78%)}
+.media--mini svg{width:58%;height:auto;display:block}
+.media .num-tag{position:absolute;top:12px;left:14px;color:var(--soft)}
+.a-tcg .tile h3{font-size:17px}
+.a-tcg .tile .meta{color:var(--soft)}
+.a-col .tile{border-radius:22px;background:var(--surface)}
+.a-col .tile .media--mini{border-radius:0}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font:400 12px/1.5 var(--f-mono);letter-spacing:.06em;text-transform:uppercase}
+.spec dt{color:var(--muted)}
+.spec dd{color:var(--fg);text-align:right;min-width:0}
+.a-criar .tile{border-color:var(--line-strong)}
+.a-criar .tile .body{border-top:0}
+.a-criar .tile::after{content:"";height:3px;background:repeating-linear-gradient(90deg,var(--muted) 0 6px,transparent 6px 12px);opacity:.35}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;justify-content:space-between;margin:24px 0 20px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.search{position:relative;flex:1 1 220px;max-width:360px}
+.search .input{padding-left:38px}
+.search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted);display:block}
+
+.empty{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:48px 16px;border:1px dashed var(--line-strong);border-radius:var(--radius)}
+.mascot-slot{width:88px;height:88px;border-radius:50%;border:1.5px dashed var(--line-strong);display:grid;place-items:center;color:var(--muted);text-align:center;font-size:10px;line-height:1.2}
+.empty h3{font-size:24px}
+.empty p{color:var(--soft);max-width:42ch}
+
+/* hub colecionar */
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+@media (max-width:760px){.choices{grid-template-columns:1fr}}
+.choice{display:flex;flex-direction:column;gap:18px;justify-content:space-between;min-height:260px;padding:26px;text-decoration:none;border-radius:14px;border:1px solid var(--line);background:var(--surface);min-width:0}
+.choice:hover{border-color:var(--muted)}
+.choice h2{font-size:clamp(36px,5vw,56px)}
+.choice p{color:var(--soft);max-width:40ch}
+.choice--tcg{border-radius:4px}
+.choice--col{border-radius:28px;background:var(--cubo-red);color:#fff;border-color:var(--cubo-red)}
+.choice--col p{color:var(--ink)}
+.choice--col .mono{color:var(--ink)}
+
+/* séries e mecânicas */
+.series-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.series{display:flex;gap:16px;align-items:center;padding:18px;border:1px solid var(--line);border-radius:22px;background:var(--surface);text-decoration:none;min-width:0}
+.series .thumb{width:88px;height:88px;border-radius:18px;display:grid;place-items:center;flex:none;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--cubo-red) 40%,var(--media-base)),var(--media-base) 80%)}
+.series .thumb svg{width:60%;height:auto;display:block}
+.series.locked{border-style:dashed;opacity:.8}
+.series.locked .thumb{background:var(--surface-2)}
+.series h3{font-size:26px;letter-spacing:-.04em;font-weight:900;text-transform:lowercase}
+.mech{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.mech>*{padding:20px;border-radius:22px;border:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column;gap:10px;min-width:0;text-decoration:none}
+.mech h3{font-size:22px;letter-spacing:-.03em;font-weight:800;text-transform:lowercase}
+.mech p{color:var(--soft);font-size:15px}
+
+.pack{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;padding:20px;border:1px solid var(--line);border-radius:22px;background:var(--surface);margin-top:28px}
+@media (max-width:760px){.pack{grid-template-columns:1fr}}
+.slots{display:flex;gap:10px}
+.slot{width:84px;height:84px;border-radius:18px;border:1.5px dashed var(--line-strong);display:grid;place-items:center;color:var(--muted);flex:none}
+.slot.filled{border-style:solid;border-color:var(--line);background:var(--media-base)}
+.slot svg{width:70%;height:auto;display:block}
+
+/* dex */
+.dex-top{display:grid;grid-template-columns:auto 1fr;gap:20px 32px;align-items:center;padding:22px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+@media (max-width:640px){.dex-top{grid-template-columns:1fr}}
+.dex-count{font:900 56px/1 var(--f-display);letter-spacing:-.04em}
+.dex-count small{font:600 16px/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--soft);margin-left:6px}
+.dex-bar{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px}
+.dex-bar span{height:14px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line)}
+.dex-bar span.on{background:var(--cubo-cyan);border-color:var(--cubo-cyan)}
+.dex-bar span.want{border-color:var(--cubo-red)}
+.dex-tile{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:22px;overflow:hidden;background:var(--surface);min-width:0}
+.dex-art{position:relative;aspect-ratio:1/1;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--c) 40%,var(--media-base)),var(--media-base) 80%)}
+.dex-art svg{width:56%;height:auto;display:block}
+.dex-tile.none .dex-art svg{filter:grayscale(1);opacity:.4}
+.dex-tile.none .dex-art{background:var(--surface-2)}
+.dex-tile.have{border-color:var(--cubo-cyan)}
+.dex-tile.want{border-color:var(--cubo-red)}
+.dex-art .num-tag{position:absolute;top:12px;left:14px;color:var(--soft)}
+.dex-meta{padding:12px 14px 4px;display:flex;flex-direction:column;gap:2px}
+.dex-meta h3{font:800 17px/1.1 var(--f-body);letter-spacing:-.03em;text-transform:lowercase}
+.dex-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 14px 14px}
+.tog{min-height:38px;border-radius:999px;border:1px solid var(--line);background:transparent;cursor:pointer;font:700 13px/1 var(--f-body);text-transform:lowercase;color:var(--soft)}
+.tog:hover{background:var(--surface-2)}
+.tog[data-st="have"][aria-pressed="true"]{background:var(--cubo-cyan);border-color:var(--cubo-cyan);color:var(--ink)}
+.tog[data-st="want"][aria-pressed="true"]{background:var(--cubo-red);border-color:var(--cubo-red);color:#fff}
+.dex-locked .dex-art{background:var(--surface-2);color:var(--faint);font:900 64px/1 var(--f-display)}
+.dex-locked{border-style:dashed;opacity:.75}
+
+/* criar */
+.a-criar main{background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;border:1px solid var(--line-strong)}
+.steps li{padding:16px;border-right:1px solid var(--line-strong);border-bottom:1px solid var(--line-strong);margin:-0 -1px -1px 0;background:var(--bg)}
+.steps li b{display:block;font:800 17px/1.1 var(--f-body);letter-spacing:-.03em;text-transform:lowercase;margin:6px 0 4px}
+.steps li span.mono{color:var(--tag)}
+.steps li p{color:var(--soft);font-size:14px}
+.order{display:grid;grid-template-columns:1fr 1.2fr;gap:32px;align-items:start}
+@media (max-width:860px){.order{grid-template-columns:1fr}}
+.order .panel{padding:24px;background:var(--bg);border:1px solid var(--line-strong);border-radius:2px}
+
+/* carrinho */
+.cart-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:24px;align-items:start;margin-top:24px}
+@media (max-width:860px){.cart-grid{grid-template-columns:1fr}}
+.line{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}
+.line .thumb{width:64px;height:64px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;flex:none}
+.line .thumb svg{width:70%;height:auto;display:block}
+.line .thumb.c{background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--c) 42%,var(--media-base)),var(--media-base) 85%)}
+.line h3{font:800 17px/1.1 var(--f-body);letter-spacing:-.03em;text-transform:lowercase}
+.line .end{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.qty{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px}
+.qty button{width:32px;height:32px;border:0;background:transparent;cursor:pointer;font:700 16px/1 var(--f-body);border-radius:999px}
+.qty button:hover{background:var(--surface-2)}
+.qty span{min-width:24px;text-align:center;font:500 14px/1 var(--f-mono)}
+.linkbtn{background:none;border:0;padding:0;color:var(--muted);cursor:pointer;font:500 12px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;text-decoration:underline}
+.linkbtn:hover{color:var(--fg)}
+.summary{padding:22px;border:1px solid var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;gap:14px;min-width:0}
+.sum-row{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.sum-row.total{font:900 26px/1 var(--f-display);letter-spacing:-.03em;padding-top:12px;border-top:1px solid var(--line)}
+.ship-opt{display:flex;justify-content:space-between;gap:10px;align-items:center;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;cursor:pointer;text-align:left}
+.ship-opt[aria-pressed="true"]{border-color:var(--paper);background:var(--surface-2)}
+.ship-opt b{font-weight:700}
+
+/* conta e apoio */
+.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px}
+@media (max-width:860px){.cols-2{grid-template-columns:1fr}}
+.card{padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;gap:14px;min-width:0}
+.card h2,.card h3{font:900 26px/1 var(--f-display);letter-spacing:-.04em;text-transform:lowercase}
+.order-row{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.status{padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--soft)}
+.status.ok{border-color:var(--cubo-cyan);color:var(--tag)}
+.tabs{display:flex;gap:4px;overflow-x:auto;margin:28px 0 20px;padding-bottom:4px}
+.prose{max-width:64ch;display:flex;flex-direction:column;gap:14px;color:var(--soft);font-size:17px}
+.prose h2{color:var(--fg);font:900 32px/1 var(--f-display);letter-spacing:-.04em;text-transform:lowercase}
+.todo{padding:12px 14px;border:1px dashed var(--line-strong);border-radius:8px;color:var(--muted);font-size:14px}
+
+/* tcg: catálogo, enciclopédia, cofre */
+.tcgwrap{padding-top:18px}
+.tcgnav{display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tcgnav a,.colnav a{flex:none;display:inline-flex;align-items:center;min-height:40px;padding:6px 14px;text-decoration:none;font:700 14px/1 var(--f-body);text-transform:lowercase;color:var(--soft);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tcgnav a:hover,.colnav a:hover{color:var(--fg)}
+.tcgnav a[aria-current="page"],.colnav a[aria-current="page"]{color:var(--fg);border-bottom-color:var(--tag)}
+.colnav{display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.tcgnav a.enc{margin-left:auto;align-self:center;min-height:32px;margin-bottom:0;padding:6px 14px;border:1px solid var(--tag);border-radius:999px;color:var(--tag)}
+.tcgnav a.enc:hover{background:var(--tag);color:var(--bg)}
+.tcgnav a.enc[aria-current="page"]{background:var(--tag);color:var(--bg);border-color:var(--tag)}
+.catalog{display:grid;grid-template-columns:250px minmax(0,1fr);gap:28px;align-items:start;margin-top:8px}
+@media (max-width:860px){.catalog{grid-template-columns:minmax(0,1fr)}}
+.filters{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.filters>summary{cursor:pointer;list-style:none;padding:14px 16px;font:500 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.filters>summary::-webkit-details-marker{display:none}
+.filters-body{display:flex;flex-direction:column;gap:14px;padding:0 16px 16px}
+.price-range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.results .toolbar{margin-top:0}
+.sort{min-width:180px}
+.state-tag{position:absolute;top:10px;right:10px;z-index:1;padding:4px 8px;border-radius:999px;font:500 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;background:var(--ink);color:var(--paper)}
+.state-tag.pre{background:var(--cubo-cyan);color:var(--ink)}
+.tile.soldout .media{opacity:.55}
+.tile.soldout h3,.tile.soldout h3 a{color:var(--soft)}
+.tile.hit{border-color:var(--cubo-cyan);box-shadow:0 0 0 1px var(--cubo-cyan)}
+.flag{display:inline-flex;align-items:center;gap:6px}
+.flag svg{width:20px;height:14px;border-radius:2px;display:block;border:1px solid rgba(0,0,0,.28)}
+.badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.grade{display:inline-block;padding:3px 7px;border-radius:4px;border:1px solid var(--line-strong);color:var(--fg)}
+.qty-un{color:var(--soft)}
+.sets-group{margin-top:28px}
+.sets-group h2{font-size:clamp(24px,3vw,32px);margin-bottom:14px}
+.grid-sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.setcard{display:flex;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);text-decoration:none;min-width:0}
+.setcard:hover{border-color:var(--line-strong);background:var(--surface-2)}
+.setlogo{width:76px;height:76px;border-radius:calc(var(--radius) * .7);flex:none;display:grid;place-items:center;padding:6px;text-align:center}
+.setlogo b{font-size:17px;line-height:1;color:var(--ink)}
+.cardpage{display:grid;grid-template-columns:minmax(200px,320px) minmax(0,1fr);gap:32px;margin-top:20px;align-items:start}
+@media (max-width:700px){.cardpage{grid-template-columns:minmax(0,1fr)}.cardpage .media--card{max-width:280px}}
+.cardpage .spec{font-size:13px;margin:16px 0 24px;max-width:420px}
+.sale-row{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}
+.vault-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:24px;align-items:start;margin-top:24px}
+@media (max-width:860px){.vault-grid{grid-template-columns:minmax(0,1fr)}}
+.vrow{display:grid;grid-template-columns:auto 52px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.vrow.off{cursor:default;opacity:.75}
+.vrow input[type=checkbox]{width:20px;height:20px;accent-color:var(--cubo-cyan)}
+.vph{width:52px;aspect-ratio:63/88;border-radius:4px;border:1px solid var(--line)}
+.timeline{list-style:none;margin:6px 0 0 6px;padding:0;border-left:2px solid var(--line-strong)}
+.timeline li{position:relative;padding:0 0 14px 18px;font-size:14px;color:var(--soft)}
+.timeline li::before{content:"";position:absolute;left:-7px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--cubo-cyan);border:2px solid var(--bg)}
+.dest{display:inline-flex;border:1px solid var(--line-strong);border-radius:999px;overflow:hidden;margin-top:8px}
+.dest button{border:0;background:transparent;padding:7px 12px;cursor:pointer;font:700 12px/1 var(--f-body);text-transform:lowercase;color:var(--soft)}
+.dest button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.faq details{border-bottom:1px solid var(--line);padding:14px 0}
+.faq summary{cursor:pointer;font:700 17px/1.3 var(--f-body);color:var(--fg)}
+.faq details p{margin-top:8px;font-size:16px}
+.themer-img{padding:10px;border-top:1px solid var(--line);margin-top:4px;font-size:13px}
+.disclaimer{margin-top:28px;padding-top:18px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+
+/* seletor de tema */
+.themer{position:fixed;z-index:65;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.themer-btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px 8px 10px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);cursor:pointer;font:700 14px/1 var(--f-body);text-transform:lowercase;box-shadow:0 6px 22px rgba(0,0,0,.22)}
+.themer-panel{display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:16px;border:1px solid var(--line-strong);background:var(--surface);box-shadow:0 10px 32px rgba(0,0,0,.28);min-width:210px}
+.themer-opt{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 10px;border-radius:10px;border:1px solid transparent;background:transparent;cursor:pointer;text-align:left;width:100%}
+.themer-opt:hover{background:var(--surface-2)}
+.themer-opt[aria-pressed="true"]{border-color:var(--fg)}
+.themer-opt b{font:800 15px/1 var(--f-body);text-transform:lowercase}
+.themer-opt span.mono{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.sw{position:relative;width:26px;height:26px;border-radius:50%;border:1px solid var(--line-strong);flex:none}
+.sw::after{content:"";position:absolute;right:-3px;bottom:-3px;width:12px;height:12px;border-radius:50%;background:var(--sa);border:2px solid var(--surface)}
+
+/* rodapé e aviso */
+footer{border-top:1px solid var(--line);padding-block:36px 48px;color:var(--muted)}
+footer .cols{display:flex;flex-wrap:wrap;gap:24px 56px;justify-content:space-between}
+footer ul{display:flex;flex-direction:column;gap:8px}
+footer a{text-decoration:none;color:var(--soft)}
+footer a:hover{color:var(--fg);text-decoration:underline}
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:70;background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:999px;font:700 14px/1.2 var(--f-body);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px);text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+
+<div class="proto-bar mono">protótipo navegável · dados, preços, prazos e fotos de exemplo · nenhum pagamento real · botão de tema no canto da tela</div>
+
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="brand" href="#home" data-go="home" aria-label="cubodex, página inicial">
+      <span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span>
+      <span class="wordmark">cubodex</span>
+    </a>
+    <nav class="main-nav" aria-label="Principal">
+      <a href="#colecionar" data-go="colecionar" data-nav="col">colecionar</a>
+      <a href="#criar" data-go="criar" data-nav="criar">criar</a>
+    </nav>
+    <div class="head-actions">
+      <a class="icon-link" href="#conta" data-go="conta" aria-label="Minha conta">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+        <span class="lbl">conta</span>
+      </a>
+      <a class="icon-link" href="#carrinho" data-go="carrinho" aria-label="Carrinho">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h2.5l2.2 11h10.6l2-8H7"/><circle cx="9" cy="20" r="1.6"/><circle cx="17" cy="20" r="1.6"/></svg>
+        <span class="lbl">carrinho</span>
+        <span class="count num" id="cartCount" data-n="0">0</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="subnav" id="subnav" hidden>
+  <div class="wrap" role="navigation" aria-label="Colecionar">
+    <a href="#colecionar" data-go="colecionar" data-sub="colecionar">visão geral</a>
+    <a href="#tcg" data-go="tcg" data-sub="tcg">tcg</a>
+    <a href="#colecionaveis" data-go="colecionaveis" data-sub="colecionaveis">colecionáveis cubodex</a>
+  </div>
+</div>
+
+<main>
+
+<!-- HOME -->
+<section class="view" id="v-home">
+  <div class="wrap hero">
+    <span class="eyebrow mono">cartas de pokémon · impressão 3d</span>
+    <h1 class="display">colecione<span class="dot">.</span><br>crie<span class="dot">.</span></h1>
+    <p class="lead">Cards originais, miniaturas em séries numeradas e peças impressas em 3D sob medida. Escolha por onde começar.</p>
+  </div>
+  <div class="wrap">
+    <div class="doors">
+      <a class="door door-col" href="#colecionar" data-go="colecionar">
+        <div class="door-art" aria-hidden="true"><div class="stack"><i></i><i></i><i></i></div></div>
+        <h2 class="display">colecionar</h2>
+        <p>Cards de pokémon, miniaturas Cubodex em séries e a Dex para acompanhar o que falta.</p>
+        <div class="pills mono"><span class="pill">tcg</span><span class="pill">colecionáveis</span><span class="pill">dex</span></div>
+      </a>
+      <a class="door door-criar" href="#criar" data-go="criar">
+        <div class="door-art" aria-hidden="true">
+          <svg viewBox="0 0 220 150" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="30" y="30" width="150" height="86" fill="none"/><path d="M30 18v-8M180 18v-8M30 14h150M30 128h0M196 30h8M196 116h8M200 30v86"/><path d="M30 14l6-4M30 14l6 4M180 14l-6-4M180 14l-6 4M200 30l-4 6M200 30l4 6M200 116l-4-6M200 116l4-6"/><path d="M30 30l150 86M180 30L30 116" stroke-dasharray="4 5" opacity=".5"/><text x="105" y="9" fill="currentColor" stroke="none" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle">86 mm</text><text x="212" y="76" fill="currentColor" stroke="none" font-family="IBM Plex Mono, monospace" font-size="10" text-anchor="middle" transform="rotate(90 212 76)">60 mm</text></svg>
+        </div>
+        <span class="mono kick">oficina 3d</span>
+        <h2 class="display">criar</h2>
+        <p class="soft">Organizadores, dados e itens de RPG, e encomendas sob medida com orçamento no WhatsApp.</p>
+        <div class="pills mono"><span class="pill">peças prontas</span><span class="pill">sob medida</span></div>
+      </a>
+    </div>
+  </div>
+
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">novidades e lançamentos</h2><span class="mono muted">exemplos</span></div>
+    <div class="strip" id="news"></div>
+  </div>
+
+  <div class="wrap section a-tcg" style="background:transparent">
+    <div class="section-head"><h2 class="display">destaques · tcg</h2><a class="link-more" href="#tcg" data-go="tcg">ver tudo →</a></div>
+    <div class="grid" id="hl-tcg"></div>
+  </div>
+  <div class="wrap section a-col" style="background:transparent">
+    <div class="section-head"><h2 class="display">destaques · colecionáveis</h2><a class="link-more" href="#colecionaveis" data-go="colecionaveis">ver séries →</a></div>
+    <div class="grid" id="hl-col"></div>
+  </div>
+  <div class="wrap section a-criar" style="background:transparent">
+    <div class="section-head"><h2 class="display">destaques · criar</h2><a class="link-more" href="#criar" data-go="criar">ver tudo →</a></div>
+    <div class="grid" id="hl-criar"></div>
+  </div>
+
+  <div class="wrap section" id="avisos">
+    <div class="opt-in">
+      <div>
+        <span class="eyebrow mono">lista de avisos</span>
+        <h2 class="display">saiba antes quando sair a próxima série.</h2>
+      </div>
+      <form id="formAvisos" class="form-stack" novalidate>
+        <div class="field"><label for="av-email">e-mail</label><input class="input" id="av-email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></div>
+        <label class="check"><input type="checkbox" id="av-ok"><span>Aceito receber avisos de lançamento da Cubodex. Posso sair da lista quando quiser.</span></label>
+        <button class="btn" type="submit">entrar na lista</button>
+        <div id="av-msg" role="status" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- COLECIONAR (hub) -->
+<section class="view" id="v-colecionar" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar</span>
+    <h1 class="display">duas prateleiras.</h1>
+    <p>Cards de pokémon e miniaturas Cubodex ficam em áreas separadas. Escolha a sua.</p>
+  </div>
+  <div class="wrap">
+    <div class="choices">
+      <a class="choice choice--tcg" href="#tcg" data-go="tcg">
+        <span class="mono tag">cartas · sets · cofre</span>
+        <h2 class="display">tcg</h2>
+        <p class="soft">Cartas de pokémon originais com filtros, enciclopédia de sets e cofre virtual, e acessórios sem personagens.</p>
+        <span class="link-more">ver catálogo →</span>
+      </a>
+      <a class="choice choice--col" href="#colecionaveis" data-go="colecionaveis">
+        <span class="mono">miniaturas 3d · personagens originais</span>
+        <h2 class="display">colecionáveis cubodex</h2>
+        <p>Séries numeradas, pacote montado por você, lançamentos e a Dex para marcar o que já é seu.</p>
+        <span class="mono">ver séries →</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- TCG · cartas à venda -->
+<section class="view" id="v-tcg" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">cartas à venda.</h1>
+    <p>Cartas de pokémon originais. Cada item mostra set, número, idioma, variante e quantidade em estoque.</p>
+  </div>
+  <div class="wrap">
+    <div class="catalog">
+      <details class="filters" id="filtersBox" open>
+        <summary>filtros</summary>
+        <div class="filters-body">
+          <div class="field"><label for="f-set">set</label><select class="select" id="f-set" data-f="set"></select></div>
+          <div class="field"><label for="f-rar">raridade</label><select class="select" id="f-rar" data-f="rar"></select></div>
+          <div class="field"><label for="f-tipo">tipo ou tema</label><select class="select" id="f-tipo" data-f="tipo"></select></div>
+          <div class="field"><label for="f-lang">idioma</label><select class="select" id="f-lang" data-f="lang"></select></div>
+          <div class="field"><label for="f-var">variante</label><select class="select" id="f-var" data-f="variant"></select></div>
+          <div class="field"><span class="lbl-t">faixa de preço (R$)</span>
+            <div class="price-range"><input class="input" id="f-min" data-f="min" type="number" min="0" inputmode="decimal" placeholder="mín." aria-label="Preço mínimo"><input class="input" id="f-max" data-f="max" type="number" min="0" inputmode="decimal" placeholder="máx." aria-label="Preço máximo"></div></div>
+          <label class="check"><input type="checkbox" id="f-grad" data-f="graded"><span>só graduadas</span></label>
+          <label class="check"><input type="checkbox" id="f-stock" data-f="stock"><span>só em estoque</span></label>
+          <button class="btn btn--ghost btn--sm" type="button" data-fclear="1">limpar filtros</button>
+        </div>
+      </details>
+      <div class="results">
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+            <input class="input" id="f-q" data-f="q" type="search" placeholder="buscar por nome ou set" aria-label="Buscar carta">
+          </div>
+          <div class="field sort"><label for="f-sort">ordenar</label><select class="select" id="f-sort" data-f="sort"></select></div>
+        </div>
+        <p class="mono muted" id="tcgCount" role="status"></p>
+        <div class="grid" id="tcgGrid" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TCG · acessórios -->
+<section class="view" id="v-acessorios" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">acessórios.</h1>
+    <p>Porta-cards, deck boxes e suportes impressos em 3D. Nenhum reproduz personagens.</p>
+  </div>
+  <div class="wrap section" style="padding-top:28px"><div class="grid" id="accGrid"></div></div>
+</section>
+
+<!-- TCG · enciclopédia de sets -->
+<section class="view" id="v-sets" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">enciclopédia de sets.</h1>
+    <p>Todos os sets, agrupados por série. As cartas que a Cubodex tem em estoque ficam destacadas.</p>
+  </div>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input class="input" id="s-q" data-s="q" type="search" placeholder="buscar set" aria-label="Buscar set">
+      </div>
+      <div class="field sort"><label for="s-ano">ano</label><select class="select" id="s-ano" data-s="ano"></select></div>
+    </div>
+    <div class="todo">Exemplo com 4 sets. Na versão real, sets, cartas e imagens são importados do TCGdex para o banco da Cubodex.</div>
+    <div id="setsBody"></div>
+  </div>
+</section>
+
+<!-- TCG · página do set -->
+<section class="view" id="v-set" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap" id="setBody"></div>
+</section>
+
+<!-- TCG · página da carta -->
+<section class="view" id="v-carta" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap" id="cartaBody"></div>
+</section>
+
+<!-- TCG · cofre virtual -->
+<section class="view" id="v-cofre" hidden>
+  <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · tcg</span>
+    <h1 class="display">cofre virtual.</h1>
+    <p>Guardamos as cartas que você comprou na Cubodex. Quando quiser, junte vários itens e peça um envio só.</p>
+  </div>
+  <div class="wrap" id="cofreBody"></div>
+</section>
+
+<!-- COLECIONÁVEIS (hub) -->
+<section class="view" id="v-colecionaveis" hidden>
+  <div class="wrap tcgwrap"><nav class="colnav" aria-label="Colecionáveis Cubodex"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionar · colecionáveis cubodex</span>
+    <h1 class="display">miniaturas em série.</h1>
+    <p>Miniaturas impressas em 3D com personagens originais. Cada série tem números fixos, e a Dex mostra o que você já tem.</p>
+  </div>
+  <div class="wrap section" style="padding-top:28px">
+    <div class="section-head"><h2 class="display">séries</h2></div>
+    <div class="series-row" id="seriesRow"></div>
+  </div>
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">jeitos de colecionar</h2></div>
+    <div class="mech">
+      <a href="#serie" data-go="serie"><span class="mono tag">disponível no protótipo</span><h3>monte seu pacote</h3><p>Escolha 3 miniaturas da série e leve juntas.</p></a>
+      <div><span class="mono muted">fase 3 · em breve</span><h3>caixa surpresa</h3><p>Caixa de valor garantido. Regras a definir, e só existe depois de validação jurídica.</p></div>
+      <div><span class="mono tag">próximo lançamento</span><h3>lançamentos</h3><p class="cd mono num" data-t="2026-11-14T12:00:00-03:00" style="color:var(--fg);font-size:16px">--</p><p class="muted" style="font-size:13px">data de exemplo</p></div>
+    </div>
+  </div>
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">dex</h2><a class="link-more" href="#dex" data-go="dex">abrir dex →</a></div>
+    <div id="dexTeaser"></div>
+  </div>
+</section>
+
+<!-- SÉRIE -->
+<section class="view" id="v-serie" hidden>
+  <div class="wrap tcgwrap"><nav class="colnav" aria-label="Colecionáveis Cubodex"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionáveis cubodex · série 01</span>
+    <h1 class="display">fiozinho.</h1>
+    <p>A primeira série da Cubodex. Cada miniatura é impressa em 3D, tem número na Dex e muda de cor ou acabamento.</p>
+  </div>
+  <div class="wrap">
+    <div class="pack" id="pack"></div>
+    <div class="section-head" style="margin-top:36px"><h2 class="display">todas da série</h2><span class="mono muted">12 miniaturas · exemplo</span></div>
+    <div class="grid a-col" id="serieGrid"></div>
+  </div>
+</section>
+
+<!-- DEX -->
+<section class="view" id="v-dex" hidden>
+  <div class="wrap tcgwrap"><nav class="colnav" aria-label="Colecionáveis Cubodex"></nav></div>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">colecionáveis cubodex · dex</span>
+    <h1 class="display">sua dex.</h1>
+    <p>Marque o que você tem e o que quer. A coleção fica salva na sua conta.</p>
+  </div>
+  <div class="wrap" style="margin-top:20px"><div id="dexBody"></div></div>
+</section>
+
+<!-- CRIAR -->
+<section class="view" id="v-criar" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">criar · oficina 3d</span>
+    <h1 class="display">peças que você usa.</h1>
+    <p>Organizadores, dados e itens de RPG impressos em 3D. Material e medidas aparecem em cada peça. Não achou? Peça sob medida.</p>
+  </div>
+  <div class="wrap section" style="padding-top:28px">
+    <div class="grid" id="criarGrid"></div>
+  </div>
+  <div class="wrap section">
+    <div class="section-head"><h2 class="display">como funciona a encomenda</h2></div>
+    <ol class="steps" style="padding:0;list-style:none">
+      <li><span class="mono">passo 1</span><b>conte o que precisa</b><p>Medidas, uso e uma foto ou arquivo de referência.</p></li>
+      <li><span class="mono">passo 2</span><b>receba o orçamento</b><p>Resposta pelo WhatsApp, com material e prazo.</p></li>
+      <li><span class="mono">passo 3</span><b>aprove e pague</b><p>Você confirma antes de imprimir.</p></li>
+      <li><span class="mono">passo 4</span><b>imprimimos e enviamos</b><p>Frete calculado pelo seu CEP.</p></li>
+    </ol>
+  </div>
+  <div class="wrap section" id="encomenda">
+    <div class="order">
+      <div>
+        <h2 class="display" style="font-size:clamp(34px,5vw,56px)">peça sob medida.</h2>
+        <p class="soft" style="margin-top:14px;max-width:44ch">Descreva a peça. No site real, este formulário abre a conversa no WhatsApp da Cubodex com os dados já preenchidos.</p>
+      </div>
+      <div class="panel">
+        <form id="formEncomenda" class="form-grid" novalidate>
+          <div class="field"><label for="en-nome">nome</label><input class="input" id="en-nome" type="text" autocomplete="name" placeholder="seu nome"></div>
+          <div class="field"><label for="en-zap">whatsapp</label><input class="input" id="en-zap" type="tel" inputmode="tel" placeholder="(11) 90000-0000"></div>
+          <div class="field full"><label for="en-desc">o que você precisa</label><textarea class="textarea" id="en-desc" placeholder="Ex.: display para 12 cards gradados, com base inclinada"></textarea></div>
+          <div class="field"><label for="en-med">medidas (mm)</label><input class="input" id="en-med" type="text" placeholder="L × A × P"></div>
+          <div class="field"><label for="en-mat">material</label><select class="select" id="en-mat"><option>PLA</option><option>PETG</option><option>ainda não sei</option></select></div>
+          <div class="field full"><label for="en-arq">arquivo ou foto de referência</label><input class="input" id="en-arq" type="file"></div>
+          <div class="full"><button class="btn btn--full" type="submit">pedir orçamento</button></div>
+          <div class="full" id="en-msg" role="status" aria-live="polite"></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTA -->
+<section class="view" id="v-conta" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">minha conta</span>
+    <h1 class="display">conta.</h1>
+  </div>
+  <div class="wrap" id="contaBody"></div>
+</section>
+
+<!-- CARRINHO -->
+<section class="view" id="v-carrinho" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">carrinho</span>
+    <h1 class="display">seu carrinho.</h1>
+  </div>
+  <div class="wrap" id="cartBody"></div>
+</section>
+
+<!-- APOIO -->
+<section class="view" id="v-apoio" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">apoio</span>
+    <h1 class="display">ajuda.</h1>
+  </div>
+  <div class="wrap">
+    <div class="tabs" role="tablist" aria-label="Apoio" id="apoioTabs">
+      <button class="chip" role="tab" data-tab="sobre">sobre</button>
+      <button class="chip" role="tab" data-tab="comprar">como comprar</button>
+      <button class="chip" role="tab" data-tab="frete">frete e prazos</button>
+      <button class="chip" role="tab" data-tab="contato">contato</button>
+      <button class="chip" role="tab" data-tab="termos">termos de uso</button>
+      <button class="chip" role="tab" data-tab="privacidade">privacidade</button>
+      <button class="chip" role="tab" data-tab="faq">faq</button>
+    </div>
+    <div id="apoioBody"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap cols">
+    <div>
+      <a class="brand" href="#home" data-go="home" aria-label="cubodex, página inicial"><span class="logo"><svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="#3ED9F0"/><polygon points="8,15 24,24 24,42 8,33" fill="#F42744"/><polygon points="24,24 40,15 40,33 24,42" fill="#C0223B"/></svg></span><span class="wordmark" style="color:var(--fg)">cubodex</span></a>
+      <p class="mono" style="margin-top:14px">@cubodex · instagram · tiktok</p>
+    </div>
+    <ul class="mono">
+      <li><a href="#apoio" data-go="apoio" data-tab="sobre">sobre</a></li>
+      <li><a href="#apoio" data-go="apoio" data-tab="comprar">como comprar</a></li>
+      <li><a href="#apoio" data-go="apoio" data-tab="frete">frete e prazos</a></li>
+      <li><a href="#apoio" data-go="apoio" data-tab="contato">contato</a></li>
+      <li><a href="#apoio" data-go="apoio" data-tab="termos">termos de uso</a></li>
+      <li><a href="#apoio" data-go="apoio" data-tab="privacidade">política de privacidade</a></li>
+      <li><a href="#apoio" data-go="apoio" data-tab="faq">faq</a></li>
+    </ul>
+  </div>
+  <div class="wrap"><p class="disclaimer">A Cubodex não é afiliada à The Pokémon Company.</p></div>
+</footer>
+
+<div class="themer" id="themer">
+  <div class="themer-panel" id="themerPanel" role="group" aria-label="Tema de cores" hidden></div>
+  <button class="themer-btn" id="themerBtn" type="button" aria-expanded="false" aria-controls="themerPanel"><span class="sw" id="themerSw"></span><span id="themerLbl">tema</span></button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var brl=function(n){return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})};
+var pad=function(n){return String(n).padStart(3,'0')};
+var esc=function(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+var norm=function(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')};
+
+/* ---------- cor e cubo ---------- */
+function mix(hex,t,to){var n=parseInt(hex.slice(1),16),r=n>>16,g=(n>>8)&255,b=n&255;var f=function(c){return Math.round(c+(to-c)*t)};return '#'+[f(r),f(g),f(b)].map(function(v){return v.toString(16).padStart(2,'0')}).join('')}
+var CS=' stroke="rgba(16,20,25,.3)" stroke-width=".9" stroke-linejoin="round"';
+function cube(c){return '<svg viewBox="0 0 48 48" aria-hidden="true"><polygon points="24,6 40,15 24,24 8,15" fill="'+mix(c,.35,255)+'"'+CS+'/><polygon points="8,15 24,24 24,42 8,33" fill="'+c+'"'+CS+'/><polygon points="24,24 40,15 40,33 24,42" fill="'+mix(c,.32,0)+'"'+CS+'/></svg>'}
+
+/* ---------- dados de exemplo ---------- */
+var VARIANTS=[
+  ['base','#F42744','comum'],['ciano','#3ED9F0','comum'],['preto fosco','#3A434F','comum'],['branco','#EDEFF2','comum'],
+  ['cinza','#7A8595','comum'],['vermelho sombra','#C0223B','rara'],['dourado','#D9A441','rara'],['prata','#B8C0CC','rara'],
+  ['translúcido','#8FE3F2','rara'],['brilha no escuro','#A6F2A0','especial'],['madeira','#B8875A','especial'],['mármore','#C9CDD6','especial']];
+var MINI_PRICE={comum:22,rara:29,especial:39};
+var P=[
+  {id:'a1',kind:'acc',name:'porta-card rígido',price:18,note:'impresso em 3D'},
+  {id:'a2',kind:'acc',name:'deck box 60 cards',price:54,note:'impresso em 3D'},
+  {id:'a3',kind:'acc',name:'suporte de exibição',price:16,note:'impresso em 3D'},
+  {id:'a4',kind:'acc',name:'suporte para card gradado',price:24,note:'impresso em 3D'},
+  {id:'k1',kind:'craft',name:'organizador de dados',price:42,spec:[['material','PLA'],['medidas','90 × 60 × 28 mm'],['impressão','~4 h']],note:'6 vãos'},
+  {id:'k2',kind:'craft',name:'torre de dados',price:96,spec:[['material','PETG'],['medidas','80 × 80 × 160 mm'],['impressão','~11 h']],note:'queda interna em rampa'},
+  {id:'k3',kind:'craft',name:'bandeja de dados com tampa',price:78,spec:[['material','PLA'],['medidas','200 × 200 × 30 mm'],['impressão','~9 h']],note:'tampa encaixa'},
+  {id:'k4',kind:'craft',name:'suporte para escudo de mestre',price:38,spec:[['material','PLA'],['medidas','140 × 120 × 45 mm'],['impressão','~5 h']],note:'rpg'},
+  {id:'k5',kind:'craft',name:'organizador de tokens',price:52,spec:[['material','PLA'],['medidas','150 × 100 × 25 mm'],['impressão','~6 h']],note:'12 vãos'},
+  {id:'k6',kind:'craft',name:'gaveta modular de miniaturas',price:64,spec:[['material','PLA'],['medidas','120 × 120 × 60 mm'],['impressão','~8 h']],note:'empilhável'}
+];
+VARIANTS.forEach(function(v,i){P.push({id:'m'+(i+1),kind:'mini',n:i+1,name:'fiozinho '+v[0],price:MINI_PRICE[v[2]],rar:v[2],color:v[1]})});
+var BY={};P.forEach(function(p){BY[p.id]=p});
+
+/* tcg (exemplo): sets, cartas de referência e itens à venda. A fonte real é o TCGdex. */
+var SETS=[
+  {id:'base1',name:'Base Set',serie:'Base',year:1999,total:102,tone:'#F42744',langs:['EN']},
+  {id:'jungle',name:'Jungle',serie:'Base',year:1999,total:64,tone:'#3ED9F0',langs:['EN']},
+  {id:'fossil',name:'Fossil',serie:'Base',year:1999,total:62,tone:'#D9A441',langs:['EN']},
+  {id:'sv151',name:'151',serie:'Escarlate e Violeta',year:2023,total:165,tone:'#8FE3F2',langs:['PT','EN']}];
+var SBY={};SETS.forEach(function(x){SBY[x.id]=x});
+var CARDS=[
+  ['base1',1,'alakazam','rara holo','psíquico'],['base1',2,'blastoise','rara holo','água'],['base1',4,'charizard','rara holo','fogo'],
+  ['base1',10,'mewtwo','rara holo','psíquico'],['base1',15,'venusaur','rara holo','planta'],['base1',58,'pikachu','comum','elétrico'],
+  ['jungle',5,'kangaskhan','rara holo','incolor'],['jungle',11,'snorlax','rara holo','incolor'],['jungle',12,'vaporeon','rara holo','água'],['jungle',60,'pikachu','comum','elétrico'],
+  ['fossil',4,'dragonite','rara holo','incolor'],['fossil',5,'gengar','rara holo','psíquico'],['fossil',10,'lapras','rara holo','água'],
+  ['sv151',3,'venusaur ex','dupla rara','planta'],['sv151',6,'charizard ex','dupla rara','fogo'],['sv151',25,'pikachu','comum','elétrico'],
+  ['sv151',94,'gengar','incomum','psíquico'],['sv151',150,'mewtwo','rara','psíquico'],['sv151',151,'mew ex','dupla rara','psíquico']
+].map(function(r){return {id:r[0]+'-'+r[1],set:r[0],n:r[1],name:r[2],rar:r[3],tipo:r[4]}});
+var CBY={};CARDS.forEach(function(c){CBY[c.id]=c});
+var ITEMS=[
+  {id:'i1',card:'base1-4',variant:'1ª edição',lang:'EN',price:890,qty:1,grade:{co:'PSA',n:8},status:'estoque',added:2},
+  {id:'i2',card:'base1-2',variant:'normal',lang:'EN',price:420,qty:2,status:'estoque',added:6},
+  {id:'i3',card:'base1-10',variant:'normal',lang:'EN',price:150,qty:3,status:'estoque',added:9},
+  {id:'i4',card:'base1-58',variant:'normal',lang:'EN',price:60,qty:5,status:'estoque',added:12},
+  {id:'i5',card:'base1-15',variant:'normal',lang:'EN',price:480,qty:1,grade:{co:'CGC',n:8},status:'estoque',added:4},
+  {id:'i6',card:'fossil-5',variant:'normal',lang:'EN',price:85,qty:2,status:'estoque',added:15},
+  {id:'i7',card:'jungle-11',variant:'normal',lang:'EN',price:45,qty:0,status:'esgotado',added:30},
+  {id:'i8',card:'sv151-6',variant:'normal',lang:'PT',price:120,qty:4,status:'estoque',added:1},
+  {id:'i9',card:'sv151-151',variant:'holo',lang:'PT',price:65,qty:10,status:'prevenda',added:0},
+  {id:'i10',card:'sv151-25',variant:'reverse holo',lang:'PT',price:18,qty:12,status:'estoque',added:3},
+  {id:'i11',card:'sv151-94',variant:'holo',lang:'EN',price:25,qty:6,status:'estoque',added:7},
+  {id:'i12',card:'sv151-6',variant:'holo',lang:'EN',price:140,qty:2,status:'estoque',added:5}];
+function itemName(it){var c=CBY[it.card];return c.name+' '+c.n+'/'+SBY[c.set].total}
+ITEMS.forEach(function(it){BY[it.id]={id:it.id,kind:'item',name:itemName(it),price:it.price,qty:it.qty,status:it.status,lang:it.lang,variant:it.variant,grade:it.grade||null}});
+var SEED_VAULT=[
+  {id:'v1',name:'blastoise 2/102',meta:'EN · normal',date:'03/10',qty:1,st:'cofre'},
+  {id:'v2',name:'pikachu 25/165',meta:'PT · reverse holo',date:'09/10',qty:2,st:'cofre'},
+  {id:'v3',name:'gengar 5/62',meta:'EN · normal',date:'28/09',qty:1,st:'envio'},
+  {id:'v4',name:'mewtwo 10/102',meta:'EN · normal',date:'12/09',qty:1,st:'enviado'}];
+var SEED_HIST=[
+  {d:'09/10',t:'guardado no cofre · pikachu 25/165 (2 un.)'},
+  {d:'09/10',t:'compra · pikachu 25/165 (2 un.)'},
+  {d:'03/10',t:'guardado no cofre · blastoise 2/102'},
+  {d:'03/10',t:'compra · blastoise 2/102'},
+  {d:'30/09',t:'pedido de envio · gengar 5/62'},
+  {d:'28/09',t:'guardado no cofre · gengar 5/62'},
+  {d:'15/09',t:'enviado · mewtwo 10/102'},
+  {d:'13/09',t:'pedido de envio · mewtwo 10/102'},
+  {d:'12/09',t:'guardado no cofre · mewtwo 10/102'}];
+var PACK_SIZE=3, PACK_PRICE=54;
+var SERIES=[{id:'s1',label:'série 01',name:'fiozinho',open:true},{id:'s2',label:'série 02',name:'em breve',open:false}];
+var SEED_DEX={m1:'have',m2:'have',m4:'have',m6:'have',m9:'have',m7:'want',m11:'want'};
+
+/* ---------- estado ---------- */
+var KEY='cubodex-proto-v1';
+var S={user:{name:'colecionador demo',email:'demo@exemplo.com'},cart:[],dex:SEED_DEX,pack:[],dexF:'todos',dexS:'s1',ship:null,payNote:false,cep:'',apoio:'sobre',img:true,setQ:'',setAno:'',setId:'base1',setRar:'',setOnly:false,cardId:'base1-4',vault:SEED_VAULT,hist:SEED_HIST,vSel:{},vCep:'',vShipIdx:null};
+try{var raw=localStorage.getItem(KEY);if(raw){var st=JSON.parse(raw);if('user' in st)S.user=st.user;if(Array.isArray(st.cart))S.cart=st.cart;if(st.dex&&typeof st.dex==='object')S.dex=st.dex;if(Array.isArray(st.vault))S.vault=st.vault;if(Array.isArray(st.hist))S.hist=st.hist}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({user:S.user,cart:S.cart,dex:S.dex,vault:S.vault,hist:S.hist}))}catch(e){}}
+
+var toastT;
+function toast(msg){var t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('show')},2200)}
+
+/* ---------- carrinho ---------- */
+function cartCount(){return S.cart.reduce(function(a,l){return a+l.qty},0)}
+function updateBadge(){var b=$('#cartCount');var n=cartCount();b.textContent=n;b.setAttribute('data-n',n)}
+function addToCart(id){
+  var p=BY[id];if(!p)return;
+  var l=S.cart.filter(function(x){return x.id===id})[0];
+  if(p.kind==='item'&&p.status==='estoque'&&l&&l.qty>=p.qty){toast('só '+p.qty+' un. em estoque');return}
+  if(l)l.qty++;else S.cart.push({id:id,name:p.name,price:p.price,qty:1,color:p.color||null,sub:subOf(p),kind:p.kind,dest:p.kind==='item'?'send':null});
+  save();updateBadge();toast('adicionado: '+p.name);
+}
+function subOf(p){
+  if(p.kind==='item')return p.lang+' · '+p.variant+(p.grade?' · '+p.grade.co+' '+p.grade.n:'')+(p.status==='prevenda'?' · pré-venda':'');
+  return p.kind==='mini'?'colecionável #'+pad(p.n):p.kind==='craft'?'criar':'acessório';
+}
+function addPack(){
+  if(S.pack.length<PACK_SIZE)return;
+  var names=S.pack.map(function(id){return BY[id].name.replace('fiozinho ','')}).join(', ');
+  S.cart.push({id:'pack-'+Date.now(),name:'pacote fiozinho',price:PACK_PRICE,qty:1,color:'#F42744',sub:names});
+  S.pack=[];save();updateBadge();toast('pacote no carrinho');
+}
+
+/* ---------- tiles ---------- */
+function tile(p){
+  var media,meta='',spec='';
+  if(p.kind==='card'){
+    media='<div class="media media--card ph"><span class="mono ph-label">foto da carta</span></div>';
+    meta='<p class="mono meta">'+esc(p.grade)+' · '+esc(p.rar)+(p.note?' · '+esc(p.note):'')+'</p>';
+  }else if(p.kind==='acc'){
+    media='<div class="media media--sq ph"><span class="mono ph-label">foto do produto</span></div>';
+    meta='<p class="mono meta">'+esc(p.note)+'</p>';
+  }else if(p.kind==='mini'){
+    media='<div class="media media--mini" style="--c:'+p.color+'"><span class="mono num-tag">#'+pad(p.n)+'</span>'+cube(p.color)+'</div>';
+    meta='<p class="mono muted">'+esc(p.rar)+' · série 01</p>';
+  }else{
+    media='<div class="media media--craft"><span class="mono ph-label">foto do processo</span></div>';
+    spec='<dl class="spec">'+p.spec.map(function(r){return '<dt>'+esc(r[0])+'</dt><dd>'+esc(r[1])+'</dd>'}).join('')+'</dl>';
+  }
+  var extra=p.kind==='mini'?'<button class="btn btn--ghost btn--sm" data-packadd="'+p.id+'">+ pacote</button>':'';
+  return '<article class="tile">'+media+'<div class="body"><h3>'+esc(p.name)+'</h3>'+meta+spec+
+    '<div class="row"><span class="price num">'+brl(p.price)+'</span><div class="actions">'+extra+'<button class="btn btn--sm" data-add="'+p.id+'">adicionar</button></div></div></div></article>';
+}
+function fill(sel,ids){$(sel).innerHTML=ids.map(function(id){return tile(BY[id])}).join('')}
+
+/* ---------- renders ---------- */
+function renderHome(){
+  $('#hl-tcg').innerHTML=[BY.i1,BY.i2,BY.i8].map(function(b){return itemTile(ITEMS.filter(function(it){return it.id===b.id})[0])}).join('');fill('#hl-col',['m1','m6','m10']);fill('#hl-criar',['k1','k2','k3']);
+  $('#news').innerHTML=
+    '<a class="news news--hot" href="#serie" data-go="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega em</h3><span class="cd num" data-t="2026-11-14T12:00:00-03:00">--</span><span class="mono">data de exemplo</span></a>'+
+    '<a class="news" href="#tcg" data-go="tcg"><span class="mono tag">novidade · tcg</span><h3>charizard 4/102 · 1ª edição</h3><span class="mono soft">PSA 8 · última unidade</span></a>'+
+    '<a class="news" href="#criar" data-go="criar"><span class="mono tag">novo em criar</span><h3>torre de dados</h3><span class="mono soft">PETG · 80 × 80 × 160 mm</span></a>'+
+    '<a class="news" href="#avisos" data-scroll="avisos"><span class="mono tag">lista de avisos</span><h3>receba o próximo lançamento primeiro</h3><span class="mono soft">entrar na lista →</span></a>';
+  tickCd();
+}
+/* ---------- tcg: cartas, sets, cofre ---------- */
+function flag(l){
+  var svg=l==='PT'
+    ?'<svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009C3B"/><polygon points="10,2 18,7 10,12 2,7" fill="#FFDF00"/><circle cx="10" cy="7" r="3" fill="#002776"/></svg>'
+    :'<svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#FFFFFF"/><g fill="#B22234"><rect width="20" height="2"/><rect y="4" width="20" height="2"/><rect y="8" width="20" height="2"/><rect y="12" width="20" height="2"/></g><rect width="9" height="8" fill="#3C3B6E"/></svg>';
+  return '<span class="flag" title="'+(l==='PT'?'português':'inglês')+'">'+svg+'<span class="mono">'+l+'</span></span>';
+}
+function imgLabel(){return S.img?'imagem de referência · tcgdex':'imagem desativada'}
+function uniq(a){return a.filter(function(v,i){return a.indexOf(v)===i})}
+function gradeChip(it){return it.grade?'<span class="mono grade">'+esc(it.grade.co)+' '+it.grade.n+'</span>':''}
+function itemTile(it){
+  var c=CBY[it.card],st=it.status,so=st==='esgotado';
+  var tag=so?'<span class="state-tag">esgotado</span>':st==='prevenda'?'<span class="state-tag pre">pré-venda</span>':'';
+  var btn=so?'<button class="btn btn--sm" disabled style="opacity:.45;cursor:not-allowed">esgotado</button>':'<button class="btn btn--sm" data-add="'+it.id+'">adicionar</button>';
+  return '<article class="tile'+(so?' soldout':'')+'">'+
+    '<a class="media media--card ph" href="#carta" data-go="carta" data-id="'+c.id+'" aria-label="Ver a carta '+esc(itemName(it))+'">'+tag+'<span class="mono ph-label">'+imgLabel()+'</span></a>'+
+    '<div class="body"><h3><a href="#carta" data-go="carta" data-id="'+c.id+'" style="text-decoration:none">'+esc(itemName(it))+'</a></h3>'+
+    '<p class="mono muted">'+esc(SBY[c.set].name)+'</p>'+
+    '<div class="badges">'+flag(it.lang)+'<span class="mono pill">'+esc(it.variant)+'</span>'+gradeChip(it)+'</div>'+
+    '<p class="mono qty-un num">'+(so?0:it.qty)+' un.</p>'+
+    '<div class="row"><span class="price num">'+brl(it.price)+'</span>'+btn+'</div></div></article>';
+}
+function renderTcgNav(v){
+  var items=[['tcg','cartas à venda'],['acessorios','acessórios'],['cofre','cofre virtual'],['sets','enciclopédia de sets']];
+  var k=v==='set'?'sets':v==='carta'?'':v;
+  var h=items.map(function(i){return '<a href="#'+i[0]+'" data-go="'+i[0]+'"'+(i[0]==='sets'?' class="enc"':'')+(i[0]===k?' aria-current="page"':'')+'>'+i[1]+'</a>'}).join('');
+  $$('.tcgnav').forEach(function(n){n.innerHTML=h});
+}
+function renderColNav(v){
+  var items=[['colecionaveis','séries'],['dex','dex']];
+  var k=v==='serie'?'colecionaveis':v;
+  var h=items.map(function(i){return '<a href="#'+i[0]+'" data-go="'+i[0]+'"'+(i[0]===k?' aria-current="page"':'')+'>'+i[1]+'</a>'}).join('');
+  $$('.colnav').forEach(function(n){n.innerHTML=h});
+}
+var F={q:'',set:'',rar:'',tipo:'',lang:'',variant:'',graded:false,stock:false,min:'',max:'',sort:'recentes'};
+function optHtml(vals,label){return '<option value="">'+label+'</option>'+vals.map(function(v){return '<option value="'+esc(v)+'">'+esc(v)+'</option>'}).join('')}
+function fillFilters(){
+  var sel=$('#f-set');if(sel.options.length>1)return;
+  sel.innerHTML='<option value="">todos os sets</option>'+SETS.map(function(x){return '<option value="'+x.id+'">'+esc(x.name)+'</option>'}).join('');
+  $('#f-rar').innerHTML=optHtml(uniq(CARDS.map(function(c){return c.rar})),'todas as raridades');
+  $('#f-tipo').innerHTML=optHtml(uniq(CARDS.map(function(c){return c.tipo})),'todos os tipos');
+  $('#f-lang').innerHTML=optHtml(['PT','EN'],'todos os idiomas');
+  $('#f-var').innerHTML=optHtml(['normal','holo','reverse holo','1ª edição'],'todas as variantes');
+  $('#f-sort').innerHTML=[['recentes','mais recentes'],['menor','menor preço'],['maior','maior preço'],['az','A–Z']].map(function(o){return '<option value="'+o[0]+'">'+o[1]+'</option>'}).join('');
+  if(window.innerWidth<860)$('#filtersBox').removeAttribute('open');
+}
+function syncFilters(){
+  var map={q:'#f-q',set:'#f-set',rar:'#f-rar',tipo:'#f-tipo',lang:'#f-lang',variant:'#f-var',min:'#f-min',max:'#f-max',sort:'#f-sort'};
+  Object.keys(map).forEach(function(k){$(map[k]).value=F[k]});
+  $('#f-grad').checked=F.graded;$('#f-stock').checked=F.stock;
+}
+function filteredItems(){
+  var q=norm(F.q.trim()),min=parseFloat(F.min),max=parseFloat(F.max);
+  var l=ITEMS.filter(function(it){
+    var c=CBY[it.card];
+    if(q&&norm(itemName(it)+' '+SBY[c.set].name).indexOf(q)<0)return false;
+    if(F.set&&c.set!==F.set)return false;
+    if(F.rar&&c.rar!==F.rar)return false;
+    if(F.tipo&&c.tipo!==F.tipo)return false;
+    if(F.lang&&it.lang!==F.lang)return false;
+    if(F.variant&&it.variant!==F.variant)return false;
+    if(F.graded&&!it.grade)return false;
+    if(F.stock&&it.status!=='estoque')return false;
+    if(!isNaN(min)&&it.price<min)return false;
+    if(!isNaN(max)&&it.price>max)return false;
+    return true;
+  });
+  l.sort(function(a,b){
+    if(F.sort==='menor')return a.price-b.price;
+    if(F.sort==='maior')return b.price-a.price;
+    if(F.sort==='az')return itemName(a).localeCompare(itemName(b),'pt');
+    return a.added-b.added;
+  });
+  return l;
+}
+function renderTcgGrid(){
+  var l=filteredItems();
+  $('#tcgCount').textContent=l.length+(l.length===1?' item':' itens');
+  $('#tcgGrid').innerHTML=l.length?l.map(itemTile).join(''):'<div class="empty" style="grid-column:1/-1"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">nada encontrado.</h3><p>Nenhum item com esses filtros. Afrouxe um filtro ou limpe tudo.</p><button class="btn btn--ghost btn--sm" data-fclear="1">limpar filtros</button></div>';
+}
+function renderTcg(){fillFilters();syncFilters();renderTcgGrid()}
+function renderAcessorios(){fill('#accGrid',['a1','a2','a3','a4'])}
+
+function cardItems(id){return ITEMS.filter(function(it){return it.card===id&&it.status!=='esgotado'})}
+function setsInSale(id){return uniq(ITEMS.filter(function(it){return CBY[it.card].set===id&&it.status!=='esgotado'}).map(function(it){return it.card})).length}
+function setCard(x){
+  var n=setsInSale(x.id);
+  return '<a class="setcard" href="#set" data-go="set" data-id="'+x.id+'"><span class="setlogo" style="background:'+x.tone+'"><b class="display">'+esc(x.name)+'</b></span><span style="min-width:0"><span class="mono muted">'+x.year+' · '+x.total+' cartas</span><br>'+(n?'<span class="mono tag">'+n+' à venda na cubodex</span>':'<span class="mono muted">nenhuma à venda</span>')+'</span></a>';
+}
+function renderSetsBody(){
+  var q=norm(S.setQ.trim());
+  var l=SETS.filter(function(x){return(!q||norm(x.name+' '+x.serie).indexOf(q)>-1)&&(!S.setAno||String(x.year)===S.setAno)});
+  var groups=uniq(l.map(function(x){return x.serie}));
+  $('#setsBody').innerHTML=groups.length?groups.map(function(g){
+    return '<div class="sets-group"><h2 class="display">'+esc(g)+'</h2><div class="grid-sets">'+l.filter(function(x){return x.serie===g}).map(setCard).join('')+'</div></div>';
+  }).join(''):'<div class="empty"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">nenhum set encontrado.</h3><p>Tente outro nome ou outro ano.</p></div>';
+}
+function renderSets(){
+  var ys=$('#s-ano');
+  if(ys.options.length<2)ys.innerHTML='<option value="">todos os anos</option>'+uniq(SETS.map(function(x){return x.year})).sort().map(function(y){return '<option value="'+y+'">'+y+'</option>'}).join('');
+  $('#s-q').value=S.setQ;ys.value=S.setAno;
+  renderSetsBody();
+}
+function cardTile(c){
+  var its=cardItems(c.id),hit=its.length>0;
+  var min=hit?Math.min.apply(null,its.map(function(i){return i.price})):0;
+  return '<article class="tile'+(hit?' hit':'')+'"><a class="media media--card ph" href="#carta" data-go="carta" data-id="'+c.id+'" aria-label="Ver '+esc(c.name)+'"><span class="mono ph-label">'+imgLabel()+'</span></a>'+
+    '<div class="body"><span class="mono muted num">'+c.n+'/'+SBY[c.set].total+'</span><h3><a href="#carta" data-go="carta" data-id="'+c.id+'" style="text-decoration:none">'+esc(c.name)+'</a></h3><p class="mono muted">'+esc(c.rar)+' · '+esc(c.tipo)+'</p>'+
+    '<div class="row">'+(hit?'<span class="mono tag">a partir de '+brl(min)+'</span><a class="btn btn--sm" href="#carta" data-go="carta" data-id="'+c.id+'">comprar</a>':'<span class="mono muted">sem item à venda</span>')+'</div></div></article>';
+}
+function renderSet(){
+  var x=SBY[S.setId]||SETS[0];S.setId=x.id;
+  var cards=CARDS.filter(function(c){return c.set===x.id}).sort(function(a,b){return a.n-b.n});
+  var rars=uniq(cards.map(function(c){return c.rar}));
+  var shown=cards.filter(function(c){return(!S.setRar||c.rar===S.setRar)&&(!S.setOnly||cardItems(c.id).length)});
+  var chips='<button class="chip" data-setrar="" aria-pressed="'+(!S.setRar)+'">todas</button>'+rars.map(function(r){return '<button class="chip" data-setrar="'+esc(r)+'" aria-pressed="'+(S.setRar===r)+'">'+esc(r)+'</button>'}).join('');
+  $('#setBody').innerHTML='<p style="padding-top:20px"><a class="link-more" href="#sets" data-go="sets">← todos os sets</a></p>'+
+    '<div class="page-title" style="padding-inline:0"><span class="eyebrow mono">'+esc(x.serie)+' · '+x.year+'</span><h1 class="display">'+esc(x.name)+'</h1><p>'+x.total+' cartas no set. Idiomas: '+x.langs.join(', ')+'.</p></div>'+
+    '<div class="todo" style="margin-top:14px">Exemplo parcial: mostrando '+shown.length+' de '+x.total+' cartas. Na versão real, a lista completa vem do TCGdex.</div>'+
+    '<div class="toolbar"><div class="chips" role="group" aria-label="Raridade">'+chips+'</div><button class="chip" data-setonly="1" aria-pressed="'+S.setOnly+'">só as que a cubodex tem</button></div>'+
+    '<div class="grid" id="setGrid">'+(shown.length?shown.map(cardTile).join(''):'<div class="empty" style="grid-column:1/-1"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">nenhuma carta aqui.</h3><p>Nenhuma carta com esse filtro neste set.</p></div>')+'</div>';
+}
+function renderCarta(){
+  var c=CBY[S.cardId]||CARDS[0];S.cardId=c.id;var x=SBY[c.set];
+  var its=ITEMS.filter(function(it){return it.card===c.id});
+  var rows=its.length?its.map(function(it){
+    var so=it.status==='esgotado';
+    return '<div class="sale-row"><div class="badges">'+flag(it.lang)+'<span class="mono pill">'+esc(it.variant)+'</span>'+gradeChip(it)+(so?'<span class="mono status">esgotado</span>':it.status==='prevenda'?'<span class="mono status ok">pré-venda</span>':'')+'</div>'+
+      '<span class="mono qty-un num">'+(so?0:it.qty)+' un.</span><span class="price num">'+brl(it.price)+'</span>'+
+      (so?'<button class="btn btn--sm" disabled style="opacity:.45;cursor:not-allowed">esgotado</button>':'<button class="btn btn--sm" data-add="'+it.id+'">adicionar</button>')+'</div>';
+  }).join(''):'<p class="soft">A Cubodex não tem item à venda desta carta agora.</p>';
+  $('#cartaBody').innerHTML='<p style="padding-top:20px"><a class="link-more" href="#set" data-go="set" data-id="'+x.id+'">← '+esc(x.name)+'</a></p>'+
+    '<div class="cardpage"><div class="media media--card ph" style="margin:0;width:100%"><span class="mono ph-label">'+imgLabel()+'</span></div>'+
+    '<div><span class="eyebrow mono">'+esc(x.name)+' · '+c.n+'/'+x.total+'</span><h1 class="display" style="font-size:clamp(44px,7vw,84px)">'+esc(c.name)+'</h1>'+
+    '<dl class="spec"><dt>set</dt><dd>'+esc(x.name)+'</dd><dt>número</dt><dd>'+c.n+'/'+x.total+'</dd><dt>raridade</dt><dd>'+esc(c.rar)+'</dd><dt>tipo</dt><dd>'+esc(c.tipo)+'</dd><dt>idiomas</dt><dd>'+x.langs.join(', ')+'</dd></dl>'+
+    '<div class="section-head" style="margin-bottom:0"><h2 class="display" style="font-size:28px">à venda</h2></div>'+rows+'</div></div>';
+}
+function vaultOpts(n){
+  var d=parseInt(S.vCep.charAt(0),10)||0;
+  var o=[{name:'econômico',days:'6 a 9 dias úteis',price:12.9+d*1.1+n*1.5},{name:'expresso',days:'2 a 4 dias úteis',price:25.5+d*1.6+n*1.5}];
+  o.forEach(function(x){x.price=Math.round(x.price*100)/100});
+  return o;
+}
+function vaultShip(){
+  var sel=S.vault.filter(function(v){return v.st==='cofre'&&S.vSel[v.id]});
+  if(!sel.length||S.vShipIdx===null)return;
+  var d=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+  sel.forEach(function(v){v.st='envio';S.hist.unshift({d:d,t:'pedido de envio · '+v.name})});
+  S.vSel={};S.vShipIdx=null;save();renderCofre();toast('pedido de envio criado (simulado)');
+}
+var VST={cofre:['no cofre','status ok'],envio:['envio solicitado','status'],enviado:['enviado','status']};
+function renderCofre(){
+  var b=$('#cofreBody');
+  if(!S.user){
+    b.innerHTML='<div class="empty" style="margin-top:20px"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">entre para abrir o cofre.</h3><p>O cofre fica ligado à sua conta. Entre para ver os itens guardados.</p><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn" data-login="demo">entrar como demo</button><a class="btn btn--ghost" href="#conta" data-go="conta">ir para a conta</a></div></div>';
+    return;
+  }
+  var sel=S.vault.filter(function(v){return v.st==='cofre'&&S.vSel[v.id]});
+  var nsel=sel.reduce(function(a,v){return a+v.qty},0);
+  var rows=S.vault.map(function(v){
+    var on=v.st==='cofre',ss=VST[v.st];
+    return '<label class="vrow'+(on?'':' off')+'"><input type="checkbox" data-vsel="'+v.id+'"'+(S.vSel[v.id]?' checked':'')+(on?'':' disabled')+' aria-label="Selecionar '+esc(v.name)+'"><span class="vph ph"></span>'+
+      '<span style="min-width:0"><b style="text-transform:lowercase">'+esc(v.name)+'</b><br><span class="mono muted">'+esc(v.meta)+' · '+esc(v.date)+' · '+v.qty+' un.</span></span><span class="mono '+ss[1]+'">'+ss[0]+'</span></label>';
+  }).join('');
+  var optsHtml='';
+  if(S.vCep&&nsel>0){
+    var opts=vaultOpts(nsel);
+    optsHtml='<div class="form-stack" style="gap:8px">'+opts.map(function(o,i){return '<button class="ship-opt" data-vship="'+i+'" aria-pressed="'+(S.vShipIdx===i)+'"><span><b>'+o.name+'</b><br><span class="mono muted">'+o.days+'</span></span><span class="num">'+brl(o.price)+'</span></button>'}).join('')+'<p class="muted" style="font-size:12px">Valores simulados. No site real, vêm do Melhor Envio pelo CEP.</p></div>';
+  }
+  var ready=nsel>0&&S.vShipIdx!==null;
+  var hist=S.hist.map(function(h){return '<li><span class="mono muted">'+esc(h.d)+'</span><br>'+esc(h.t)+'</li>'}).join('');
+  b.innerHTML='<div class="vault-grid"><div><div class="section-head" style="margin-bottom:6px"><h2 class="display" style="font-size:28px">seus itens</h2><span class="mono muted">'+S.vault.filter(function(v){return v.st==='cofre'}).length+' no cofre · exemplo</span></div>'+rows+
+    '<div class="section-head" style="margin:36px 0 10px"><h2 class="display" style="font-size:28px">histórico</h2></div><ol class="timeline">'+hist+'</ol></div>'+
+    '<aside class="summary"><h3 class="display" style="font-size:26px">pedir envio</h3><p class="soft">'+(nsel?nsel+' un. selecionadas':'Marque os itens que quer receber.')+'</p>'+
+    '<form id="formVFrete" class="form-stack" novalidate style="gap:10px"><div class="field"><label for="vcep">cep de entrega</label><div style="display:flex;gap:8px"><input class="input" id="vcep" inputmode="numeric" maxlength="9" placeholder="00000-000" value="'+esc(S.vCep?S.vCep.slice(0,5)+'-'+S.vCep.slice(5):'')+'"><button class="btn btn--ghost" type="submit">calcular</button></div></div><div id="vcep-msg" class="muted" style="font-size:13px" role="status"></div></form>'+optsHtml+
+    '<button class="btn btn--full" data-vpay="1"'+(ready?'':' disabled style="opacity:.45;cursor:not-allowed"')+'>pagar frete e pedir envio</button>'+
+    '<p class="muted" style="font-size:12px">Neste protótipo o frete não é cobrado. O item sai do estoque à venda na compra, mas continua com a Cubodex até o envio.</p>'+
+    '<div class="todo"><b>Decisões em aberto.</b> Envio sem custo junto de uma nova compra, e prazo máximo de guarda com o que acontece depois dele.</div></aside></div>';
+}
+
+function dexTotals(){
+  var items=P.filter(function(p){return p.kind==='mini'});
+  var have=items.filter(function(p){return S.dex[p.id]==='have'}).length;
+  var want=items.filter(function(p){return S.dex[p.id]==='want'}).length;
+  return {total:items.length,have:have,want:want,items:items};
+}
+function renderColecionaveis(){
+  var t=dexTotals();
+  $('#seriesRow').innerHTML=SERIES.map(function(s){
+    if(s.open)return '<a class="series" href="#serie" data-go="serie"><div class="thumb">'+cube('#F42744')+'</div><div><span class="mono tag">'+s.label+' · disponível</span><h3>'+s.name+'</h3><p class="muted" style="font-size:14px">'+t.total+' miniaturas · '+t.have+' na sua dex</p></div></a>';
+    return '<div class="series locked"><div class="thumb mono muted" style="font-size:22px">?</div><div><span class="mono muted">'+s.label+' · em breve</span><h3>'+s.name+'</h3><p class="muted" style="font-size:14px">avise-me no lançamento</p></div></div>';
+  }).join('');
+  $('#dexTeaser').innerHTML='<div class="dex-top"><div><p class="mono muted">sua coleção</p><p class="dex-count num">'+t.have+'<small>de '+t.total+' coletados</small></p></div>'+dexBar(t)+'</div>';
+  tickCd();
+}
+function dexBar(t){
+  return '<div class="dex-bar" role="img" aria-label="'+t.have+' de '+t.total+' coletados">'+t.items.map(function(p){var s=S.dex[p.id];return '<span class="'+(s==='have'?'on':s==='want'?'want':'')+'"></span>'}).join('')+'</div>';
+}
+function renderSerie(){
+  var slots='';
+  for(var i=0;i<PACK_SIZE;i++){var id=S.pack[i];slots+=id?'<div class="slot filled" style="--c:'+BY[id].color+'">'+cube(BY[id].color)+'</div>':'<div class="slot mono">'+(i+1)+'</div>'}
+  var full=S.pack.length===PACK_SIZE;
+  $('#pack').innerHTML='<div class="slots">'+slots+'</div>'+
+    '<div><h3 class="display" style="font-size:28px">monte seu pacote</h3><p class="soft" style="font-size:15px;margin-top:4px">Toque em “+ pacote” nas miniaturas abaixo. Pacote de '+PACK_SIZE+': <b class="num" style="color:var(--fg)">'+brl(PACK_PRICE)+'</b> <span class="muted">(preço de exemplo)</span></p></div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--ghost btn--sm" data-packclear="1"'+(S.pack.length?'':' disabled style="opacity:.4"')+'>esvaziar</button><button class="btn" data-packbuy="1"'+(full?'':' disabled style="opacity:.4;cursor:not-allowed"')+'>'+(full?'adicionar pacote':'faltam '+(PACK_SIZE-S.pack.length))+'</button></div>';
+  $('#serieGrid').innerHTML=P.filter(function(p){return p.kind==='mini'}).map(tile).join('');
+}
+function renderDex(){
+  var body=$('#dexBody');
+  if(!S.user){
+    body.innerHTML='<div class="empty"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">entre para ver sua dex.</h3><p>A dex fica salva na sua conta. Entre ou crie uma conta para marcar o que você tem e o que quer.</p><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn" data-login="demo">entrar como demo</button><a class="btn btn--ghost" href="#conta" data-go="conta">ir para a conta</a></div></div>';
+    return;
+  }
+  var t=dexTotals();
+  var statusF=['todos','tenho','quero','faltam'];
+  var chipsS=SERIES.map(function(s){return '<button class="chip" data-dexs="'+s.id+'" aria-pressed="'+(S.dexS===s.id)+'">'+s.label+(s.open?'':' · em breve')+'</button>'}).join('');
+  var chipsF=statusF.map(function(f){return '<button class="chip" data-dexf="'+f+'" aria-pressed="'+(S.dexF===f)+'">'+f+'</button>'}).join('');
+  var grid='';
+  if(S.dexS==='s1'){
+    var items=t.items.filter(function(p){var s=S.dex[p.id];return S.dexF==='todos'||(S.dexF==='tenho'&&s==='have')||(S.dexF==='quero'&&s==='want')||(S.dexF==='faltam'&&s!=='have')});
+    grid=items.length?items.map(function(p){
+      var s=S.dex[p.id]||'';
+      return '<article class="dex-tile '+(s||'none')+'"><div class="dex-art" style="--c:'+p.color+'"><span class="mono num-tag">#'+pad(p.n)+'</span>'+cube(p.color)+'</div>'+
+        '<div class="dex-meta"><h3>'+esc(p.name)+'</h3><span class="mono muted">'+esc(p.rar)+'</span></div>'+
+        '<div class="dex-actions"><button class="tog" data-dex="'+p.id+'" data-st="have" aria-pressed="'+(s==='have')+'">tenho</button><button class="tog" data-dex="'+p.id+'" data-st="want" aria-pressed="'+(s==='want')+'">quero</button></div></article>';
+    }).join(''):'<div class="empty" style="grid-column:1/-1"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">nenhuma miniatura aqui.</h3><p>Nada marcado como “'+S.dexF+'” nesta série.</p></div>';
+  }else{
+    for(var i=13;i<=24;i++)grid+='<article class="dex-tile dex-locked"><div class="dex-art"><span class="mono num-tag">#'+pad(i)+'</span>?</div><div class="dex-meta"><h3>???</h3><span class="mono muted">em breve</span></div><div style="height:14px"></div></article>';
+  }
+  body.innerHTML='<div class="dex-top"><div><p class="mono muted">sua coleção · exemplo</p><p class="dex-count num">'+t.have+'<small>de '+t.total+' coletados</small></p><p class="mono soft" style="margin-top:8px">'+t.want+' na lista de desejos</p></div>'+dexBar(t)+'</div>'+
+    '<div class="toolbar"><div class="chips" role="group" aria-label="Série">'+chipsS+'</div><div class="chips" role="group" aria-label="Filtrar">'+chipsF+'</div></div>'+
+    '<div class="grid a-col">'+grid+'</div>';
+}
+function renderCriar(){fill('#criarGrid',['k1','k2','k3','k4','k5','k6'])}
+function renderConta(){
+  var b=$('#contaBody');
+  if(!S.user){
+    b.innerHTML='<div class="cols-2"><div class="card"><h2>entrar</h2><form id="formLogin" class="form-stack" novalidate><div class="field"><label for="lg-email">e-mail</label><input class="input" id="lg-email" type="email" autocomplete="email" placeholder="voce@exemplo.com"></div><div class="field"><label for="lg-pass">senha</label><input class="input" id="lg-pass" type="password" autocomplete="current-password" placeholder="qualquer valor neste protótipo"></div><button class="btn" type="submit">entrar</button><p class="muted" style="font-size:13px">Protótipo: nada é enviado nem salvo fora deste navegador.</p></form></div>'+
+      '<div class="card"><h2>criar conta</h2><form id="formCadastro" class="form-stack" novalidate><div class="field"><label for="cd-nome">nome</label><input class="input" id="cd-nome" type="text" autocomplete="name"></div><div class="field"><label for="cd-email">e-mail</label><input class="input" id="cd-email" type="email" autocomplete="email"></div><label class="check"><input type="checkbox" id="cd-ok"><span>Li os termos de uso e a política de privacidade, e autorizo o uso dos meus dados para pedidos e entrega. <em class="muted">(texto provisório, a versão final precisa de revisão jurídica)</em></span></label><button class="btn" type="submit">criar conta</button><div id="cd-msg" role="status" aria-live="polite"></div></form></div></div>'+
+      '<p style="margin-top:20px"><button class="linkbtn" data-login="demo">entrar como demo</button></p>';
+    return;
+  }
+  var t=dexTotals();
+  b.innerHTML='<p class="soft" style="margin-top:8px">Olá, <b style="color:var(--fg)">'+esc(S.user.name)+'</b>. <button class="linkbtn" data-logout="1">sair</button></p>'+
+    '<div class="cols-2"><div class="card"><h3>pedidos</h3>'+
+      '<div class="order-row"><div><b>#1042 · torre de dados</b><br><span class="mono muted">exemplo</span></div><span class="mono status ok">enviado</span></div>'+
+      '<div class="order-row"><div><b>#1051 · pacote fiozinho</b><br><span class="mono muted">exemplo</span></div><span class="mono status">pago</span></div>'+
+      '<div class="order-row" style="border:0"><div><b>#1057 · charizard holo 1ª edição</b><br><span class="mono muted">exemplo</span></div><span class="mono status">aguardando pagamento</span></div></div>'+
+    '<div class="card"><h3>minha dex</h3><p class="dex-count num">'+t.have+'<small>de '+t.total+' coletados</small></p>'+dexBar(t)+'<a class="btn btn--ghost" href="#dex" data-go="dex">abrir dex</a></div>'+
+    '<div class="card"><h3>cofre</h3><p class="dex-count num">'+S.vault.filter(function(v){return v.st==='cofre'}).length+'<small>itens guardados</small></p><a class="btn btn--ghost" href="#cofre" data-go="cofre">abrir cofre</a></div>'+
+    '<div class="card"><h3>endereços</h3><p class="soft">Rua Exemplo, 123 · apto 45<br>São Paulo / SP · CEP 01000-000</p><span class="mono muted">endereço de exemplo</span></div>'+
+    '<div class="card"><h3>dados e privacidade</h3><p class="soft">'+esc(S.user.email||'')+'</p><p class="muted" style="font-size:14px">Aqui o cliente pede cópia ou exclusão dos dados (LGPD). Tela a definir com apoio jurídico.</p></div></div>';
+}
+function needShip(){return S.cart.some(function(l){return l.dest!=='vault'})}
+function cartTotals(){
+  var sub=S.cart.reduce(function(a,l){return a+l.price*l.qty},0);
+  var ns=needShip();
+  var ship=ns&&S.ship?S.ship.price:0;
+  return {sub:sub,ship:ship,total:sub+ship,ns:ns};
+}
+function renderCart(){
+  var b=$('#cartBody');
+  if(!S.cart.length){
+    b.innerHTML='<div class="empty" style="margin-top:24px"><div class="mascot-slot mono">fiozinho aqui</div><h3 class="display">carrinho vazio.</h3><p>Nada por aqui ainda. Comece por uma das duas portas.</p><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><a class="btn" href="#colecionar" data-go="colecionar">colecionar</a><a class="btn btn--ghost" href="#criar" data-go="criar">criar</a></div></div>';
+    return;
+  }
+  var tot=cartTotals();
+  var lines=S.cart.map(function(l,i){
+    var c=l.color||'#7A8595';
+    var dest=l.kind==='item'?'<div class="dest" role="group" aria-label="O que fazer com este item"><button data-dest="'+i+'" data-v="send" aria-pressed="'+(l.dest!=='vault')+'">enviar agora</button><button data-dest="'+i+'" data-v="vault" aria-pressed="'+(l.dest==='vault')+'">guardar no cofre</button></div>':'';
+    return '<div class="line"><div class="thumb '+(l.color?'c':'ph')+'" style="--c:'+c+'">'+(l.color?cube(c):'')+'</div>'+
+      '<div style="min-width:0"><h3>'+esc(l.name)+'</h3><p class="mono muted" style="margin-top:4px">'+esc(l.sub||'')+'</p>'+dest+'</div>'+
+      '<div class="end"><span class="price num">'+brl(l.price*l.qty)+'</span><div class="qty"><button data-qty="'+i+'" data-d="-1" aria-label="Diminuir">−</button><span class="num">'+l.qty+'</span><button data-qty="'+i+'" data-d="1" aria-label="Aumentar">+</button></div><button class="linkbtn" data-rm="'+i+'">remover</button></div></div>';
+  }).join('');
+  var shipHtml='';
+  if(tot.ns){
+    shipHtml='<form id="formFrete" class="form-stack" novalidate style="gap:10px"><div class="field"><label for="cep">calcular frete pelo cep</label><div style="display:flex;gap:8px"><input class="input" id="cep" inputmode="numeric" maxlength="9" placeholder="00000-000" value="'+esc(S.cep?S.cep.slice(0,5)+'-'+S.cep.slice(5):'')+'"><button class="btn btn--ghost" type="submit">calcular</button></div></div><div id="cep-msg" class="muted" style="font-size:13px" role="status"></div></form>';
+    if(S.cep){
+      var d=parseInt(S.cep.charAt(0),10)||0;
+      var opts=[{name:'econômico',days:'6 a 9 dias úteis',price:14.9+d*1.1},{name:'expresso',days:'2 a 4 dias úteis',price:27.5+d*1.6}];
+      opts.forEach(function(o){o.price=Math.round(o.price*100)/100});
+      S.opts=opts;
+      shipHtml+='<div class="form-stack" style="gap:8px">'+opts.map(function(o,i){return '<button class="ship-opt" data-ship="'+i+'" aria-pressed="'+(S.ship&&S.ship.name===o.name)+'"><span><b>'+o.name+'</b><br><span class="mono muted">'+o.days+'</span></span><span class="num">'+brl(o.price)+'</span></button>'}).join('')+'<p class="muted" style="font-size:12px">Valores simulados. No site real, vêm do Melhor Envio pelo CEP.</p></div>';
+    }
+    if(S.cart.some(function(l){return l.dest==='vault'}))shipHtml+='<p class="muted" style="font-size:13px">Itens marcados para o cofre ficam guardados e não entram neste frete.</p>';
+  }else{
+    shipHtml='<p class="soft">Tudo vai para o cofre. O frete é calculado quando você pedir o envio.</p>';
+  }
+  var canPay=!tot.ns||!!S.ship;
+  b.innerHTML='<div class="cart-grid"><div>'+lines+'</div><aside class="summary" aria-label="Resumo">'+shipHtml+
+    '<div class="sum-row"><span class="soft">subtotal</span><span class="num">'+brl(tot.sub)+'</span></div>'+
+    '<div class="sum-row"><span class="soft">frete</span><span class="num">'+(!tot.ns?'no cofre':S.ship?brl(tot.ship):'calcule acima')+'</span></div>'+
+    '<div class="sum-row total"><span>total</span><span class="num">'+brl(tot.total)+'</span></div>'+
+    '<button class="btn btn--full" data-pay="1"'+(canPay?'':' disabled style="opacity:.45;cursor:not-allowed"')+'>pagar com mercado pago</button>'+
+    (S.payNote?'<div class="msg" role="status"><b>Fase 2.</b> Aqui o cliente seguiria para o checkout hospedado do Mercado Pago. O pedido só viria como “pago” depois que o Mercado Pago avisar o servidor, e só então os itens marcados para guardar entrariam no cofre. Neste protótipo nenhum pagamento é feito.</div>':'')+
+    '</aside></div>';
+}
+var APOIO={
+  sobre:'<h2>sobre a cubodex</h2><p>A Cubodex junta duas coisas: cartas de pokémon originais e peças impressas em 3D. Colecionar e criar na mesma loja.</p><div class="todo">História do Fiozinho: texto a escrever.</div>',
+  comprar:'<h2>como comprar</h2><p>Escolha os itens, calcule o frete pelo CEP no carrinho e pague pelo checkout do Mercado Pago. Para peças sob medida, peça um orçamento em Criar antes.</p><div class="todo">Texto de exemplo. Revisar quando o fluxo real existir.</div>',
+  frete:'<h2>frete e prazos</h2><p>O frete é calculado por CEP no carrinho. Peças impressas sob encomenda têm prazo combinado no orçamento.</p><div class="todo">Prazos reais e transportadoras: a definir.</div>',
+  contato:'<h2>contato</h2><p>Instagram e TikTok: <b style="color:var(--fg)">@cubodex</b>. Orçamentos e dúvidas pelo WhatsApp.</p><div class="todo">Número de WhatsApp: a preencher.</div>',
+  privacidade:'<h2>política de privacidade</h2><p>Cadastro, e-mail e endereço são dados pessoais e entram na LGPD. A política e o texto de consentimento do cadastro serão escritos com apoio jurídico.</p><div class="todo">Texto provisório. Não usar em produção sem revisão.</div>',
+  termos:'<h2>termos de uso</h2><p>Os termos precisam cobrir a guarda de itens no cofre, extravio e o prazo máximo de guarda.</p><div class="todo">Requisitos legais não verificados. Texto a ser escrito com apoio de um advogado.</div>',
+  faq:'<h2>faq</h2><div class="faq"><details open><summary>O que é o cofre virtual?</summary><p>É onde ficam as cartas que você comprou na Cubodex e escolheu guardar. Você junta vários itens e pede um envio só.</p></details><details><summary>Como escolho entre enviar agora e guardar?</summary><p>No carrinho, cada carta tem as opções enviar agora ou guardar no cofre.</p></details><details><summary>Posso guardar cartas que já tenho?</summary><p>Na primeira versão não. O cofre guarda só itens comprados na Cubodex.</p></details><details><summary>Por quanto tempo posso guardar uma carta?</summary><p>O prazo máximo ainda não foi definido.</p></details><details><summary>A Cubodex é afiliada à The Pokémon Company?</summary><p>Não.</p></details><details><summary>Posso pedir uma peça sob medida?</summary><p>Sim, em Criar. O orçamento vem pelo WhatsApp.</p></details></div><div class="todo">FAQ provisória, a revisar com as decisões em aberto.</div>'
+};
+function renderApoio(){
+  $$('#apoioTabs [data-tab]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-tab')===S.apoio));b.setAttribute('aria-selected',String(b.getAttribute('data-tab')===S.apoio))});
+  $('#apoioBody').innerHTML='<div class="prose">'+APOIO[S.apoio]+'</div>';
+}
+
+/* ---------- contagem regressiva ---------- */
+function tickCd(){
+  $$('.cd').forEach(function(el){
+    var t=new Date(el.getAttribute('data-t')).getTime()-Date.now();
+    if(isNaN(t)||t<=0){el.textContent='já saiu';return}
+    var d=Math.floor(t/864e5),h=Math.floor(t%864e5/36e5),m=Math.floor(t%36e5/6e4),s=Math.floor(t%6e4/1e3);
+    el.textContent=d+'d '+String(h).padStart(2,'0')+'h '+String(m).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';
+  });
+}
+setInterval(tickCd,1000);
+
+/* ---------- navegação ---------- */
+var AREA={home:'home',colecionar:'home',tcg:'tcg',acessorios:'tcg',sets:'tcg',set:'tcg',carta:'tcg',cofre:'tcg',colecionaveis:'col',serie:'col',dex:'col',criar:'criar',conta:'home',carrinho:'home',apoio:'home'};
+var GROUP={colecionar:'col',tcg:'col',acessorios:'col',sets:'col',set:'col',carta:'col',cofre:'col',colecionaveis:'col',serie:'col',dex:'col',criar:'criar'};
+var SUB=['colecionar','tcg','acessorios','sets','set','carta','cofre','colecionaveis','serie','dex'];
+var SUBKEY={dex:'colecionaveis',acessorios:'tcg',sets:'tcg',set:'tcg',carta:'tcg',cofre:'tcg',serie:'colecionaveis'};
+var TCGV=['tcg','acessorios','sets','set','carta','cofre'];
+var RENDER={home:renderHome,tcg:renderTcg,acessorios:renderAcessorios,sets:renderSets,set:renderSet,carta:renderCarta,cofre:renderCofre,colecionaveis:renderColecionaveis,serie:renderSerie,dex:renderDex,criar:renderCriar,conta:renderConta,carrinho:renderCart,apoio:renderApoio};
+var cur='home';
+function go(v,opt){
+  if(!AREA[v])v='home';
+  opt=opt||{};cur=v;
+  if(v==='apoio'&&opt.tab&&APOIO[opt.tab])S.apoio=opt.tab;
+  if(v==='carrinho')S.payNote=false;
+  if(opt.id){if(v==='set')S.setId=opt.id;if(v==='carta')S.cardId=opt.id}
+  $$('.view').forEach(function(s){s.hidden=s.id!=='v-'+v});
+  document.body.className='a-'+AREA[v];
+  $$('[data-nav]').forEach(function(a){if(a.getAttribute('data-nav')===GROUP[v])a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  var sub=$('#subnav');sub.hidden=SUB.indexOf(v)<0;
+  $$('[data-sub]').forEach(function(a){var k=a.getAttribute('data-sub');if(k===(SUBKEY[v]||v))a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+  if(TCGV.indexOf(v)>-1)renderTcgNav(v);
+  if(v==='colecionaveis'||v==='serie'||v==='dex')renderColNav(v);
+  if(RENDER[v])RENDER[v]();
+  if(!opt.keepScroll)window.scrollTo(0,0);
+  try{history.replaceState(null,'','#'+v)}catch(e){}
+}
+function refresh(){if(RENDER[cur])RENDER[cur]()}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',function(e){
+  if(e.target.closest('#themerBtn')){togglePanel();return}
+  var so=e.target.closest('[data-settema]');
+  if(so){setTema(so.getAttribute('data-settema'),true);togglePanel(false);return}
+  if(!e.target.closest('#themer'))togglePanel(false);
+  var t=e.target.closest('[data-go],[data-add],[data-packadd],[data-packclear],[data-packbuy],[data-fclear],[data-setrar],[data-setonly],[data-dest],[data-vship],[data-vpay],[data-dex],[data-dexs],[data-dexf],[data-qty],[data-rm],[data-ship],[data-pay],[data-login],[data-logout],[data-tab],[data-scroll]');
+  if(!t)return;
+  if(t.hasAttribute('data-go')){e.preventDefault();go(t.getAttribute('data-go'),{tab:t.getAttribute('data-tab'),id:t.getAttribute('data-id')});return}
+  if(t.hasAttribute('data-scroll')){e.preventDefault();var el=document.getElementById(t.getAttribute('data-scroll'));if(el)el.scrollIntoView({behavior:'smooth',block:'center'});return}
+  if(t.hasAttribute('data-add')){addToCart(t.getAttribute('data-add'));return}
+  if(t.hasAttribute('data-packadd')){
+    if(S.pack.length>=PACK_SIZE){toast('pacote cheio');return}
+    S.pack.push(t.getAttribute('data-packadd'));renderSerie();toast('no pacote: '+S.pack.length+' de '+PACK_SIZE);return}
+  if(t.hasAttribute('data-packclear')){S.pack=[];renderSerie();return}
+  if(t.hasAttribute('data-packbuy')){addPack();renderSerie();return}
+  if(t.hasAttribute('data-fclear')){F={q:'',set:'',rar:'',tipo:'',lang:'',variant:'',graded:false,stock:false,min:'',max:'',sort:'recentes'};syncFilters();renderTcgGrid();return}
+  if(t.hasAttribute('data-setrar')){S.setRar=t.getAttribute('data-setrar');renderSet();return}
+  if(t.hasAttribute('data-setonly')){S.setOnly=!S.setOnly;renderSet();return}
+  if(t.hasAttribute('data-dest')){var li=S.cart[+t.getAttribute('data-dest')];if(li){li.dest=t.getAttribute('data-v');save();renderCart()}return}
+  if(t.hasAttribute('data-vship')){S.vShipIdx=+t.getAttribute('data-vship');renderCofre();return}
+  if(t.hasAttribute('data-vpay')){vaultShip();return}
+  if(t.hasAttribute('data-dex')){
+    var id=t.getAttribute('data-dex'),st=t.getAttribute('data-st');
+    if(S.dex[id]===st)delete S.dex[id];else S.dex[id]=st;
+    save();renderDex();return}
+  if(t.hasAttribute('data-dexs')){S.dexS=t.getAttribute('data-dexs');renderDex();return}
+  if(t.hasAttribute('data-dexf')){S.dexF=t.getAttribute('data-dexf');renderDex();return}
+  if(t.hasAttribute('data-qty')){
+    var i=+t.getAttribute('data-qty'),d=+t.getAttribute('data-d'),ln=S.cart[i],bp=BY[ln.id];
+    if(d>0&&bp&&bp.kind==='item'&&bp.status==='estoque'&&ln.qty>=bp.qty){toast('só '+bp.qty+' un. em estoque');return}
+    ln.qty=Math.max(1,ln.qty+d);save();updateBadge();renderCart();return}
+  if(t.hasAttribute('data-rm')){S.cart.splice(+t.getAttribute('data-rm'),1);save();updateBadge();renderCart();return}
+  if(t.hasAttribute('data-ship')){S.ship=S.opts[+t.getAttribute('data-ship')];renderCart();return}
+  if(t.hasAttribute('data-pay')){S.payNote=true;renderCart();return}
+  if(t.hasAttribute('data-login')){S.user={name:'colecionador demo',email:'demo@exemplo.com'};save();refresh();toast('entrou como demo');return}
+  if(t.hasAttribute('data-logout')){S.user=null;save();refresh();return}
+  if(t.hasAttribute('data-tab')&&!t.hasAttribute('data-go')){S.apoio=t.getAttribute('data-tab');renderApoio();return}
+});
+document.addEventListener('input',function(e){
+  var tg=e.target;
+  if(tg.hasAttribute('data-f')){F[tg.getAttribute('data-f')]=tg.type==='checkbox'?tg.checked:tg.value;renderTcgGrid();return}
+  if(tg.hasAttribute('data-s')){if(tg.getAttribute('data-s')==='q')S.setQ=tg.value;else S.setAno=tg.value;renderSetsBody();return}
+  if(tg.hasAttribute('data-vsel')){S.vSel[tg.getAttribute('data-vsel')]=tg.checked;renderCofre();return}
+  if(tg.id==='imgSwitch'){S.img=tg.checked;refresh();return}
+  if(e.target.id==='cep'||e.target.id==='vcep'){var v=e.target.value.replace(/\D/g,'').slice(0,8);e.target.value=v.length>5?v.slice(0,5)+'-'+v.slice(5):v}
+});
+document.addEventListener('submit',function(e){
+  var f=e.target;e.preventDefault();
+  if(f.id==='formAvisos'){
+    var em=$('#av-email').value.trim(),ok=$('#av-ok').checked,m=$('#av-msg');
+    if(!/^\S+@\S+\.\S+$/.test(em)){m.innerHTML='<div class="msg">Digite um e-mail válido.</div>';return}
+    if(!ok){m.innerHTML='<div class="msg">Marque o aceite para entrar na lista.</div>';return}
+    m.innerHTML='<div class="msg"><b>Na lista.</b> Neste protótipo o e-mail não é enviado a lugar nenhum.</div>';
+  }
+  if(f.id==='formEncomenda'){
+    var d=$('#en-desc').value.trim(),m2=$('#en-msg');
+    if(!d){m2.innerHTML='<div class="msg">Descreva o que você precisa para pedir o orçamento.</div>';return}
+    m2.innerHTML='<div class="msg"><b>Pedido registrado.</b> No site real, a conversa abriria no WhatsApp com estes dados. Aqui nada é enviado.</div>';
+  }
+  if(f.id==='formLogin'){
+    var le=$('#lg-email').value.trim();
+    S.user={name:le?le.split('@')[0]:'colecionador demo',email:le||'demo@exemplo.com'};save();renderConta();toast('você entrou');
+  }
+  if(f.id==='formCadastro'){
+    var ne=$('#cd-email').value.trim(),nn=$('#cd-nome').value.trim(),mm=$('#cd-msg');
+    if(!/^\S+@\S+\.\S+$/.test(ne)){mm.innerHTML='<div class="msg">Digite um e-mail válido.</div>';return}
+    if(!$('#cd-ok').checked){mm.innerHTML='<div class="msg">O aceite dos termos de uso e da política de privacidade é obrigatório para criar a conta.</div>';return}
+    S.user={name:nn||ne.split('@')[0],email:ne};S.dex={};save();renderConta();toast('conta criada');
+  }
+  if(f.id==='formVFrete'){
+    var vc=$('#vcep').value.replace(/\D/g,'');
+    if(vc.length!==8){$('#vcep-msg').textContent='CEP com 8 dígitos, por favor.';return}
+    S.vCep=vc;S.vShipIdx=null;renderCofre();
+  }
+  if(f.id==='formFrete'){
+    var c=$('#cep').value.replace(/\D/g,'');
+    if(c.length!==8){$('#cep-msg').textContent='CEP com 8 dígitos, por favor.';return}
+    S.cep=c;S.ship=null;renderCart();
+  }
+});
+
+/* ---------- temas ---------- */
+var THEMES=[
+  {id:'escuro',note:'original, preto cubodex',bg:'#101419',ac:'#F42744'},
+  {id:'1a',note:'cinza frio · cards brancos',bg:'#EEF1F4',ac:'#F42744'},
+  {id:'1b',note:'creme quente',bg:'#F5F2EC',ac:'#E5233F'},
+  {id:'1c',note:'cinza suave · tons amenos',bg:'#E9EAEC',ac:'#D9384F'},
+  {id:'1d',note:'branco puro',bg:'#FFFFFF',ac:'#F42744'}];
+var TKEY='cubodex-proto-tema';
+var tema='escuro';
+function themeById(id){return THEMES.filter(function(t){return t.id===id})[0]||THEMES[0]}
+function renderThemer(){
+  var cur=themeById(tema);
+  var sw=$('#themerSw');sw.style.background=cur.bg;sw.style.setProperty('--sa',cur.ac);
+  $('#themerLbl').textContent='tema · '+cur.id;
+  $('#themerPanel').innerHTML=THEMES.map(function(t){
+    return '<button class="themer-opt" type="button" data-settema="'+t.id+'" aria-pressed="'+(t.id===tema)+'"><span class="sw" style="background:'+t.bg+';--sa:'+t.ac+'"></span><span><b>'+t.id+'</b><span class="mono">'+t.note+'</span></span></button>';
+  }).join('')+'<label class="check themer-img"><input type="checkbox" id="imgSwitch"'+(S.img?' checked':'')+'><span>mostrar imagens do tcgdex</span></label>';
+}
+function setTema(id,persist){
+  tema=themeById(id).id;
+  document.documentElement.setAttribute('data-tema',tema);
+  if(persist){try{localStorage.setItem(TKEY,tema)}catch(e){}}
+  renderThemer();
+}
+function togglePanel(open){
+  var p=$('#themerPanel'),b=$('#themerBtn');
+  var o=typeof open==='boolean'?open:p.hidden;
+  p.hidden=!o;b.setAttribute('aria-expanded',String(o));
+}
+(function(){
+  var saved=null;try{saved=localStorage.getItem(TKEY)}catch(e){}
+  var rt=document.documentElement.getAttribute('data-theme');
+  var light=false;try{light=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches}catch(e){}
+  var first=saved?saved:(rt==='light'?'1a':rt==='dark'?'escuro':(light?'1a':'escuro'));
+  setTema(first,false);
+})();
+
+/* ---------- início ---------- */
+updateBadge();
+var start='home';
+try{var h=location.hash.replace('#','');if(AREA[h])start=h}catch(e){}
+go(start,{keepScroll:true});
+})();
+</script>
+
+</body></html>
