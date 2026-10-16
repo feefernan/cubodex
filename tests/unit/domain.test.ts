@@ -170,6 +170,9 @@ describe('validação', () => {
     expect(isEmail('a@b')).toBe(false);
     expect(cepDigits('01.310-100x9')).toBe('01310100');
     expect(formatCep('0131')).toBe('0131');
+    expect(formatCep('01310')).toBe('01310');
+    expect(isEmail('a@b.co x')).toBe(false);
+    expect(isEmail('x a@b.co')).toBe(false);
     expect(formatCep('01310100')).toBe('01310-100');
   });
   it('contagem regressiva', () => {
@@ -177,6 +180,7 @@ describe('validação', () => {
     expect(countdown('2026-11-14T12:00:00-03:00', now)).toBe('1d 01h 01m 03s');
     expect(countdown('2026-11-14T12:00:00-03:00', now + 864e5 * 2)).toBe('já saiu');
     expect(countdown('data ruim', now)).toBe('já saiu');
+    expect(countdown('2026-11-14T12:00:00-03:00', new Date('2026-11-14T12:00:00-03:00').getTime())).toBe('já saiu');
   });
 });
 

@@ -40,6 +40,7 @@ export interface AppState extends PersistedState {
 export const DEMO_USER: User = { name: 'colecionador demo', email: 'demo@exemplo.com' };
 
 // shortcut: o visitante começa logado como demo com dados de exemplo, como no protótipo — corrigir em #5.
+// Stryker disable all
 const SEED_VAULT: VaultEntry[] = [
   { id: 'v1', name: 'blastoise 2/102', meta: 'EN · normal', date: '03/10', qty: 1, st: 'cofre' },
   { id: 'v2', name: 'pikachu 25/165', meta: 'PT · reverse holo', date: '09/10', qty: 2, st: 'cofre' },
@@ -84,6 +85,8 @@ export const initialState = (): AppState => ({
   vCep: '',
   vShipIdx: null,
 });
+
+// Stryker restore all
 
 /** Junta o que veio salvo ao estado inicial, campo a campo, ignorando o que tem forma errada. */
 // shortcut: só confere o tipo de cada campo, não o conteúdo das linhas — validar de verdade em #9.

@@ -68,6 +68,8 @@ export interface Item {
   added: number;
 }
 
+// Dados de exemplo: literais não são regra, ficam fora do teste de mutação.
+// Stryker disable all
 const VARIANTS: [string, string, Rarity][] = [
   ['base', '#F42744', 'comum'],
   ['ciano', '#3ED9F0', 'comum'],
@@ -167,6 +169,7 @@ export const ITEMS: Item[] = [
   { id: 'i12', card: 'sv151-6', variant: 'holo', lang: 'EN', price: 140, qty: 2, status: 'estoque', added: 5 },
 ];
 
+// Stryker restore all
 export const setById: Record<string, TcgSet> = Object.fromEntries(SETS.map((s) => [s.id, s]));
 export const cardById: Record<string, Card> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
 
@@ -176,6 +179,7 @@ export const itemName = (it: Item): string => {
   return `${c.name} ${c.n}/${setById[c.set].total}`;
 };
 
+// Stryker disable all
 const PRODUCTS: Product[] = [
   { id: 'a1', kind: 'acc', name: 'porta-card rígido', price: 18, note: 'impresso em 3D' },
   { id: 'a2', kind: 'acc', name: 'deck box 60 cards', price: 54, note: 'impresso em 3D' },
@@ -193,6 +197,7 @@ const PRODUCTS: Product[] = [
   { id: 'k5', kind: 'craft', name: 'organizador de tokens', price: 52, spec: [['material', 'PLA'], ['medidas', '150 × 100 × 25 mm'], ['impressão', '~6 h']], note: '12 vãos' },
   // biome-ignore format: tabela
   { id: 'k6', kind: 'craft', name: 'gaveta modular de miniaturas', price: 64, spec: [['material', 'PLA'], ['medidas', '120 × 120 × 60 mm'], ['impressão', '~8 h']], note: 'empilhável' },
+  // Stryker restore all
   ...VARIANTS.map(
     ([variant, color, rar], i): Mini => ({
       id: `m${i + 1}`,
