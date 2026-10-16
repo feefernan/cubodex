@@ -44,9 +44,8 @@ const lineHtml = (l: (typeof S.cart)[number], i: number) => {
   return `<div class="line"><div class="thumb ${l.color ? 'c' : 'ph'}" style="--c:${c}">${l.color ? cube(c) : ''}</div><div style="min-width:0"><h3>${esc(l.name)}</h3><p class="mono muted" style="margin-top:4px">${esc(l.sub || '')}</p>${dest}</div><div class="end"><span class="price num">${brl(l.price * l.qty)}</span><div class="qty"><button data-action="qty" data-i="${i}" data-d="-1" aria-label="Diminuir">−</button><span class="num">${l.qty}</span><button data-action="qty" data-i="${i}" data-d="1" aria-label="Aumentar">+</button></div><button class="linkbtn" data-action="remove" data-i="${i}">remover</button></div></div>`;
 };
 
-const shippingHtml = (needsShipping: boolean) => {
-  if (!needsShipping)
-    return '<p class="soft">Tudo vai para o cofre. O frete é calculado quando você pedir o envio.</p>';
+const shippingHtml = (shipped: boolean) => {
+  if (!shipped) return '<p class="soft">Tudo vai para o cofre. O frete é calculado quando você pedir o envio.</p>';
   let html = cepForm('formFrete', 'cep', 'calcular frete pelo cep', S.cep);
   if (S.cep) {
     S.shipOpts = quoteCart(S.cep);
