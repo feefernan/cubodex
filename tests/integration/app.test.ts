@@ -22,7 +22,39 @@ const submit = (sel: string) => $<HTMLFormElement>(sel).requestSubmit();
 const goTo = (view: string) => click(`[data-action="go"][data-view="${view}"]`);
 const saved = () => JSON.parse(localStorage.getItem('cubodex-proto-v1') ?? '{}');
 
+/** API da loja e ViaCEP falsos: guardam o que o site mandou e respondem como os reais. */
+const api = {
+  sent: [] as { url: string; body: Record<string, unknown> | null }[],
+  fail: null as null | { status: number; error: string },
+  checkoutUrl: 'https://mp.test/pagar' as string | null,
+  status: 'Aguardando pagamento',
+  products: [] as unknown[],
+};
+const SHIPPING = [
+  { id: 1, name: 'PAC', company: 'Correios', price: 22.5, days: 7 },
+  { id: 2, name: 'SEDEX', company: 'Correios', price: 38.9, days: 3 },
+];
+const apiFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = String(input);
+  const body = init?.body ? JSON.parse(String(init.body)) : null;
+  api.sent.push({ url, body });
+  if (url.startsWith('https://viacep.com.br/'))
+    return Response.json({ logradouro: 'Avenida Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP' });
+  if (api.fail && url !== '/api/catalog') return Response.json({ error: api.fail.error }, { status: api.fail.status });
+  if (url === '/api/catalog') return Response.json({ products: api.products });
+  if (url === '/api/shipping/quote') return Response.json({ options: SHIPPING });
+  if (url === '/api/orders')
+    return Response.json({ serial: 'CBX-20261016-ABCDEF', total: 1, checkoutUrl: api.checkoutUrl }, { status: 201 });
+  if (url.endsWith('/status')) return Response.json({ status: api.status });
+  if (url === '/api/avisos') return Response.json({ ok: true }, { status: 201 });
+  return Response.json({ error: 'não encontrado' }, { status: 404 });
+});
+const lastSent = (url: string) => [...api.sent].reverse().find((c) => c.url === url)?.body;
+const settle = () => new Promise((r) => setTimeout(r, 0));
+
 beforeAll(async () => {
+  vi.stubGlobal('fetch', apiFetch);
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
   window.matchMedia = vi.fn(() => ({ matches: false })) as unknown as typeof window.matchMedia;
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -138,7 +170,9 @@ describe('tcg', () => {
 });
 
 describe('carrinho', () => {
-  it('adiciona, limita ao estoque, calcula frete e paga (simulado)', () => {
+  it('adiciona, limita ao estoque, cota o frete na API e vai para o pagamento', async () => {
+    const { nav } = await import('../../src/ui/cart');
+    const to = vi.spyOn(nav, 'to').mockImplementation(() => {});
     goTo('tcg');
     click('#tcgGrid [data-action="add"][data-id="i1"]');
     expect($('#cartCount').textContent).toBe('1');
@@ -146,7 +180,7 @@ describe('carrinho', () => {
     expect($('#toast').textContent).toBe('só 1 un. em estoque');
     goTo('carrinho');
     expect(document.querySelectorAll('.line')).toHaveLength(1);
-    expect($<HTMLButtonElement>('[data-action="pay"]').disabled).toBe(true);
+    expect($<HTMLButtonElement>('[data-action="checkout-open"]').disabled).toBe(true);
     type('#cep', '1');
     submit('#formFrete');
     expect($('#cep-msg').textContent).toBe('CEP com 8 dígitos, por favor.');
@@ -155,21 +189,116 @@ describe('carrinho', () => {
     type('#cep', '01310100');
     expect($<HTMLInputElement>('#cep').value).toBe('01310-100');
     submit('#formFrete');
-    expect(document.querySelectorAll('.ship-opt')).toHaveLength(2);
+    expect($('#cartBody').textContent).toContain('calculando frete');
+    await vi.waitFor(() => expect(document.querySelectorAll('.ship-opt')).toHaveLength(2));
+    expect(lastSent('/api/shipping/quote')).toEqual({ cep: '01310100', items: [{ id: 'i1', qty: 1, dest: 'send' }] });
+    expect($('.ship-opt').textContent).toContain('Correios PAC');
     click('[data-action="ship"][data-i="1"]');
-    expect($('.sum-row.total').textContent).toContain('917,50');
-    click('[data-action="pay"]');
-    expect($('#cartBody .msg').textContent).toContain('Fase 2');
+    expect($('.sum-row.total').textContent).toContain('928,90');
+
+    click('[data-action="checkout-open"]');
+    await vi.waitFor(() => expect($<HTMLInputElement>('#ck-street').value).toBe('Avenida Paulista'));
+    submit('#formCheckout');
+    expect($('#ck-msg').textContent).toContain('Digite seu nome');
+    expect($('#ck-name').getAttribute('aria-invalid')).toBe('true');
+    type('#ck-name', 'Ana Lima');
+    type('#ck-email', 'ana@exemplo.com');
+    submit('#formCheckout');
+    expect($('#ck-msg').textContent).toContain('número');
+    type('#ck-number', '1000');
+    submit('#formCheckout');
+    expect($('#formCheckout button[type="submit"]').textContent).toBe('registrando pedido…');
+    await vi.waitFor(() => expect(to).toHaveBeenCalledWith('https://mp.test/pagar'));
+    expect(lastSent('/api/orders')).toEqual({
+      items: [{ id: 'i1', qty: 1, dest: 'send' }],
+      customer: { name: 'Ana Lima', email: 'ana@exemplo.com' },
+      address: {
+        cep: '01310100',
+        street: 'Avenida Paulista',
+        number: '1000',
+        complement: '',
+        district: 'Bela Vista',
+        city: 'São Paulo',
+        uf: 'SP',
+      },
+      shipping: { serviceId: 2 },
+    });
     expect(saved().cart).toHaveLength(1);
   });
 
-  it('guardar no cofre tira o frete; quantidade e remover', () => {
+  it('frete indisponível aparece como alerta e não deixa finalizar', async () => {
+    goTo('carrinho');
+    api.fail = { status: 503, error: 'Frete ainda não está ligado. Tente mais tarde.' };
+    submit('#formFrete');
+    await vi.waitFor(() => expect($('#cartBody [role="alert"]').textContent).toContain('Frete ainda não está ligado'));
+    expect($<HTMLButtonElement>('[data-action="checkout-open"]').disabled).toBe(true);
+    api.fail = null;
+    submit('#formFrete');
+    await vi.waitFor(() => expect(document.querySelectorAll('.ship-opt')).toHaveLength(2));
+    click('[data-action="ship"][data-i="1"]');
+  });
+
+  it('erro da API no pedido aparece no formulário e o carrinho fica', async () => {
+    goTo('carrinho');
+    click('[data-action="checkout-open"]');
+    api.fail = { status: 409, error: 'Essa opção de frete mudou. Calcule o frete de novo.' };
+    submit('#formCheckout');
+    await vi.waitFor(() => expect($('#ck-msg').textContent).toContain('opção de frete mudou'));
+    api.fail = null;
+    expect(saved().cart).toHaveLength(1);
+  });
+
+  it('volta do pagamento: mostra o status e, pago, esvazia o carrinho', async () => {
+    location.hash = '#/pedido/CBX-20261016-ABCDEF';
+    await vi.waitFor(() => expect($('#pedidoBody').textContent).toContain('Aguardando a confirmação'));
+    api.status = 'Pago';
+    click('[data-action="order-refresh"]');
+    await vi.waitFor(() => expect($('#pedidoBody').textContent).toContain('Pagamento confirmado'));
+    expect($('#cartCount').textContent).toBe('0');
+    api.fail = { status: 502, error: 'Não foi possível consultar o pedido agora' };
+    click('[data-action="order-refresh"]');
+    await vi.waitFor(() => expect($('#pedidoBody [role="alert"]').textContent).toContain('consultar o pedido'));
+    api.fail = null;
+    // Saiu da página antes da resposta: a resposta atrasada não desenha por cima da tela nova.
+    click('[data-action="order-refresh"]');
+    goTo('criar');
+    await settle();
+    expect($('#pedidoBody').textContent).toContain('consultando');
+    location.hash = '#/pedido/xyz';
+    await vi.waitFor(() => expect($('#pedidoBody').textContent).toContain('não encontrado'));
+    api.status = 'Aguardando pagamento';
+  });
+
+  it('sem Mercado Pago ligado, o pedido vai para a página do pedido', async () => {
+    goTo('tcg');
+    click('#tcgGrid [data-action="add"][data-id="i3"]');
     goTo('carrinho');
     click('[data-action="dest"][data-v="vault"]');
+    click('[data-action="dest"][data-v="send"]');
+    await vi.waitFor(() => expect(document.querySelectorAll('.ship-opt')).toHaveLength(2));
+    click('[data-action="ship"][data-i="0"]');
+    click('[data-action="checkout-open"]');
+    await settle();
+    api.checkoutUrl = null;
+    submit('#formCheckout');
+    await vi.waitFor(() => expect(location.hash).toBe('#/pedido/CBX-20261016-ABCDEF'));
+    api.checkoutUrl = 'https://mp.test/pagar';
+    goTo('carrinho');
+  });
+
+  it('guardar no cofre tira o frete; quantidade e remover', async () => {
+    goTo('carrinho');
+    while (document.querySelector('[data-action="remove"]')) click('[data-action="remove"]');
+    goTo('tcg');
+    click('#tcgGrid [data-action="add"][data-id="i1"]');
+    goTo('carrinho');
+    click('[data-action="dest"][data-v="vault"]');
+    await settle();
     expect($('#cartBody').textContent).toContain('Tudo vai para o cofre');
     click('[data-action="qty"][data-d="1"]');
     expect($('#toast').textContent).toBe('só 1 un. em estoque');
     click('[data-action="remove"]');
+    await settle();
     expect($('#cartBody .empty')).not.toBeNull();
     expect($('#cartCount').dataset.n).toBe('0');
   });
@@ -281,7 +410,7 @@ describe('conta e formulários', () => {
     expect($('#contaBody').textContent).toContain('colecionador demo');
   });
 
-  it('lista de avisos e encomenda validam antes de confirmar', () => {
+  it('lista de avisos vai para a API; encomenda monta o WhatsApp', async () => {
     type('#av-email', 'ruim');
     submit('#formAvisos');
     expect($('#av-msg').textContent).toContain('e-mail válido');
@@ -291,14 +420,20 @@ describe('conta e formulários', () => {
     expect($('#av-msg').textContent).toContain('aceite');
     expect($('#av-email').hasAttribute('aria-invalid')).toBe(false);
     $<HTMLInputElement>('#av-ok').checked = true;
+    api.fail = { status: 503, error: 'A lista de avisos ainda não está ligado. Tente mais tarde.' };
     submit('#formAvisos');
-    expect($('#av-msg').textContent).toContain('Na lista');
+    await vi.waitFor(() => expect($('#av-msg [role="alert"]').textContent).toContain('lista de avisos'));
+    api.fail = null;
+    submit('#formAvisos');
+    await vi.waitFor(() => expect($('#av-msg').textContent).toContain('Na lista'));
+    expect(lastSent('/api/avisos')).toEqual({ email: 'a@b.co', consent: true });
+    expect($<HTMLInputElement>('#av-email').value).toBe('');
     goTo('criar');
     submit('#formEncomenda');
     expect($('#en-msg').textContent).toContain('Descreva');
     $<HTMLTextAreaElement>('#en-desc').value = 'display para 12 cards';
     submit('#formEncomenda');
-    expect($('#en-msg').textContent).toContain('Pedido registrado');
+    expect($('#en-msg').textContent).toContain('WhatsApp da Cubodex ainda não está configurado');
   });
 
   it('ajuda abre na aba do rodapé e troca de aba', () => {

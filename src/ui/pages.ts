@@ -1,5 +1,9 @@
 import { ITEMS, LAUNCH_DATE } from '../domain/catalog';
+import { quoteRequestText, whatsappUrl } from '../domain/contact';
+import { escapeHtml as esc } from '../domain/format';
 import { isEmail } from '../domain/validation';
+import { api } from '../infra/api';
+import { alertMsg, progress } from './cart';
 import { tickCountdowns } from './collectibles';
 import { $, $$, check, onAction, onSubmit } from './dom';
 import { go, registerView } from './router';
@@ -48,6 +52,9 @@ const renderApoio = () => {
   $('#apoioBody').innerHTML = `<div class="prose">${APOIO[S.apoio]}</div>`;
 };
 
+/** Saída para o WhatsApp (trocável nos testes). */
+const nav = { open: (url: string) => window.open(url, '_blank', 'noopener') };
+
 const msgHtml = (html: string) => `<div class="msg">${html}</div>`;
 const message = (el: HTMLElement, html: string) => {
   el.innerHTML = msgHtml(html);
@@ -58,22 +65,47 @@ export const initPages = () => {
   registerView('criar', () => fillProducts($('#criarGrid'), ['k1', 'k2', 'k3', 'k4', 'k5', 'k6']));
   registerView('apoio', renderApoio);
   onAction('apoio-tab', (el) => go('apoio', el.dataset.tab));
-  // shortcut: os formulários só confirmam na tela — lista de avisos em #19, WhatsApp em #18.
-  onSubmit('formAvisos', () => {
+  onSubmit('formAvisos', async (form) => {
     const msg = $('#av-msg');
     const email = $<HTMLInputElement>('#av-email');
     const ok = $<HTMLInputElement>('#av-ok');
     if (!check(email, msg, isEmail(email.value.trim()), msgHtml('Digite um e-mail válido.'))) return;
     if (!check(ok, msg, ok.checked, msgHtml('Marque o aceite para entrar na lista.'))) return;
-    message(msg, '<b>Na lista.</b> Neste protótipo o e-mail não é enviado a lugar nenhum.');
+    const button = $<HTMLButtonElement>('button[type="submit"]', form);
+    button.disabled = true;
+    msg.innerHTML = progress('inscrevendo…');
+    try {
+      await api.subscribe(email.value.trim());
+      message(msg, '<b>Na lista.</b> Você recebe um e-mail quando sair a próxima série.');
+      (form as HTMLFormElement).reset();
+    } catch (e) {
+      msg.innerHTML = alertMsg((e as Error).message);
+    } finally {
+      button.disabled = false;
+    }
   });
   onSubmit('formEncomenda', () => {
     const msg = $('#en-msg');
     const desc = $<HTMLTextAreaElement>('#en-desc');
     if (!check(desc, msg, !!desc.value.trim(), msgHtml('Descreva o que você precisa para pedir o orçamento.'))) return;
+    const text = quoteRequestText({
+      name: $<HTMLInputElement>('#en-nome').value,
+      description: desc.value,
+      size: $<HTMLInputElement>('#en-med').value,
+      material: $<HTMLSelectElement>('#en-mat').value,
+    });
+    const url = whatsappUrl(text);
+    if (!url) {
+      message(
+        msg,
+        'O WhatsApp da Cubodex ainda não está configurado. Fale com a gente pelo Instagram <b>@cubodex</b>.',
+      );
+      return;
+    }
     message(
       msg,
-      '<b>Pedido registrado.</b> No site real, a conversa abriria no WhatsApp com estes dados. Aqui nada é enviado.',
+      `<b>Quase lá.</b> Abrimos o WhatsApp com o seu pedido. Se não abriu, <a href="${esc(url)}" target="_blank" rel="noopener">toque aqui</a>. Fotos e arquivos você manda direto na conversa.`,
     );
+    nav.open(url);
   });
 };

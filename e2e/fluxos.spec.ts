@@ -1,5 +1,29 @@
 import { expect, test } from '@playwright/test';
 
+// API da loja e ViaCEP simulados: respondem como os reais (o Worker local não tem tokens).
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/catalog', (route) => route.fulfill({ json: { products: [] } }));
+  await page.route('**/api/shipping/quote', (route) =>
+    route.fulfill({
+      json: {
+        options: [
+          { id: 1, name: 'PAC', company: 'Correios', price: 22.5, days: 7 },
+          { id: 2, name: 'SEDEX', company: 'Correios', price: 38.9, days: 3 },
+        ],
+      },
+    }),
+  );
+  await page.route('**/api/orders', (route) =>
+    route.fulfill({ status: 201, json: { serial: 'CBX-20261016-E2E2E2', total: 158.9, checkoutUrl: null } }),
+  );
+  await page.route('**/api/orders/*/status', (route) => route.fulfill({ json: { status: 'Novo' } }));
+  await page.route('https://viacep.com.br/**', (route) =>
+    route.fulfill({
+      json: { logradouro: 'Avenida Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP' },
+    }),
+  );
+});
+
 test.describe('fluxos principais', () => {
   test('home carrega sem erros de console', async ({ page }) => {
     const errors: string[] = [];
@@ -10,7 +34,7 @@ test.describe('fluxos principais', () => {
     expect(errors).toEqual([]);
   });
 
-  test('compra de carta: filtro, carrinho, frete e pagamento simulado', async ({ page }) => {
+  test('compra de carta: filtro, carrinho, frete, checkout e pedido', async ({ page }) => {
     await page.goto('/#tcg');
     // No celular os filtros começam recolhidos.
     if (!(await page.locator('#f-lang').isVisible())) await page.locator('#filtersBox summary').click();
@@ -21,9 +45,15 @@ test.describe('fluxos principais', () => {
     await page.locator('.head-actions [data-view="carrinho"]').click();
     await page.locator('#cep').fill('01310100');
     await page.locator('#formFrete button[type="submit"]').click();
-    await page.locator('[data-action="ship"]').first().click();
-    await page.locator('[data-action="pay"]').click();
-    await expect(page.locator('#cartBody .msg')).toContainText('Fase 2');
+    await page.locator('[data-action="ship"]').nth(1).click();
+    await page.locator('[data-action="checkout-open"]').click();
+    await expect(page.locator('#ck-street')).toHaveValue('Avenida Paulista');
+    await page.locator('#ck-name').fill('Ana Lima');
+    await page.locator('#ck-email').fill('ana@exemplo.com');
+    await page.locator('#ck-number').fill('1000');
+    await page.locator('#formCheckout button[type="submit"]').click();
+    await expect(page).toHaveURL(/#\/pedido\/CBX-20261016-E2E2E2$/);
+    await expect(page.locator('#pedidoBody')).toContainText('Pedido registrado');
   });
 
   test('pacote de miniaturas e dex', async ({ page }) => {

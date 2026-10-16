@@ -1,5 +1,5 @@
-import type { CartEntry } from './cart';
-import { MINIS, productById } from './catalog';
+import { type CartEntry, parseCartEntries } from './cart';
+import { MINIS } from './catalog';
 import type { Dex, DexFilter, HistoryEntry, VaultEntry } from './collection';
 import type { ShippingOption } from './shipping';
 
@@ -19,14 +19,25 @@ export interface PersistedState {
   hist: HistoryEntry[];
 }
 
+export type BuyerField = 'name' | 'email' | 'street' | 'number' | 'complement' | 'district' | 'city' | 'uf';
+
 export interface AppState extends PersistedState {
   pack: string[];
   dexF: DexFilter;
   dexS: string;
   ship: ShippingOption | null;
   shipOpts: ShippingOption[];
-  payNote: boolean;
+  /** Frete sendo cotado / erro da última cotação. */
+  quoting: boolean;
+  quoteError: string;
+  /** Formulário de finalizar compra aberto, enviando, e o erro do envio. */
+  checkout: boolean;
+  paying: boolean;
+  payError: string;
+  buyer: Record<BuyerField, string>;
   cep: string;
+  /** Pedido aberto na página de volta do pagamento. */
+  orderSerial: string;
   apoio: string;
   img: boolean;
   setQ: string;
@@ -82,8 +93,14 @@ export const initialState = (): AppState => ({
   dexS: 's1',
   ship: null,
   shipOpts: [],
-  payNote: false,
+  quoting: false,
+  quoteError: '',
+  checkout: false,
+  paying: false,
+  payError: '',
+  buyer: { name: '', email: '', street: '', number: '', complement: '', district: '', city: '', uf: '' },
   cep: '',
+  orderSerial: '',
   apoio: 'sobre',
   img: true,
   setQ: '',
@@ -108,16 +125,6 @@ const parseUser = (v: unknown): User | null =>
   isObj(v) && isText(v.name) && isText(v.email)
     ? { name: v.name, email: v.email, ...(v.demo === true ? { demo: true } : {}) }
     : null;
-
-const parseCartEntry = (v: unknown): CartEntry[] => {
-  if (!isObj(v) || !isText(v.id, 40) || !isQty(v.qty)) return [];
-  const dest = v.dest === 'vault' || v.dest === 'send' ? v.dest : undefined;
-  if (Array.isArray(v.pack)) {
-    const pack = v.pack.filter((id): id is string => typeof id === 'string' && productById[id]?.kind === 'mini');
-    return pack.length === v.pack.length ? [{ id: v.id, qty: v.qty, pack }] : [];
-  }
-  return productById[v.id] ? [{ id: v.id, qty: v.qty, ...(dest ? { dest } : {}) }] : [];
-};
 
 const parseVault = (v: unknown): VaultEntry[] =>
   isObj(v) &&
@@ -147,7 +154,7 @@ const parseDex = (v: unknown): Dex => {
 export const mergePersisted = (base: AppState, saved: unknown): AppState => {
   if (!isObj(saved)) return base;
   base.user = parseUser(saved.user);
-  if (Array.isArray(saved.cart)) base.cart = saved.cart.flatMap(parseCartEntry);
+  base.cart = parseCartEntries(saved.cart);
   base.dex = parseDex(saved.dex);
   if (Array.isArray(saved.vault)) base.vault = saved.vault.flatMap(parseVault);
   if (Array.isArray(saved.hist)) base.hist = saved.hist.flatMap(parseHist);

@@ -15,6 +15,7 @@ const AREA = {
   conta: 'home',
   carrinho: 'home',
   apoio: 'home',
+  pedido: 'home',
 } as const;
 
 export type View = keyof typeof AREA;

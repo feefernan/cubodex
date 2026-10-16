@@ -10,13 +10,18 @@ import {
   toEntry,
 } from '../domain/cart';
 import { brl, escapeHtml as esc } from '../domain/format';
-import { quoteCart } from '../domain/shipping';
-import { cepDigits, formatCep } from '../domain/validation';
+import { type ShippingOption, shippingDays, shippingLabel } from '../domain/shipping';
+import type { BuyerField } from '../domain/state';
+import { cepDigits, formatCep, isEmail } from '../domain/validation';
+import { api, lookupCep } from '../infra/api';
 import { cube, emptyState } from './art';
 import { $, check, disabledAttr, onAction, onInput, onSubmit } from './dom';
-import { registerView } from './router';
+import { currentView, go, registerView } from './router';
 import { persist, S } from './store';
 import { toast } from './toast';
+
+/** Saída para o checkout do Mercado Pago (trocável nos testes: o jsdom não navega para fora). */
+export const nav = { to: (url: string) => location.assign(url) };
 
 export const updateBadge = () => {
   const b = $('#cartCount');
@@ -25,18 +30,17 @@ export const updateBadge = () => {
   b.dataset.n = String(n);
 };
 
-const shipOption = (o: { name: string; days: string; price: number }, i: number, action: string, pressed: boolean) =>
-  `<button class="ship-opt" data-action="${action}" data-i="${i}" aria-pressed="${pressed}"><span><b>${o.name}</b><br><span class="mono muted">${o.days}</span></span><span class="num">${brl(o.price)}</span></button>`;
+const shipOption = (o: ShippingOption, i: number, action: string, pressed: boolean) =>
+  `<button class="ship-opt" data-action="${action}" data-i="${i}" aria-pressed="${pressed}"><span><b>${esc(shippingLabel(o))}</b><br><span class="mono muted">${shippingDays(o.days)}</span></span><span class="num">${brl(o.price)}</span></button>`;
 
-export const shipOptionsHtml = (
-  opts: { name: string; days: string; price: number }[],
-  action: string,
-  isOn: (i: number) => boolean,
-) =>
-  `<div class="form-stack" style="gap:8px">${opts.map((o, i) => shipOption(o, i, action, isOn(i))).join('')}<p class="muted" style="font-size:12px">Valores simulados. No site real, vêm do Melhor Envio pelo CEP.</p></div>`;
+export const shipOptionsHtml = (opts: ShippingOption[], action: string, isOn: (i: number) => boolean) =>
+  `<div class="form-stack" style="gap:8px">${opts.map((o, i) => shipOption(o, i, action, isOn(i))).join('')}<p class="muted" style="font-size:12px">Valores do Melhor Envio para o seu CEP.</p></div>`;
 
 export const cepForm = (formId: string, inputId: string, label: string, cep: string) =>
-  `<form id="${formId}" class="form-stack" novalidate style="gap:10px"><div class="field"><label for="${inputId}">${label}</label><div style="display:flex;gap:8px"><input class="input" id="${inputId}" data-input="cep" inputmode="numeric" maxlength="9" placeholder="00000-000" value="${esc(formatCep(cep))}"><button class="btn btn--ghost" type="submit">calcular</button></div></div><div id="${inputId}-msg" class="muted" style="font-size:13px" role="status"></div></form>`;
+  `<form id="${formId}" class="form-stack" novalidate style="gap:10px"><div class="field"><label for="${inputId}">${label}</label><div style="display:flex;gap:8px"><input class="input" id="${inputId}" data-input="cep" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000" value="${esc(formatCep(cep))}"><button class="btn btn--ghost" type="submit">calcular</button></div></div><div id="${inputId}-msg" class="muted" style="font-size:13px" role="status"></div></form>`;
+
+export const progress = (label: string) => `<p class="mono muted progress-label" role="status">${label}</p>`;
+export const alertMsg = (msg: string) => (msg ? `<div class="msg" role="alert">${esc(msg)}</div>` : '');
 
 const EMPTY = emptyState(
   'carrinho vazio.',
@@ -58,32 +62,28 @@ const shippingHtml = (lines: CartLine[]) => {
   if (!needsShipping(lines))
     return '<p class="soft">Tudo vai para o cofre. O frete é calculado quando você pedir o envio.</p>';
   let html = cepForm('formFrete', 'cep', 'calcular frete pelo cep', S.cep);
-  if (S.cep) {
-    S.shipOpts = quoteCart(S.cep);
-    html += shipOptionsHtml(S.shipOpts, 'ship', (i) => S.ship?.name === S.shipOpts[i].name);
-  }
+  if (S.quoting) html += progress('calculando frete…');
+  else if (S.quoteError) html += alertMsg(S.quoteError);
+  else if (S.shipOpts.length) html += shipOptionsHtml(S.shipOpts, 'ship', (i) => S.ship?.id === S.shipOpts[i].id);
   if (lines.some((l) => l.dest === 'vault'))
     html +=
       '<p class="muted" style="font-size:13px">Itens marcados para o cofre ficam guardados e não entram neste frete.</p>';
   return html;
 };
 
-const PAY_NOTE =
-  '<div class="msg" role="status"><b>Fase 2.</b> Aqui o cliente seguiria para o checkout hospedado do Mercado Pago. O pedido só viria como “pago” depois que o Mercado Pago avisar o servidor, e só então os itens marcados para guardar entrariam no cofre. Neste protótipo nenhum pagamento é feito.</div>';
+const field = (name: BuyerField, label: string, attrs: string, full = false) =>
+  `<div class="field${full ? ' full' : ''}"><label for="ck-${name}">${label}</label><input class="input" id="ck-${name}" name="${name}" data-input="buyer" ${attrs} value="${esc(S.buyer[name])}"></div>`;
 
-const renderCart = () => {
-  const b = $('#cartBody');
-  const lines = syncCart();
-  if (!lines.length) {
-    b.innerHTML = EMPTY;
-    return;
-  }
-  const ship = shippingHtml(lines);
-  const tot = cartTotals(lines, S.ship?.price ?? null);
-  const canPay = !tot.needsShipping || !!S.ship;
-  const shipLabel = !tot.needsShipping ? 'no cofre' : S.ship ? brl(tot.ship) : 'calcule acima';
-  b.innerHTML = `<div class="cart-grid"><div>${lines.map(lineHtml).join('')}</div><aside class="summary" aria-label="Resumo">${ship}<div class="sum-row"><span class="soft">subtotal</span><span class="num">${brl(tot.sub)}</span></div><div class="sum-row"><span class="soft">frete</span><span class="num">${shipLabel}</span></div><div class="sum-row total"><span>total</span><span class="num">${brl(tot.total)}</span></div><button class="btn btn--full" data-action="pay"${disabledAttr(!canPay)}>pagar com mercado pago</button>${S.payNote ? PAY_NOTE : ''}</aside></div>`;
-};
+const checkoutForm = (shipped: boolean) =>
+  `<form id="formCheckout" class="form-grid" novalidate style="gap:10px"><h3 class="display full" style="font-size:24px">seus dados</h3>${field('name', 'nome', 'autocomplete="name" maxlength="120"', true)}${field('email', 'e-mail', 'type="email" autocomplete="email" maxlength="200"', true)}${
+    shipped
+      ? `<p class="mono muted full">entrega no CEP ${esc(formatCep(S.cep))}</p>${field('street', 'rua', 'autocomplete="address-line1" maxlength="200"', true)}${field('number', 'número', 'inputmode="numeric" maxlength="20"')}${field('complement', 'complemento', 'autocomplete="address-line2" maxlength="100"')}${field('district', 'bairro', 'maxlength="100"')}${field('city', 'cidade', 'autocomplete="address-level2" maxlength="100"')}${field('uf', 'UF', 'autocomplete="address-level1" maxlength="2"')}`
+      : ''
+  }<div class="full">${
+    S.paying
+      ? `<button class="btn btn--full" type="submit" disabled>registrando pedido…</button>`
+      : '<button class="btn btn--full" type="submit">pagar com mercado pago</button>'
+  }</div><div class="full" id="ck-msg" role="status" aria-live="polite">${alertMsg(S.payError)}</div><p class="muted full" style="font-size:12px">O pagamento (Pix ou cartão) acontece no site do Mercado Pago. Os itens do cofre só entram nele depois do pagamento confirmado.</p></form>`;
 
 /**
  * Confere o carrinho salvo contra o catálogo atual: item que sumiu ou esgotou sai (com aviso) e a
@@ -102,10 +102,120 @@ const syncCart = (): CartLine[] => {
   return lines;
 };
 
+const renderCart = () => {
+  const b = $('#cartBody');
+  const lines = syncCart();
+  if (!lines.length) {
+    b.innerHTML = EMPTY;
+    return;
+  }
+  const tot = cartTotals(lines, S.ship?.price ?? null);
+  const ready = !tot.needsShipping || !!S.ship;
+  const shipLabel = !tot.needsShipping ? 'no cofre' : S.ship ? brl(tot.ship) : 'calcule acima';
+  const action = S.checkout
+    ? checkoutForm(tot.needsShipping)
+    : `<button class="btn btn--full" data-action="checkout-open"${disabledAttr(!ready)}>finalizar compra</button>`;
+  b.innerHTML = `<div class="cart-grid"><div>${lines.map(lineHtml).join('')}</div><aside class="summary" aria-label="Resumo">${shippingHtml(lines)}<div class="sum-row"><span class="soft">subtotal</span><span class="num">${brl(tot.sub)}</span></div><div class="sum-row"><span class="soft">frete</span><span class="num">${shipLabel}</span></div><div class="sum-row total"><span>total</span><span class="num">${brl(tot.total)}</span></div>${action}</aside></div>`;
+};
+
+const renderIfOpen = () => {
+  if (currentView() === 'carrinho') renderCart();
+};
+
+/** Cota o frete de novo (CEP novo ou carrinho mudou): o preço depende do que vai na caixa. */
+const requote = async () => {
+  const lines = resolveCart(S.cart).lines;
+  S.ship = null;
+  S.shipOpts = [];
+  S.quoteError = '';
+  if (!S.cep || !needsShipping(lines)) {
+    renderIfOpen();
+    return;
+  }
+  S.quoting = true;
+  renderIfOpen();
+  try {
+    S.shipOpts = await api.quote(S.cep, S.cart);
+  } catch (e) {
+    S.quoteError = (e as Error).message;
+  } finally {
+    S.quoting = false;
+    renderIfOpen();
+  }
+};
+
 const changed = () => {
   persist();
   updateBadge();
+  S.checkout = false;
+  if (S.cep) void requote();
+  else renderCart();
+};
+
+/** Abre o checkout: nome e e-mail da conta e endereço do CEP já preenchidos quando possível. */
+const openCheckout = async () => {
+  S.checkout = true;
+  S.payError = '';
+  if (S.user && !S.buyer.name) S.buyer.name = S.user.name;
+  if (S.user && !S.buyer.email) S.buyer.email = S.user.email;
   renderCart();
+  if (S.cep && !S.buyer.street) {
+    const found = await lookupCep(S.cep);
+    if (found) Object.assign(S.buyer, found);
+    renderIfOpen();
+  }
+  document.getElementById(S.buyer.name ? 'ck-number' : 'ck-name')?.focus();
+};
+
+const REQUIRED: [BuyerField, string][] = [
+  ['name', 'Digite seu nome.'],
+  ['street', 'Digite a rua.'],
+  ['number', 'Digite o número.'],
+  ['city', 'Digite a cidade.'],
+  ['uf', 'Digite a UF (2 letras).'],
+];
+
+const submitOrder = async () => {
+  const shipped = needsShipping(resolveCart(S.cart).lines);
+  const msg = $('#ck-msg');
+  const b = S.buyer;
+  for (const [k, text] of REQUIRED) {
+    if (!shipped && k !== 'name') continue;
+    const ok = k === 'uf' ? /^[A-Za-z]{2}$/.test(b.uf.trim()) : b[k].trim().length > (k === 'name' ? 1 : 0);
+    if (!check($(`#ck-${k}`), msg, ok, alertMsg(text))) return;
+  }
+  if (!check($('#ck-email'), msg, isEmail(b.email.trim()), alertMsg('Digite um e-mail válido.'))) return;
+
+  S.paying = true;
+  S.payError = '';
+  renderCart();
+  try {
+    const order = await api.order({
+      items: S.cart,
+      customer: { name: b.name.trim(), email: b.email.trim() },
+      address: shipped
+        ? {
+            cep: S.cep,
+            street: b.street.trim(),
+            number: b.number.trim(),
+            complement: b.complement.trim(),
+            district: b.district.trim(),
+            city: b.city.trim(),
+            uf: b.uf.trim().toUpperCase(),
+          }
+        : null,
+      shipping: shipped && S.ship ? { serviceId: S.ship.id } : null,
+    });
+    S.paying = false;
+    S.checkout = false;
+    // O carrinho só esvazia quando o pagamento for confirmado (página do pedido).
+    if (order.checkoutUrl) nav.to(order.checkoutUrl);
+    else go('pedido', order.serial);
+  } catch (e) {
+    S.paying = false;
+    S.payError = (e as Error).message;
+    renderIfOpen();
+  }
 };
 
 export const initCart = () => {
@@ -120,11 +230,12 @@ export const initCart = () => {
     }
     persist();
     updateBadge();
+    S.ship = null;
+    S.shipOpts = [];
     toast(`adicionado: ${r.name}`);
   });
   onAction('qty', (el) => {
-    const line = S.cart[Number(el.dataset.i)];
-    const r = changeQty(line, Number(el.dataset.d));
+    const r = changeQty(S.cart[Number(el.dataset.i)], Number(el.dataset.d));
     if (!r.ok) toast(r.error);
     else changed();
   });
@@ -136,16 +247,16 @@ export const initCart = () => {
     const line = S.cart[Number(el.dataset.i)];
     if (!line) return;
     line.dest = el.dataset.v as Destination;
-    persist();
-    renderCart();
+    changed();
   });
   onAction('ship', (el) => {
-    S.ship = S.shipOpts[Number(el.dataset.i)];
+    S.ship = S.shipOpts[Number(el.dataset.i)] ?? null;
     renderCart();
   });
-  onAction('pay', () => {
-    S.payNote = true;
-    renderCart();
+  onAction('checkout-open', () => void openCheckout());
+  onInput('buyer', (el) => {
+    const input = el as HTMLInputElement;
+    S.buyer[input.name as BuyerField] = input.value;
   });
   onInput('cep', (el) => {
     const input = el as HTMLInputElement;
@@ -154,8 +265,18 @@ export const initCart = () => {
   onSubmit('formFrete', () => {
     const c = cepDigits($<HTMLInputElement>('#cep').value);
     if (!check($('#cep'), $('#cep-msg'), c.length === 8, 'CEP com 8 dígitos, por favor.')) return;
+    if (c !== S.cep) Object.assign(S.buyer, { street: '', district: '', city: '', uf: '' });
     S.cep = c;
-    S.ship = null;
-    renderCart();
+    void requote();
   });
+  onSubmit('formCheckout', () => void submitOrder());
+};
+
+/** Pagamento confirmado: o carrinho esvazia. */
+export const clearCart = () => {
+  S.cart = [];
+  S.ship = null;
+  S.shipOpts = [];
+  persist();
+  updateBadge();
 };

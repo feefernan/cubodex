@@ -19,6 +19,7 @@ let current: View = 'home';
 
 export const registerView = (v: View, render: Render) => renders.set(v, render);
 export const refresh = () => renders.get(current)?.();
+export const currentView = () => current;
 
 const TCG_NAV: [View, string][] = [
   ['tcg', 'cartas à venda'],
@@ -46,9 +47,9 @@ const setCurrent = (el: Element, on: boolean) =>
 const show = ({ view: v, id }: Route, focus: boolean) => {
   current = v;
   if (v === 'apoio' && id) S.apoio = id;
-  if (v === 'carrinho') S.payNote = false;
   if (id && v === 'set') S.setId = id;
   if (id && v === 'carta') S.cardId = id;
+  if (id && v === 'pedido') S.orderSerial = id;
 
   for (const s of $$('.view')) s.hidden = s.id !== `v-${v}`;
   document.body.className = `a-${areaOf(v)}`;

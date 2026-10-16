@@ -13,5 +13,15 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "tests", "e2e", "*.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "worker/src",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.stryker.config.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["worker/src/entry.ts"]
 }
