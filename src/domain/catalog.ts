@@ -88,7 +88,8 @@ const MINI_PRICE: Record<Rarity, number> = { comum: 22, rara: 29, especial: 39 }
 
 export const PACK_SIZE = 3;
 export const PACK_PRICE = 54;
-export const LAUNCH_DATE = '2026-11-14T12:00:00-03:00';
+// shortcut: data do lançamento da série 01 ainda não definida (#15); vazio = "em breve". Formato: '2026-11-14T12:00:00-03:00'.
+export const LAUNCH_DATE = '';
 
 export const SERIES = [
   { id: 's1', label: 'série 01', name: 'fiozinho', open: true },

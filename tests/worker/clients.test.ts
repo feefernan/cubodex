@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { sendLoginEmail } from '../../worker/src/email';
 import { quoteShipping } from '../../worker/src/melhor-envio';
 import { createCheckout, getPayment, verifySignature } from '../../worker/src/mercado-pago';
 
@@ -75,5 +76,21 @@ describe('Melhor Envio', () => {
   });
   it('erro da API vira exceção', async () => {
     await expect(quoteShipping(async () => new Response('x', { status: 401 }), env, '1', [])).rejects.toThrow('401');
+  });
+});
+
+describe('e-mail de login', () => {
+  it('manda texto e HTML, com o link escapado no HTML', async () => {
+    const send = vi.fn(async (_m: { to: string; from: string; subject: string; text: string; html: string }) => ({}));
+    await sendLoginEmail(
+      { send },
+      'entrar@cubodex.test',
+      'ana@exemplo.com',
+      'https://cubodex.test/api/auth/verify?t=a&x="b"',
+    );
+    const msg = send.mock.calls[0][0];
+    expect(msg).toMatchObject({ to: 'ana@exemplo.com', from: 'entrar@cubodex.test' });
+    expect(msg.text).toContain('https://cubodex.test/api/auth/verify?t=a&x="b"');
+    expect(msg.html).toContain('href="https://cubodex.test/api/auth/verify?t=a&#38;x=&#34;b&#34;"');
   });
 });

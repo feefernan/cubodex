@@ -92,7 +92,7 @@ const renderCofre = () => {
     `<div class="section-head" style="margin:36px 0 10px"><h2 class="display" style="font-size:28px">histórico</h2></div><ol class="timeline">${hist}</ol></div>` +
     `<aside class="summary"><h3 class="display" style="font-size:26px">pedir envio</h3><p class="soft">${units ? `${units} un. selecionadas` : 'Marque os itens que quer receber.'}</p>` +
     shipPanel(units) +
-    '<div class="todo"><b>Decisões em aberto.</b> Envio sem custo junto de uma nova compra, e prazo máximo de guarda com o que acontece depois dele.</div></aside></div>';
+    '</aside></div>';
 };
 
 const renderIfOpen = () => {

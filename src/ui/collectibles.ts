@@ -13,8 +13,10 @@ import { productTile } from './tiles';
 import { toast } from './toast';
 import { loginPrompt } from './vault';
 
+/** Contagem até o lançamento; sem data definida, "em breve". */
 export const tickCountdowns = () => {
-  for (const el of $$('.cd')) el.textContent = countdown(el.dataset.t ?? LAUNCH_DATE, Date.now());
+  const target = LAUNCH_DATE;
+  for (const el of $$('.cd')) el.textContent = target ? countdown(target, Date.now()) : 'em breve';
 };
 
 export const dexBar = (dex: Dex) => {
@@ -48,7 +50,7 @@ const renderSerie = () => {
   const full = S.pack.length === PACK_SIZE;
   $('#pack').innerHTML =
     `<div class="slots">${slots}</div>` +
-    `<div><h3 class="display" style="font-size:28px">monte seu pacote</h3><p class="soft" style="font-size:15px;margin-top:4px">Toque em “+ pacote” nas miniaturas abaixo. Pacote de ${PACK_SIZE}: <b class="num" style="color:var(--fg)">${brl(PACK_PRICE)}</b> <span class="muted">(preço de exemplo)</span></p></div>` +
+    `<div><h3 class="display" style="font-size:28px">monte seu pacote</h3><p class="soft" style="font-size:15px;margin-top:4px">Toque em “+ pacote” nas miniaturas abaixo. Pacote de ${PACK_SIZE}: <b class="num" style="color:var(--fg)">${brl(PACK_PRICE)}</b> </p></div>` +
     `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--ghost btn--sm" data-action="pack-clear"${disabledAttr(!S.pack.length)}>esvaziar</button><button class="btn" data-action="pack-buy"${disabledAttr(!full)}>${full ? 'adicionar pacote' : `faltam ${PACK_SIZE - S.pack.length}`}</button></div>`;
   $('#serieGrid').innerHTML = MINIS.map(productTile).join('');
 };
@@ -91,7 +93,7 @@ const renderDex = () => {
     (f) => `<button class="chip" data-action="dex-filter" data-v="${f}" aria-pressed="${S.dexF === f}">${f}</button>`,
   ).join('');
   body.innerHTML =
-    `<div class="dex-top"><div><p class="mono muted">sua coleção · exemplo</p><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p><p class="mono soft" style="margin-top:8px">${t.want} na lista de desejos</p></div>${dexBar(S.dex)}</div>` +
+    `<div class="dex-top"><div><p class="mono muted">sua coleção${S.user.demo ? ' · demonstração' : ''}</p><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p><p class="mono soft" style="margin-top:8px">${t.want} na lista de desejos</p></div>${dexBar(S.dex)}</div>` +
     `<div class="toolbar"><div class="chips" role="group" aria-label="Série">${chipsS}</div><div class="chips" role="group" aria-label="Filtrar">${chipsF}</div></div>` +
     `<div class="grid a-col">${dexGrid()}</div>`;
 };

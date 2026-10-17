@@ -3,9 +3,9 @@ import { brl, escapeHtml as esc, pad3 } from '../domain/format';
 import { itemsOfCard } from '../domain/tcg';
 import { cube, flag } from './art';
 import { disabledAttr } from './dom';
-import { S } from './store';
 
-export const imgLabel = () => (S.img ? 'imagem de referência · tcgdex' : 'imagem desativada');
+// shortcut: fotos das cartas ainda não existem (#15, #16).
+export const IMG_LABEL = 'foto em breve';
 
 const gradeChip = (it: Item) => (it.grade ? `<span class="mono grade">${esc(it.grade.co)} ${it.grade.n}</span>` : '');
 
@@ -57,7 +57,7 @@ export const itemTile = (it: Item): string => {
       ? '<span class="state-tag pre">pré-venda</span>'
       : '';
   const name = esc(itemName(it));
-  return `<article class="tile${soldOut ? ' soldout' : ''}">${cardLink(c, `${tag}<span class="mono ph-label">${imgLabel()}</span>`, 'media media--card ph', `Ver a carta ${name}`)}<div class="body"><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(setById[c.set].name)}</p><div class="badges">${flag(it.lang)}<span class="mono pill">${esc(it.variant)}</span>${gradeChip(it)}</div><p class="mono qty-un num">${soldOut ? 0 : it.qty} un.</p><div class="row"><span class="price num">${brl(it.price)}</span>${soldOut ? soldOutButton : addButton(it.id)}</div></div></article>`;
+  return `<article class="tile${soldOut ? ' soldout' : ''}">${cardLink(c, `${tag}<span class="mono ph-label">${IMG_LABEL}</span>`, 'media media--card ph', `Ver a carta ${name}`)}<div class="body"><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(setById[c.set].name)}</p><div class="badges">${flag(it.lang)}<span class="mono pill">${esc(it.variant)}</span>${gradeChip(it)}</div><p class="mono qty-un num">${soldOut ? 0 : it.qty} un.</p><div class="row"><span class="price num">${brl(it.price)}</span>${soldOut ? soldOutButton : addButton(it.id)}</div></div></article>`;
 };
 
 /** Linha de venda na página da carta. */
@@ -80,5 +80,5 @@ export const cardTile = (c: Card): string => {
   const row = hit
     ? `<span class="mono tag">a partir de ${brl(min)}</span><a class="btn btn--sm" href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}">comprar</a>`
     : '<span class="mono muted">sem item à venda</span>';
-  return `<article class="tile${hit ? ' hit' : ''}">${cardLink(c, `<span class="mono ph-label">${imgLabel()}</span>`, 'media media--card ph', `Ver ${name}`)}<div class="body"><span class="mono muted num">${c.n}/${setById[c.set].total}</span><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(c.rar)} · ${esc(c.tipo)}</p><div class="row">${row}</div></div></article>`;
+  return `<article class="tile${hit ? ' hit' : ''}">${cardLink(c, `<span class="mono ph-label">${IMG_LABEL}</span>`, 'media media--card ph', `Ver ${name}`)}<div class="body"><span class="mono muted num">${c.n}/${setById[c.set].total}</span><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(c.rar)} · ${esc(c.tipo)}</p><div class="row">${row}</div></div></article>`;
 };
