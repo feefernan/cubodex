@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- O site navega por #/…; buscadores indexam só a página inicial. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://acubodex.com.br/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+</urlset>
