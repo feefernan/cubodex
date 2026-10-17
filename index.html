@@ -11,8 +11,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
 </head>
 <body>
-<div class="proto-bar mono">protótipo navegável · dados, preços, prazos e fotos de exemplo · nenhum pagamento real · botão de tema no canto da tela</div>
-
 <header class="site-head">
   <div class="wrap head-row">
     <a class="brand" href="#/home" data-action="go" data-view="home" aria-label="cubodex, página inicial">
@@ -24,6 +22,7 @@
       <a href="#/criar" data-action="go" data-view="criar" data-nav="criar">criar</a>
     </nav>
     <div class="head-actions">
+      <button class="icon-link" id="themeBtn" type="button" data-action="theme-toggle"></button>
       <a class="icon-link" href="#/conta" data-action="go" data-view="conta" aria-label="Minha conta">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
         <span class="lbl">conta</span>
@@ -75,7 +74,7 @@
   </div>
 
   <div class="wrap section">
-    <div class="section-head"><h2 class="display">novidades e lançamentos</h2><span class="mono muted">exemplos</span></div>
+    <div class="section-head"><h2 class="display">novidades e lançamentos</h2></div>
     <div class="strip" id="news"></div>
   </div>
 
@@ -200,7 +199,6 @@
       </div>
       <div class="field sort"><label for="s-ano">ano</label><select class="select" id="s-ano" data-input="sets-year"></select></div>
     </div>
-    <div class="todo">Exemplo com 4 sets. Na versão real, sets, cartas e imagens são importados do TCGdex para o banco da Cubodex.</div>
     <div id="setsBody"></div>
   </div>
 </section>
@@ -243,9 +241,9 @@
   <div class="wrap section">
     <div class="section-head"><h2 class="display">jeitos de colecionar</h2></div>
     <div class="mech">
-      <a href="#/serie" data-action="go" data-view="serie"><span class="mono tag">disponível no protótipo</span><h3>monte seu pacote</h3><p>Escolha 3 miniaturas da série e leve juntas.</p></a>
-      <div><span class="mono muted">fase 3 · em breve</span><h3>caixa surpresa</h3><p>Caixa de valor garantido. Regras a definir, e só existe depois de validação jurídica.</p></div>
-      <div><span class="mono tag">próximo lançamento</span><h3>lançamentos</h3><p class="cd mono num" data-t="2026-11-14T12:00:00-03:00" style="color:var(--fg);font-size:16px">--</p><p class="muted" style="font-size:13px">data de exemplo</p></div>
+      <a href="#/serie" data-action="go" data-view="serie"><span class="mono tag">disponível</span><h3>monte seu pacote</h3><p>Escolha 3 miniaturas da série e leve juntas.</p></a>
+      <div><span class="mono muted">em breve</span><h3>caixa surpresa</h3><p>Uma caixa de valor garantido. Avisamos pela lista quando chegar.</p></div>
+      <div><span class="mono tag">próximo lançamento</span><h3>lançamentos</h3><p class="cd mono num" style="color:var(--fg);font-size:16px">em breve</p></div>
     </div>
   </div>
   <div class="wrap section">
@@ -264,7 +262,7 @@
   </div>
   <div class="wrap">
     <div class="pack" id="pack"></div>
-    <div class="section-head" style="margin-top:36px"><h2 class="display">todas da série</h2><span class="mono muted">12 miniaturas · exemplo</span></div>
+    <div class="section-head" style="margin-top:36px"><h2 class="display">todas da série</h2><span class="mono muted">12 miniaturas</span></div>
     <div class="grid a-col" id="serieGrid"></div>
   </div>
 </section>
@@ -303,7 +301,7 @@
     <div class="order">
       <div>
         <h2 class="display" style="font-size:clamp(34px,5vw,56px)">peça sob medida.</h2>
-        <p class="soft" style="margin-top:14px;max-width:44ch">Descreva a peça. No site real, este formulário abre a conversa no WhatsApp da Cubodex com os dados já preenchidos.</p>
+        <p class="soft" style="margin-top:14px;max-width:44ch">Descreva a peça. Ao enviar, abrimos a conversa no WhatsApp da Cubodex com os dados já preenchidos.</p>
       </div>
       <div class="panel">
         <form id="formEncomenda" class="form-grid" novalidate>
@@ -389,10 +387,6 @@
   <div class="wrap"><p class="disclaimer">A Cubodex não é afiliada à The Pokémon Company.</p></div>
 </footer>
 
-<div class="themer" id="themer">
-  <fieldset class="themer-panel" id="themerPanel" aria-label="Tema de cores" hidden></fieldset>
-  <button class="themer-btn" id="themerBtn" data-action="themer" type="button" aria-expanded="false" aria-controls="themerPanel"><span class="sw" id="themerSw"></span><span id="themerLbl">tema</span></button>
-</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module" src="/src/main.ts"></script>

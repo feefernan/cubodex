@@ -1,4 +1,4 @@
-import { ITEMS, LAUNCH_DATE } from '../domain/catalog';
+import { ITEMS } from '../domain/catalog';
 import { quoteRequestText, whatsappUrl } from '../domain/contact';
 import { escapeHtml as esc } from '../domain/format';
 import { isEmail } from '../domain/validation';
@@ -11,7 +11,7 @@ import { S } from './store';
 import { fillProducts, itemTile } from './tiles';
 
 const NEWS =
-  `<a class="news news--hot" href="#/serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega em</h3><span class="cd num" data-t="${LAUNCH_DATE}">--</span><span class="mono">data de exemplo</span></a>` +
+  `<a class="news news--hot" href="#/serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega</h3><span class="cd num">em breve</span><span class="mono">entre na lista para saber primeiro</span></a>` +
   '<a class="news" href="#/tcg" data-action="go" data-view="tcg"><span class="mono tag">novidade · tcg</span><h3>charizard 4/102 · 1ª edição</h3><span class="mono soft">PSA 8 · última unidade</span></a>' +
   '<a class="news" href="#/criar" data-action="go" data-view="criar"><span class="mono tag">novo em criar</span><h3>torre de dados</h3><span class="mono soft">PETG · 80 × 80 × 160 mm</span></a>' +
   '<a class="news" href="#avisos" data-action="scroll" data-target="avisos"><span class="mono tag">lista de avisos</span><h3>receba o próximo lançamento primeiro</h3><span class="mono soft">entrar na lista →</span></a>';
@@ -29,18 +29,18 @@ const renderHome = () => {
 
 const APOIO: Record<string, string> = {
   sobre:
-    '<h2>sobre a cubodex</h2><p>A Cubodex junta duas coisas: cartas de pokémon originais e peças impressas em 3D. Colecionar e criar na mesma loja.</p><div class="todo">História do Fiozinho: texto a escrever.</div>',
+    '<h2>sobre a cubodex</h2><p>A Cubodex junta duas coisas: cartas de pokémon originais e peças impressas em 3D. Colecionar e criar na mesma loja.</p>',
   comprar:
-    '<h2>como comprar</h2><p>Escolha os itens, calcule o frete pelo CEP no carrinho e pague pelo checkout do Mercado Pago. Para peças sob medida, peça um orçamento em Criar antes.</p><div class="todo">Texto de exemplo. Revisar quando o fluxo real existir.</div>',
+    '<h2>como comprar</h2><p>Escolha os itens, calcule o frete pelo CEP no carrinho e pague pelo checkout do Mercado Pago. Para peças sob medida, peça um orçamento em Criar antes.</p>',
   frete:
-    '<h2>frete e prazos</h2><p>O frete é calculado por CEP no carrinho. Peças impressas sob encomenda têm prazo combinado no orçamento.</p><div class="todo">Prazos reais e transportadoras: a definir.</div>',
+    '<h2>frete e prazos</h2><p>O frete é calculado por CEP no carrinho. Peças impressas sob encomenda têm prazo combinado no orçamento.</p>',
   contato:
-    '<h2>contato</h2><p>Instagram e TikTok: <b style="color:var(--fg)">@cubodex</b>. Orçamentos e dúvidas pelo WhatsApp.</p><div class="todo">Número de WhatsApp: a preencher.</div>',
+    '<h2>contato</h2><p>Instagram e TikTok: <b style="color:var(--fg)">@cubodex</b>. Peças sob medida: peça o orçamento em <a href="#/criar" data-action="go" data-view="criar">criar</a>.</p>',
   privacidade:
-    '<h2>política de privacidade</h2><p>Cadastro, e-mail e endereço são dados pessoais e entram na LGPD. A política e o texto de consentimento do cadastro serão escritos com apoio jurídico.</p><div class="todo">Texto provisório. Não usar em produção sem revisão.</div>',
+    '<h2>política de privacidade</h2><p>Usamos seu nome, e-mail e endereço só para processar pedidos e entregas, manter sua conta (Dex e cofre) e, se você pedir, mandar avisos de lançamento.</p><p>O pagamento acontece no Mercado Pago: a Cubodex não vê nem guarda dados de cartão.</p><p>Na sua conta você baixa uma cópia dos seus dados ou apaga a conta. Para sair da lista de avisos, use o link que vai em todo e-mail.</p><p>A versão completa desta política está em revisão e será publicada aqui.</p>',
   termos:
-    '<h2>termos de uso</h2><p>Os termos precisam cobrir a guarda de itens no cofre, extravio e o prazo máximo de guarda.</p><div class="todo">Requisitos legais não verificados. Texto a ser escrito com apoio de um advogado.</div>',
-  faq: '<h2>faq</h2><div class="faq"><details open><summary>O que é o cofre virtual?</summary><p>É onde ficam as cartas que você comprou na Cubodex e escolheu guardar. Você junta vários itens e pede um envio só.</p></details><details><summary>Como escolho entre enviar agora e guardar?</summary><p>No carrinho, cada carta tem as opções enviar agora ou guardar no cofre.</p></details><details><summary>Posso guardar cartas que já tenho?</summary><p>Na primeira versão não. O cofre guarda só itens comprados na Cubodex.</p></details><details><summary>Por quanto tempo posso guardar uma carta?</summary><p>O prazo máximo ainda não foi definido.</p></details><details><summary>A Cubodex é afiliada à The Pokémon Company?</summary><p>Não.</p></details><details><summary>Posso pedir uma peça sob medida?</summary><p>Sim, em Criar. O orçamento vem pelo WhatsApp.</p></details></div><div class="todo">FAQ provisória, a revisar com as decisões em aberto.</div>',
+    '<h2>termos de uso</h2><p>Os termos de uso da Cubodex, incluindo as regras do cofre virtual, estão em revisão e serão publicados aqui.</p><p>Dúvidas: Instagram <b style="color:var(--fg)">@cubodex</b>.</p>',
+  faq: '<h2>faq</h2><div class="faq"><details open><summary>O que é o cofre virtual?</summary><p>É onde ficam as cartas que você comprou na Cubodex e escolheu guardar. Você junta vários itens e pede um envio só.</p></details><details><summary>Como escolho entre enviar agora e guardar?</summary><p>No carrinho, cada carta tem as opções enviar agora ou guardar no cofre.</p></details><details><summary>Posso guardar cartas que já tenho?</summary><p>Na primeira versão não. O cofre guarda só itens comprados na Cubodex.</p></details><details><summary>Por quanto tempo posso guardar uma carta?</summary><p>O prazo máximo ainda não foi definido.</p></details><details><summary>A Cubodex é afiliada à The Pokémon Company?</summary><p>Não.</p></details><details><summary>Posso pedir uma peça sob medida?</summary><p>Sim, em Criar. O orçamento vem pelo WhatsApp.</p></details></div>',
 };
 
 const renderApoio = () => {

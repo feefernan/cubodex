@@ -46,7 +46,6 @@ export interface AppState extends PersistedState {
   /** Pedido aberto na página de volta do pagamento. */
   orderSerial: string;
   apoio: string;
-  img: boolean;
   setQ: string;
   setAno: string;
   setId: string;
@@ -117,7 +116,6 @@ export const initialState = (): AppState => ({
   cep: '',
   orderSerial: '',
   apoio: 'sobre',
-  img: true,
   setQ: '',
   setAno: '',
   setId: 'base1',

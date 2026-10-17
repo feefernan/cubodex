@@ -135,7 +135,9 @@ describe('navegação', () => {
     expect(visible()).toEqual(['v-home']);
     expect(document.querySelectorAll('#hl-tcg .tile')).toHaveLength(3);
     expect(document.querySelectorAll('#hl-col .tile')).toHaveLength(3);
-    expect($('#news .cd').textContent).toMatch(/\d+d|já saiu/);
+    // Sem data de lançamento definida, nada de contagem inventada.
+    expect($('#news .cd').textContent).toBe('em breve');
+    expect(document.body.textContent).not.toMatch(/protótipo|data de exemplo|versão real|no site real/i);
     expect(document.body.className).toBe('a-home');
   });
 
@@ -222,14 +224,9 @@ describe('tcg', () => {
     type('#s-ano', '');
   });
 
-  it('acessórios e imagens desligadas', () => {
+  it('acessórios', () => {
     goTo('acessorios');
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
-    goTo('tcg');
-    click('#themerBtn');
-    check('[data-input="toggle-images"]', false);
-    expect($('#tcgGrid .ph-label').textContent).toBe('imagem desativada');
-    check('[data-input="toggle-images"]', true);
   });
 });
 
@@ -563,15 +560,17 @@ describe('conta e formulários', () => {
     expect(location.hash).toBe('#/apoio/termos');
   });
 
-  it('seletor de tema abre, troca, salva e fecha ao clicar fora', () => {
-    click('#themerBtn');
-    expect($('#themerPanel').hidden).toBe(false);
-    click('[data-action="set-theme"][data-id="1b"]');
-    expect(document.documentElement.dataset.tema).toBe('1b');
-    expect(localStorage.getItem('cubodex-proto-tema')).toBe('1b');
-    expect($('#themerPanel').hidden).toBe(true);
-    click('#themerBtn');
-    click('main');
-    expect($('#themerPanel').hidden).toBe(true);
+  it('botão de modo claro/escuro alterna, diz para onde vai e salva a escolha (#14)', () => {
+    const btn = $('#themeBtn');
+    expect(document.documentElement.dataset.tema).toBe('escuro');
+    expect(btn.getAttribute('aria-label')).toBe('Mudar para o modo claro');
+    expect(btn.textContent).toBe('modo claro');
+    click('#themeBtn');
+    expect(document.documentElement.dataset.tema).toBe('claro');
+    expect(btn.textContent).toBe('modo escuro');
+    expect(localStorage.getItem('cubodex-proto-tema')).toBe('claro');
+    click('#themeBtn');
+    expect(document.documentElement.dataset.tema).toBe('escuro');
+    expect(document.querySelector('#themer, .proto-bar')).toBeNull();
   });
 });

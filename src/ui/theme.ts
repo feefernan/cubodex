@@ -1,47 +1,7 @@
 import { loadTheme, saveTheme } from '../infra/storage';
-import { $, onAction, onInput } from './dom';
-import { refresh } from './router';
-import { S } from './store';
+import { $, onAction } from './dom';
 
-// shortcut: seletor de tema do protótipo, para escolher a paleta final — sai em #14.
-const THEMES = [
-  { id: 'escuro', note: 'original, preto cubodex', bg: '#101419', ac: '#F42744' },
-  { id: '1a', note: 'cinza frio · cards brancos', bg: '#EEF1F4', ac: '#F42744' },
-  { id: '1b', note: 'creme quente', bg: '#F5F2EC', ac: '#E5233F' },
-  { id: '1c', note: 'cinza suave · tons amenos', bg: '#E9EAEC', ac: '#D9384F' },
-  { id: '1d', note: 'branco puro', bg: '#FFFFFF', ac: '#F42744' },
-];
-
-let tema = 'escuro';
-const themeById = (id: string | null) => THEMES.find((t) => t.id === id) ?? THEMES[0];
-
-const renderThemer = () => {
-  const cur = themeById(tema);
-  const sw = $('#themerSw');
-  sw.style.background = cur.bg;
-  sw.style.setProperty('--sa', cur.ac);
-  $('#themerLbl').textContent = `tema · ${cur.id}`;
-  $('#themerPanel').innerHTML =
-    THEMES.map(
-      (t) =>
-        `<button class="themer-opt" type="button" data-action="set-theme" data-id="${t.id}" aria-pressed="${t.id === tema}"><span class="sw" style="background:${t.bg};--sa:${t.ac}"></span><span><b>${t.id}</b><span class="mono">${t.note}</span></span></button>`,
-    ).join('') +
-    `<label class="check themer-img"><input type="checkbox" data-input="toggle-images"${S.img ? ' checked' : ''}><span>mostrar imagens do tcgdex</span></label>`;
-};
-
-const setTheme = (id: string | null, persist: boolean) => {
-  tema = themeById(id).id;
-  document.documentElement.dataset.tema = tema;
-  if (persist) saveTheme(tema);
-  renderThemer();
-};
-
-const togglePanel = (open?: boolean) => {
-  const panel = $('#themerPanel');
-  const o = open ?? panel.hidden;
-  panel.hidden = !o;
-  $('#themerBtn').setAttribute('aria-expanded', String(o));
-};
+type Mode = 'claro' | 'escuro';
 
 const prefersLight = () => {
   try {
@@ -51,19 +11,35 @@ const prefersLight = () => {
   }
 };
 
+/** Escolha salva; valores antigos do protótipo (1a–1d) contam como claro. Sem escolha, segue o aparelho. */
+const savedMode = (): Mode | null => {
+  const t = loadTheme();
+  if (t === 'escuro' || t === 'claro') return t;
+  return t && /^1[a-d]$/.test(t) ? 'claro' : null;
+};
+
+const ICON = {
+  // Lua: aparece no modo claro (vai para o escuro). Sol: aparece no modo escuro (vai para o claro).
+  escuro:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+  claro:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+};
+
+const apply = (mode: Mode) => {
+  document.documentElement.dataset.tema = mode;
+  const next: Mode = mode === 'claro' ? 'escuro' : 'claro';
+  const btn = $('#themeBtn');
+  btn.dataset.mode = mode;
+  btn.setAttribute('aria-label', `Mudar para o modo ${next}`);
+  btn.innerHTML = `${ICON[next]}<span class="lbl">modo ${next}</span>`;
+};
+
 export const initTheme = () => {
-  onAction('themer', () => togglePanel());
-  onAction('set-theme', (el) => {
-    setTheme(el.dataset.id ?? null, true);
-    togglePanel(false);
+  onAction('theme-toggle', (el) => {
+    const mode: Mode = el.dataset.mode === 'claro' ? 'escuro' : 'claro';
+    saveTheme(mode);
+    apply(mode);
   });
-  onInput('toggle-images', (el) => {
-    S.img = (el as HTMLInputElement).checked;
-    refresh();
-  });
-  // Clique fora do seletor fecha o painel.
-  document.addEventListener('click', (e) => {
-    if (!(e.target as Element).closest('#themer')) togglePanel(false);
-  });
-  setTheme(loadTheme() ?? (prefersLight() ? '1a' : 'escuro'), false);
+  apply(savedMode() ?? (prefersLight() ? 'claro' : 'escuro'));
 };
