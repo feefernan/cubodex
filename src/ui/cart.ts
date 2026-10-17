@@ -26,6 +26,12 @@ export const nav = { to: (url: string) => location.assign(url) };
 export const updateBadge = () => {
   const b = $('#cartCount');
   const n = cartCount(S.cart);
+  // Pulso só quando aumenta: confirma que o item entrou. Reiniciar a classe permite pulsar de novo.
+  if (n > Number(b.dataset.n ?? n)) {
+    b.classList.remove('bump');
+    void b.offsetWidth;
+    b.classList.add('bump');
+  }
   b.textContent = String(n);
   b.dataset.n = String(n);
 };

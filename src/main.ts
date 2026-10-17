@@ -1,4 +1,5 @@
 import './styles/main.css';
+import './styles/motion.css';
 import { applyStock, parseStockRows } from './domain/stock';
 import { api } from './infra/api';
 import { initAccount } from './ui/account';
