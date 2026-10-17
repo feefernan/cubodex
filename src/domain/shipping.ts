@@ -44,11 +44,15 @@ const BOX: Record<CartLine['kind'], Box> = {
 export const shippingProducts = (lines: Pick<CartLine, 'id' | 'kind' | 'qty' | 'price'>[]) =>
   lines.map((l) => ({ id: l.id, ...BOX[l.kind], insurance_value: l.price, quantity: l.qty }));
 
-export type PaymentStatus = 'Aguardando pagamento' | 'Pago' | 'Cancelado';
+export type PaymentStatus = 'Aguardando pagamento' | 'Pago' | 'Cancelado' | 'Estornado';
 
-/** Status do pedido depois de um aviso do Mercado Pago; null = não muda (aviso repetido ou intermediário). */
+/**
+ * Status do pedido depois de um aviso do Mercado Pago; null = não muda (aviso repetido ou intermediário).
+ * Pago só sai de Pago por estorno ou chargeback (#39); Estornado é final.
+ */
 export const nextOrderStatus = (current: string, mp: string): PaymentStatus | null => {
-  if (current === 'Pago') return null;
+  if (current === 'Estornado') return null;
+  if (current === 'Pago') return mp === 'refunded' || mp === 'charged_back' ? 'Estornado' : null;
   if (mp === 'approved') return 'Pago';
   if (['rejected', 'cancelled', 'refunded', 'charged_back'].includes(mp) && current !== 'Cancelado') return 'Cancelado';
   return null;

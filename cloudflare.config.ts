@@ -38,6 +38,8 @@ export default defineConfig({
       ORDERS_LIMITER: bindings.rateLimit({ namespace: '2001', simple: { limit: 5, period: 60 } }),
       // Cotações, status e inscrições: o cliente pode testar alguns CEPs.
       QUOTES_LIMITER: bindings.rateLimit({ namespace: '2002', simple: { limit: 20, period: 60 } }),
+      // Links de login: 3 por minuto por e-mail.
+      LOGIN_LIMITER: bindings.rateLimit({ namespace: '2003', simple: { limit: 3, period: 60 } }),
     },
   },
 });

@@ -13,7 +13,7 @@ export const json = (body: unknown, status = 200, extra: Record<string, string> 
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...extra },
   });
 
-export const unavailable = (what: string) => json({ error: `${what} ainda não está ligado. Tente mais tarde.` }, 503);
+export const unavailable = () => json({ error: 'Isso ainda não está disponível. Tente mais tarde.' }, 503);
 
 /** Limite por IP; null = pode seguir. */
 export const limited = async (

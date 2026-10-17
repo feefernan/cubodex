@@ -20,6 +20,9 @@ export interface CartLine extends CartEntry {
   kind: Product['kind'] | 'pack';
 }
 
+/** Máximo por linha (o mesmo limite do servidor). */
+const MAX_QTY = 99;
+
 export type CartResult = { ok: true; name: string } | { ok: false; error: string };
 
 const isMini = (id: string) => productById[id]?.kind === 'mini';
@@ -84,6 +87,7 @@ export const addToCart = (cart: CartEntry[], id: string): CartResult => {
   const line = cart.find((l) => l.id === id);
   const qty = line?.qty ?? 0;
   if (limit !== null && qty >= limit) return { ok: false, error: `só ${limit} un. em estoque` };
+  if (qty >= MAX_QTY) return { ok: false, error: `no máximo ${MAX_QTY} un. por item` };
   if (line) line.qty++;
   else cart.push(p.kind === 'item' ? { id, qty: 1, dest: 'send' } : { id, qty: 1 });
   return { ok: true, name: p.name };
@@ -93,6 +97,7 @@ export const addToCart = (cart: CartEntry[], id: string): CartResult => {
 export const changeQty = (entry: CartEntry, delta: number): CartResult => {
   const limit = stockLimit(entry.id);
   if (delta > 0 && limit !== null && entry.qty >= limit) return { ok: false, error: `só ${limit} un. em estoque` };
+  if (delta > 0 && entry.qty >= MAX_QTY) return { ok: false, error: `no máximo ${MAX_QTY} un. por item` };
   entry.qty = Math.max(1, entry.qty + delta);
   return { ok: true, name: entry.id };
 };
@@ -113,7 +118,9 @@ export const cartTotals = (lines: CartLine[], shipPrice: number | null) => {
   return { sub, ship, total: sub + ship, needsShipping: ns };
 };
 
-const isQty = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 99;
+const isQty = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_QTY;
+/** Id de linha de pacote: nunca o id de um produto (senão um pacote forjado baixaria o estoque de uma carta). */
+const PACK_ID = /^pack-\d+$/;
 
 /** Carrinho vindo de fora (localStorage ou corpo do pedido): só entradas com forma e ids válidos. */
 export const parseCartEntries = (raw: unknown): CartEntry[] =>
@@ -122,6 +129,7 @@ export const parseCartEntries = (raw: unknown): CartEntry[] =>
         const o = v as Record<string, unknown>;
         if (!o || typeof o !== 'object' || typeof o.id !== 'string' || o.id.length > 40 || !isQty(o.qty)) return [];
         if (Array.isArray(o.pack)) {
+          if (!PACK_ID.test(o.id)) return [];
           const pack = o.pack.filter((id): id is string => typeof id === 'string' && isMini(id));
           return pack.length === o.pack.length ? [{ id: o.id, qty: o.qty, pack }] : [];
         }

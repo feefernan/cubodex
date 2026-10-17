@@ -1,5 +1,5 @@
 /** D1 de mentira para testes: SQLite do Node com a migração real e a mesma forma de API (prepare/bind/first/all/run/batch). */
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
 import type { Db, Stmt } from '../../worker/src/accounts';
@@ -7,7 +7,12 @@ import type { Db, Stmt } from '../../worker/src/accounts';
 export const testDb = () => {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys = ON;');
-  sqlite.exec(readFileSync(resolve(__dirname, '../../worker/migrations/0001_contas.sql'), 'utf-8'));
+  // Todas as migrações, em ordem, como o deploy aplica.
+  const dir = resolve(__dirname, '../../worker/migrations');
+  for (const file of readdirSync(dir)
+    .filter((f) => f.endsWith('.sql'))
+    .sort())
+    sqlite.exec(readFileSync(resolve(dir, file), 'utf-8'));
   type Exec = Stmt & { exec(): unknown };
   const stmt = (sql: string, values: SQLInputValue[] = []): Exec => ({
     bind: (...v: unknown[]) => stmt(sql, v as SQLInputValue[]),
