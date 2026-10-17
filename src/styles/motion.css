@@ -1,0 +1,118 @@
+/*
+ * Sistema de motion — skill design-motion-principles (.claude/skills/design-motion-principles).
+ * Contexto: e-commerce → primário Jakub Krehel (polimento sutil), secundário Emil Kowalski (contenção).
+ *
+ * O que anima, e por quê:
+ *   - troca de tela: entrada curta (orientação: algo novo apareceu);
+ *   - toast: entra e sai (feedback de ação);
+ *   - botões: toque responde na hora (feedback);
+ *   - contador do carrinho: um pulso quando aumenta (confirma que entrou);
+ *   - textos de espera ("calculando frete…"): surgem suavemente (progresso).
+ * O que NÃO anima: filtros, quantidade, marcar na Dex, troca de tema, rolagem ao topo (frequentes ou de teclado).
+ * Só transform/opacity/filter. Nada de ease/ease-in-out puros. Saída mais curta e sutil que a entrada.
+ * prefers-reduced-motion desliga tudo (fim do arquivo).
+ */
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --dur-press: 120ms;
+  --dur-fast: 160ms; /* saídas, micro-feedback */
+  --dur-base: 240ms; /* telas, toast — ação frequente, abaixo de 300ms */
+  --enter-y: 8px;
+  --enter-blur: 4px;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--enter-y));
+    filter: blur(var(--enter-blur));
+  }
+}
+
+/* ── TELAS ─────────────────────────────────────── */
+/* backwards (não both/forwards): ao terminar não sobra transform/filter na tela, que viraria containing
+   block e quebraria elementos position: fixed dentro dela. */
+.view:not([hidden]) {
+  animation: enter var(--dur-base) var(--ease-out) backwards;
+}
+
+/* ── TOAST ─────────────────────────────────────── */
+/* Some de verdade (visibility) e sai mais rápido do que entra. */
+.toast {
+  visibility: hidden;
+  filter: blur(var(--enter-blur));
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    filter var(--dur-fast) var(--ease-out),
+    visibility 0s linear var(--dur-fast);
+}
+.toast.show {
+  visibility: visible;
+  filter: none;
+  transition:
+    opacity var(--dur-base) var(--ease-out),
+    transform var(--dur-base) var(--ease-out),
+    filter var(--dur-base) var(--ease-out),
+    visibility 0s;
+}
+
+/* ── TOQUE ─────────────────────────────────────── */
+.btn,
+.chip,
+.tog,
+.ship-opt,
+.icon-link,
+.qty button {
+  transition-property: background-color, border-color, color, box-shadow, transform;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
+}
+.btn:active:not(:disabled),
+.chip:active,
+.tog:active,
+.ship-opt:active,
+.icon-link:active {
+  transform: scale(0.97);
+  transition-duration: var(--dur-press);
+}
+
+/* Portas da home sobem um pouco no hover — só onde existe hover (no toque o hover "gruda"). */
+.door {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .door:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* ── CARRINHO ──────────────────────────────────── */
+/* Um pulso único quando a quantidade aumenta (não é loop). */
+.count.bump {
+  animation: bump var(--dur-base) var(--ease-out);
+}
+@keyframes bump {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+/* ── PROGRESSO ─────────────────────────────────── */
+.progress-label {
+  animation: enter var(--dur-fast) var(--ease-out) backwards;
+}
+
+/* ── ACESSIBILIDADE: MOVIMENTO REDUZIDO ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

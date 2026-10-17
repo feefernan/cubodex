@@ -72,7 +72,8 @@ const show = ({ view: v, id }: Route, focus: boolean) => {
   const h1 = document.querySelector<HTMLElement>(`#v-${v} h1`);
   document.title = h1 && v !== 'home' ? `${h1.textContent?.replace(/\.$/, '')} · Cubodex` : 'Cubodex';
   if (!focus) return;
-  window.scrollTo(0, 0);
+  // Pula para o topo sem animar: rolar a página inteira a cada troca de tela seria movimento à toa.
+  window.scrollTo({ top: 0, behavior: 'instant' });
   // Leitor de tela anuncia a tela nova; o foco não fica preso no link clicado (#11).
   if (h1) {
     h1.tabIndex = -1;

@@ -151,6 +151,8 @@ describe('navegação', () => {
     expect(document.body.className).toBe('a-tcg');
     expect($('#v-tcg .tcgnav [aria-current="page"]').textContent).toBe('cartas à venda');
     expect(location.hash).toBe('#/tcg');
+    // Volta ao topo sem animar a rolagem (#13).
+    expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
     expect(document.activeElement).toBe($('#v-tcg h1'));
     expect(document.title).toBe('cartas à venda · Cubodex');
     goTo('criar');
@@ -237,6 +239,8 @@ describe('carrinho', () => {
     goTo('tcg');
     click('#tcgGrid [data-action="add"][data-id="i1"]');
     expect($('#cartCount').textContent).toBe('1');
+    // Pulso no contador só quando aumenta (#13).
+    expect($('#cartCount').classList.contains('bump')).toBe(true);
     click('#tcgGrid [data-action="add"][data-id="i1"]');
     expect($('#toast').textContent).toBe('só 1 un. em estoque');
     goTo('carrinho');
