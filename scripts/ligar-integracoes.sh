@@ -15,17 +15,30 @@
 # Qualquer chave pode ficar em branco agora e ser cadastrada depois rodando o script de novo.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# gh/node podem estar fora do PATH do terminal (ex.: gh em ~/.local/bin).
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 REPO=feefernan/cubodex
+# Confere tudo ANTES de pedir chaves: se o script quebrar no meio, o que foi colado cai no terminal.
+command -v gh >/dev/null || { echo "Falta o gh (GitHub CLI): brew install gh"; exit 1; }
+command -v node >/dev/null || { echo "Falta o Node.js."; exit 1; }
+gh auth status >/dev/null 2>&1 || { echo "Entre no GitHub primeiro: gh auth login"; exit 1; }
+gh repo view "$REPO" >/dev/null 2>&1 || { echo "Sem acesso ao repositório $REPO no GitHub."; exit 1; }
+[ -d node_modules ] || { echo "Rode npm install na pasta do projeto antes."; exit 1; }
 CONFIG=cloudflare.config.ts
 NOTION="https://api.notion.com/v1"
 
-ask() { # pergunta sem eco; vazio = pular
-  local value
-  read -r -s -p "$1 (Enter para pular): " value
+ask() { # pergunta sem eco; vazio = pular; tira espaços colados junto
+  # Sem o modo "canônico" do terminal: no macOS ele corta linhas acima de 1024 caracteres, e o token
+  # do Melhor Envio é maior que isso.
+  local value saved
+  printf '%s (Enter para pular): ' "$1" >&2
+  saved=$(stty -g 2>/dev/null || true)
+  stty -echo -icanon min 1 time 0 2>/dev/null || true
+  IFS= read -r value || true
+  [ -n "$saved" ] && stty "$saved" 2>/dev/null
   echo >&2
-  printf '%s' "$value"
+  printf '%s' "$value" | tr -d '[:space:]'
 }
-
 notion() { # método caminho corpo
   curl -sf -X "$1" "$NOTION$2" -H "Authorization: Bearer $NOTION_TOKEN" -H "Notion-Version: 2022-06-28" \
     -H "Content-Type: application/json" -d "$3"
@@ -48,9 +61,50 @@ set_text() { # nome valor — troca bindings.text('…') da variável no cloudfl
 
 NOTION_TOKEN=$(ask "Token do Notion do Cubodex (ntn_…)")
 if [ -n "$NOTION_TOKEN" ]; then
-  read -r -p "Link ou ID da página \"Loja Cubodex\" no Notion (Enter se os bancos já existem): " PAGE
-  PAGE_ID=$(printf '%s' "$PAGE" | grep -oE '[0-9a-f]{32}' | tail -1 || true)
+  if ! notion GET /users/me "" >/dev/null 2>&1; then
+    # Sem mostrar o segredo: só o começo e o tamanho, para saber o que foi colado.
+    echo "Token do Notion recusado (recebi ${#NOTION_TOKEN} caracteres começando com \"${NOTION_TOKEN:0:4}\")."
+    echo "O token começa com ntn_ (ou secret_): Notion → Configurações → Conexões → sua integração → Mostrar token."
+    exit 1
+  fi
+  echo "    token do Notion ok"
+  read -r -p "Link da página \"Loja Cubodex\" no Notion (Enter = procurar pelo nome): " PAGE
+  if [ -z "$PAGE" ] && ! grep -q "NOTION_PRODUCTS_DB: bindings.text('[0-9a-f]" "$CONFIG"; then
+    # Sem link: procura uma página com o título "Loja Cubodex" entre as que a integração enxerga.
+    PAGE=$(notion POST /search '{"query":"Loja Cubodex","filter":{"property":"object","value":"page"},"page_size":20}' 2>/dev/null |
+      node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=(JSON.parse(s||"{}").results||[]).filter(p=>{
+        const t=Object.values(p.properties||{}).find(x=>x.type==="title");return t&&t.title.map(x=>x.plain_text).join("").trim().toLowerCase()==="loja cubodex"});
+        if(r.length===1)process.stdout.write(r[0].id)})')
+    if [ -z "$PAGE" ]; then
+      echo "Não achei uma (e só uma) página chamada \"Loja Cubodex\" conectada à integração."
+      echo "No Notion: crie a página (em branco), ⋯ → Conexões → adicione a integração, e rode de novo."
+      exit 1
+    fi
+    echo "    achei a página Loja Cubodex"
+  fi
+  # Aceita link do Notion, ID de 32 caracteres ou ID com hífens.
+  # O ID é o último código de 32 caracteres ANTES do "?" (depois dele vem o da visualização, ?v=…).
+  PAGE_ID=$(printf '%s' "${PAGE%%\?*}" | tr -d '-' | grep -oE '[0-9a-f]{32}' | tail -1 || true)
+  if [ -n "$PAGE" ] && [ -z "$PAGE_ID" ]; then
+    echo "Não reconheci a página. Cole o link (Compartilhar → Copiar link) e rode de novo."; exit 1
+  fi
   if [ -n "$PAGE_ID" ]; then
+    if notion GET "/databases/$PAGE_ID" "" >/dev/null 2>&1; then
+      echo "Esse link é de uma TABELA (banco de dados), não de uma página. No Notion: + Nova página →"
+      echo "título \"Loja Cubodex\" → deixe em branco (não escolha Tabela) → ⋯ → Conexões → adicione a integração →"
+      echo "Compartilhar → Copiar link. Rode de novo com esse link."
+      exit 1
+    fi
+    if ! notion GET "/pages/$PAGE_ID" "" >/dev/null 2>&1; then
+      echo "A integração não enxerga essa página. Páginas que ela enxerga hoje:"
+      notion POST /search '{"filter":{"property":"object","value":"page"},"page_size":10}' 2>/dev/null |
+        node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=(JSON.parse(s||"{}").results||[]);
+          if(!r.length){console.log("    (nenhuma) — na página: ⋯ → Conexões → adicione a integração");return}
+          for(const p of r){const t=Object.values(p.properties||{}).find(x=>x.type==="title");
+            console.log("    "+((t&&t.title.map(x=>x.plain_text).join(""))||"(sem título)")+"  →  "+p.id)}})'
+      echo "Rode de novo e cole o ID da \"Loja Cubodex\" dessa lista (depois de conectar a integração a ela)."
+      exit 1
+    fi
     echo "1/4 Criando os bancos no Notion…"
     db() { # título schema → id
       notion POST /databases "{\"parent\":{\"page_id\":\"$PAGE_ID\"},\"title\":[{\"text\":{\"content\":\"$1\"}}],\"properties\":$2}" |
