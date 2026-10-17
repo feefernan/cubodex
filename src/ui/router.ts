@@ -13,6 +13,9 @@ import {
 import { $, $$, onAction } from './dom';
 import { S } from './store';
 
+/** Título da página inicial: o mesmo do index.html, que é o que buscadores e prévias de link leem. */
+const HOME_TITLE = 'Cubodex · cartas de pokémon, miniaturas e impressão 3D';
+
 type Render = () => void;
 const renders = new Map<View, Render>();
 let current: View = 'home';
@@ -70,7 +73,7 @@ const show = ({ view: v, id }: Route, focus: boolean) => {
   renders.get(v)?.();
 
   const h1 = document.querySelector<HTMLElement>(`#v-${v} h1`);
-  document.title = h1 && v !== 'home' ? `${h1.textContent?.replace(/\.$/, '')} · Cubodex` : 'Cubodex';
+  document.title = h1 && v !== 'home' ? `${h1.textContent?.replace(/\.$/, '')} · Cubodex` : HOME_TITLE;
   if (!focus) return;
   window.scrollTo(0, 0);
   // Leitor de tela anuncia a tela nova; o foco não fica preso no link clicado (#11).
