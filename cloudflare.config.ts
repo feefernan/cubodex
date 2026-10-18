@@ -32,7 +32,7 @@ export default defineConfig({
       // Contas (#29): Dex, cofre e pedidos. O CI cria o banco e aplica worker/migrations antes do deploy.
       DB: bindings.d1({ name: 'cubodex-db' }),
       // Entrar com Google (#43). O client ID é público; vazio (ou sem o segredo) = login desligado.
-      GOOGLE_CLIENT_ID: bindings.text(''),
+      GOOGLE_CLIENT_ID: bindings.text('812025645528-r0nmle0ecuaacvmoqji17l218oho69t9.apps.googleusercontent.com'),
       GOOGLE_CLIENT_SECRET: bindings.secret(),
       // 5 pedidos por minuto por IP: suficiente para quem compra, freia spam.
       ORDERS_LIMITER: bindings.rateLimit({ namespace: '2001', simple: { limit: 5, period: 60 } }),
