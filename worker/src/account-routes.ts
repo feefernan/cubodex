@@ -8,6 +8,7 @@ import {
   endSession,
   exportAccount,
   getAccount,
+  pendingCustody,
   redeemLoginToken,
   SESSION_TTL,
   saveDex,
@@ -44,7 +45,7 @@ const requestLogin = async (request: Request, env: Env) => {
   const blocked = await limited(request, env.QUOTES_LIMITER);
   if (blocked) return blocked;
   const mailOn = !!env.EMAIL && !!env.EMAIL_FROM;
-  if (!env.DB || (!mailOn && !isLocal(request))) return unavailable('O login por e-mail');
+  if (!env.DB || (!mailOn && !isLocal(request))) return unavailable();
   try {
     const input = await readJson(request);
     const email = String(input.email ?? '')
@@ -53,7 +54,8 @@ const requestLogin = async (request: Request, env: Env) => {
       .slice(0, 200);
     if (!isEmail(email)) throw new OrderError(400, 'Digite um e-mail válido.');
     // Um e-mail não recebe uma enxurrada de links, mesmo vindo de IPs diferentes.
-    const perEmail = await limited(request, env.QUOTES_LIMITER, `login:${email}`);
+    // Limite próprio e apertado (#39): com IPs trocados, ninguém inunda a caixa de alguém com links.
+    const perEmail = await limited(request, env.LOGIN_LIMITER, `login:${email}`);
     if (perEmail) return perEmail;
     const token = await createLoginToken(env.DB, email);
     const origin = isLocal(request) ? new URL(request.url).origin : env.SITE_URL;
@@ -137,12 +139,12 @@ export const accountRoutes = async (request: Request, env: Env, path: string): P
     if (path === '/api/me' && method === 'DELETE')
       return await withUser(request, env, async (u, db) => {
         await readJson(request);
-        const kept = await db
-          .prepare("SELECT COUNT(*) AS n FROM vault_items WHERE user_id = ? AND status IN ('cofre', 'envio')")
-          .bind(u.id)
-          .first<{ n: number }>();
-        // Cartas guardadas são bens do cliente: a conta só sai depois que elas forem enviadas.
-        if (kept?.n) throw new OrderError(409, 'Você ainda tem itens no cofre. Peça o envio antes de apagar a conta.');
+        // Cartas guardadas (ou pagas para o cofre e ainda não confirmadas) são bens do cliente.
+        if (await pendingCustody(db, u.id))
+          throw new OrderError(
+            409,
+            'Você ainda tem itens no cofre ou uma compra para o cofre em andamento. Peça o envio antes de apagar a conta.',
+          );
         await deleteAccount(db, u.id);
         log('info', 'conta apagada a pedido do titular', {});
         return json({ ok: true }, 200, clearCookie);

@@ -1,5 +1,9 @@
 import { type CartLine, parseCartEntries, resolveCart } from './cart';
+import { productById } from './catalog';
 import { isEmail } from './validation';
+
+/** Linhas por pedido: cabe no limite de chamadas do Worker e no texto do pedido no Notion. */
+export const MAX_LINES = 15;
 
 export interface Address {
   cep: string;
@@ -60,11 +64,24 @@ export const parseAddress = (raw: unknown): Address | null => {
  */
 export const validateOrder = (raw: unknown, opts: { vaultAllowed: boolean }): ValidOrder => {
   const o = (raw ?? {}) as Record<string, unknown>;
-  const entries = parseCartEntries(o.items);
+  const rawItems: unknown[] = Array.isArray(o.items) ? o.items : [];
+  const entries = parseCartEntries(rawItems);
   if (!entries.length) throw new OrderError(400, 'Carrinho vazio');
+  // Linha que não passa na validação é recusada, nunca descartada: o cliente não pode pagar sem um item.
+  if (entries.length !== rawItems.length)
+    throw new OrderError(400, 'Carrinho inválido. Atualize a página e confira os itens.');
+  if (entries.length > MAX_LINES)
+    throw new OrderError(400, `No máximo ${MAX_LINES} itens diferentes por pedido. Divida em dois pedidos.`);
   const { lines, dropped } = resolveCart(entries);
   if (dropped || lines.some((l, i) => l.qty !== entries[i].qty))
     throw new OrderError(409, 'Algum item esgotou ou mudou de quantidade. Revise o carrinho.');
+  // A mesma carta em duas linhas (enviar e guardar) soma contra o estoque.
+  const perCard = new Map<string, number>();
+  for (const l of lines) if (l.kind === 'item') perCard.set(l.id, (perCard.get(l.id) ?? 0) + l.qty);
+  for (const [id, qty] of perCard) {
+    const p = productById[id];
+    if (p?.kind === 'item' && qty > p.qty) throw new OrderError(409, `Só ${p.qty} un. de ${p.name} em estoque.`);
+  }
   if (!opts.vaultAllowed && lines.some((l) => l.dest === 'vault'))
     throw new OrderError(401, 'Para guardar cartas no cofre, entre na sua conta.');
 

@@ -11,6 +11,14 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
+/** POST do formulário de saída da lista, como o navegador envia. */
+const leave = (t: string, origin = 'https://cubodex.test') =>
+  new Request('https://cubodex.test/api/avisos/sair', {
+    method: 'POST',
+    body: new URLSearchParams({ t }),
+    headers: { Origin: origin },
+  });
+
 describe('rotas básicas', () => {
   it('health, 404 e limite por IP', async () => {
     expect(await (await handle(req('/api/health'), env(), ctx, api.f)).json()).toEqual({ ok: true });
@@ -102,10 +110,8 @@ describe('pedido', () => {
       shipments: { cost: 38.9 },
       items: [{ unit_price: 464 }],
       metadata: {
-        items: [
-          { id: 'i2', qty: 1 },
-          { id: 'm1', qty: 2 },
-        ],
+        // Só cartas: o estoque das miniaturas não é controlado pelo site.
+        items: [{ id: 'i2', qty: 1 }],
       },
       statement_descriptor: 'CUBODEX',
     });
@@ -115,10 +121,27 @@ describe('pedido', () => {
     expect(JSON.stringify(page.Frete)).toContain('Correios SEDEX · 3 dias úteis');
   });
 
-  it('sem Mercado Pago o pedido fica "Novo", sem link de pagamento', async () => {
+  it('sem Mercado Pago não aceita pedido (503) e não grava nada', async () => {
     const res = await handle(req('/api/orders', ORDER), env({ MP_ACCESS_TOKEN: undefined }), ctx, api.f);
-    expect(await res.json()).toMatchObject({ checkoutUrl: null });
-    expect(api.state.orders[0].status).toBe('Novo');
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toContain('ainda não está disponível');
+    expect(api.state.orders).toEqual([]);
+  });
+
+  it('recusa pacote forjado, carta repetida acima do estoque, linhas demais e quantidade acima de 99', async () => {
+    const order = (items: unknown[]) => handle(req('/api/orders', { ...ORDER, items }), env(), ctx, api.f);
+    // Pacote só com id pack-<n>: uma carta não vira "pacote" para driblar o estoque.
+    expect((await order([{ id: 'i2', qty: 1, pack: ['m1', 'm1', 'm1'] }])).status).toBe(400);
+    // i2 tem 2 un.: duas linhas de 2 somam 4.
+    const twice = await order([
+      { id: 'i2', qty: 2 },
+      { id: 'i2', qty: 2, dest: 'send' },
+    ]);
+    expect(twice.status).toBe(409);
+    expect((await twice.json()).error).toContain('Só 2 un.');
+    expect((await order(Array.from({ length: 16 }, () => ({ id: 'm1', qty: 1 })))).status).toBe(400);
+    expect((await order([{ id: 'm1', qty: 100 }])).status).toBe(400);
+    expect(api.calls.some((c) => c.url.endsWith('/checkout/preferences'))).toBe(false);
   });
 
   it('frete que sumiu, cobrança que falhou e cofre sem conta não gravam pedido', async () => {
@@ -160,6 +183,18 @@ describe('aviso do Mercado Pago', () => {
     expect(api.state.stock.i2).toBe(1);
   });
 
+  it('aviso com corpo que não é JSON usa o data.id da URL', async () => {
+    const created = await (await handle(req('/api/orders', ORDER), env(), ctx, api.f)).json();
+    api.state.payment.external_reference = created.serial;
+    const raw = new Request('https://cubodex.test/api/mp/webhook?data.id=77&type=payment', {
+      method: 'POST',
+      body: 'não é json',
+      headers: { 'x-signature': await sign('webhook-secret', '77', 'req-1', '1700000000'), 'x-request-id': 'req-1' },
+    });
+    expect((await handle(raw, env(), ctx, api.f)).status).toBe(200);
+    expect(api.state.orders[0].status).toBe('Pago');
+  });
+
   it('recusa assinatura inválida e ignora pagamento sem pedido', async () => {
     expect((await hook('outra-chave')).status).toBe(401);
     api.state.payment.external_reference = 'CBX-20261016-AAAAAA';
@@ -194,12 +229,26 @@ describe('lista de avisos', () => {
 
   it('link de saída marca Saiu; token inválido ou desconhecido não', async () => {
     api.state.subscribers.push({ id: 's9', email: 'a@b.co', token: 'f'.repeat(32), out: false });
-    const res = await handle(req(`/api/avisos/sair?t=${'f'.repeat(32)}`), env(), ctx, api.f);
+    // O GET só mostra o botão: verificadores de link não tiram ninguém da lista.
+    const pageRes = await handle(req(`/api/avisos/sair?t=${'f'.repeat(32)}`), env(), ctx, api.f);
+    expect(pageRes.status).toBe(200);
+    expect(await pageRes.text()).toContain(`name="t" value="${'f'.repeat(32)}"`);
+    expect(api.state.subscribers[0].out).toBe(false);
+    const res = await handle(leave('f'.repeat(32)), env(), ctx, api.f);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain('você saiu da lista');
     expect(api.state.subscribers[0].out).toBe(true);
     expect((await handle(req('/api/avisos/sair?t=<x>'), env(), ctx, api.f)).status).toBe(400);
-    expect((await handle(req(`/api/avisos/sair?t=${'a'.repeat(32)}`), env(), ctx, api.f)).status).toBe(404);
+    expect((await handle(leave('<x>'), env(), ctx, api.f)).status).toBe(400);
+    expect((await handle(leave('a'.repeat(32)), env(), ctx, api.f)).status).toBe(404);
+    expect((await handle(leave('a'.repeat(32), 'https://outro.site'), env(), ctx, api.f)).status).toBe(403);
+    // Corpo que não é formulário conta como link inválido.
+    const notForm = new Request('https://cubodex.test/api/avisos/sair', {
+      method: 'POST',
+      body: '{}',
+      headers: { Origin: 'https://cubodex.test', 'Content-Type': 'application/json' },
+    });
+    expect((await handle(notForm, env(), ctx, api.f)).status).toBe(400);
   });
 });
 
@@ -217,7 +266,7 @@ describe('falhas', () => {
     expect(res.status).toBe(502);
     expect((await res.json()).error).toContain('Tente de novo');
     expect((await handle(req('/api/orders/CBX-20261016-AAAAAA/status'), env(), ctx, down)).status).toBe(502);
-    expect((await handle(req(`/api/avisos/sair?t=${'a'.repeat(32)}`), env(), ctx, down)).status).toBe(502);
+    expect((await handle(leave('a'.repeat(32)), env(), ctx, down)).status).toBe(502);
   });
 
   it('corpo inválido, grande demais e integrações desligadas', async () => {

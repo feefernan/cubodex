@@ -16,6 +16,8 @@ export interface Env {
   ORIGIN_CEP: string;
   ORDERS_LIMITER: Limiter;
   QUOTES_LIMITER: Limiter;
+  /** Pedidos de link de login por e-mail: poucos por minuto. */
+  LOGIN_LIMITER: Limiter;
   /** Cada integração liga quando o segredo existe; sem ele, a rota responde 503 e o site explica. */
   NOTION_TOKEN?: string;
   MELHOR_ENVIO_TOKEN?: string;

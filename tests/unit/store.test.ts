@@ -39,9 +39,13 @@ describe('frete', () => {
       { id: 'i1', weight: 0.05, width: 9, height: 1, length: 12, insurance_value: 890, quantity: 2 },
     ]);
   });
-  it('status do pedido acompanha o Mercado Pago sem voltar de Pago', () => {
+  it('status do pedido acompanha o Mercado Pago; de Pago só sai por estorno', () => {
     expect(nextOrderStatus('Aguardando pagamento', 'approved')).toBe('Pago');
-    expect(nextOrderStatus('Pago', 'refunded')).toBeNull();
+    expect(nextOrderStatus('Pago', 'refunded')).toBe('Estornado');
+    expect(nextOrderStatus('Pago', 'charged_back')).toBe('Estornado');
+    expect(nextOrderStatus('Pago', 'cancelled')).toBeNull();
+    expect(nextOrderStatus('Estornado', 'approved')).toBeNull();
+    expect(nextOrderStatus('Aguardando pagamento', 'refunded')).toBe('Cancelado');
     expect(nextOrderStatus('Aguardando pagamento', 'rejected')).toBe('Cancelado');
     expect(nextOrderStatus('Cancelado', 'cancelled')).toBeNull();
     expect(nextOrderStatus('Aguardando pagamento', 'in_process')).toBeNull();

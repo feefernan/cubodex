@@ -22,6 +22,7 @@ export const createCheckout = async (f: typeof fetch, token: string, c: Charge):
     method: 'POST',
     // Mesmo serial = mesma preferência, se a chamada for repetida.
     headers: { ...auth(token), 'X-Idempotency-Key': c.serial },
+    signal: AbortSignal.timeout(8000),
     body: JSON.stringify({
       items: [{ id: c.serial, title: c.title, quantity: 1, unit_price: c.goods, currency_id: 'BRL' }],
       shipments: { mode: 'not_specified', cost: c.shipping },
@@ -35,7 +36,8 @@ export const createCheckout = async (f: typeof fetch, token: string, c: Charge):
       statement_descriptor: 'CUBODEX',
     }),
   });
-  if (!res.ok) throw new Error(`Mercado Pago preferência: ${res.status} ${await res.text()}`);
+  // Só o status: o corpo do erro pode repetir dados do comprador.
+  if (!res.ok) throw new Error(`Mercado Pago preferência: ${res.status}`);
   const data = (await res.json()) as { init_point?: string; sandbox_init_point?: string };
   // Credenciais de teste (TEST-…) pagam no ambiente de testes.
   const url = token.startsWith('TEST-') ? (data.sandbox_init_point ?? data.init_point) : data.init_point;
@@ -44,11 +46,15 @@ export const createCheckout = async (f: typeof fetch, token: string, c: Charge):
 };
 
 export const getPayment = async (f: typeof fetch, token: string, id: string) => {
-  const res = await f(`${API}/v1/payments/${encodeURIComponent(id)}`, { headers: auth(token) });
+  const res = await f(`${API}/v1/payments/${encodeURIComponent(id)}`, {
+    headers: auth(token),
+    signal: AbortSignal.timeout(8000),
+  });
   if (!res.ok) throw new Error(`Mercado Pago pagamento ${id}: ${res.status}`);
   return (await res.json()) as {
     id: number;
     status: string;
+    transaction_amount?: number;
     external_reference?: string;
     metadata?: { items?: { id?: unknown; qty?: unknown }[] };
   };

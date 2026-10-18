@@ -41,8 +41,9 @@ export const quoteShipping = async (
       to: { postal_code: to },
       products: shippingProducts(lines),
     }),
+    signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) throw new Error(`Melhor Envio cotação: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`Melhor Envio cotação: ${res.status}`);
   const quotes = (await res.json()) as Quote[];
   return quotes
     .filter((q) => !q.error && (q.custom_price ?? q.price))

@@ -22,19 +22,43 @@ type Prop = {
 };
 type Page = { id: string; properties: Record<string, Prop> };
 
+/** Erros só com status e código: o corpo do Notion pode repetir dados do cliente (e-mail, endereço). */
+const failure = async (res: Response, what: string) => {
+  const code = ((await res.json().catch(() => ({}))) as { code?: string }).code ?? '';
+  return new Error(`Notion ${what}: ${res.status}${code ? ` ${code}` : ''}`);
+};
+
 const call = async (f: Fetch, token: string, path: string, method: string, body: unknown, what: string) => {
   const res = await f(`${API}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, 'Notion-Version': VERSION, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    // Sem resposta em 8 s, desiste: o Mercado Pago reenvia o aviso e o cliente não fica preso no checkout.
+    signal: AbortSignal.timeout(8000),
   });
-  if (!res.ok) throw new Error(`Notion ${what}: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw await failure(res, what);
   return (await res.json()) as Record<string, unknown>;
 };
 
-const query = async (f: Fetch, token: string, db: string, filter: unknown, what: string) =>
-  (await call(f, token, `/databases/${db}/query`, 'POST', { page_size: 100, ...(filter ? { filter } : {}) }, what))
-    .results as Page[];
+/** Todas as páginas da consulta (o Notion devolve no máximo 100 por vez). */
+const query = async (f: Fetch, token: string, db: string, filter: unknown, what: string) => {
+  const pages: Page[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < 20; i++) {
+    const data = await call(
+      f,
+      token,
+      `/databases/${db}/query`,
+      'POST',
+      { page_size: 100, ...(filter ? { filter } : {}), ...(cursor ? { start_cursor: cursor } : {}) },
+      what,
+    );
+    pages.push(...(data.results as Page[]));
+    if (!data.has_more) break;
+    cursor = data.next_cursor as string;
+  }
+  return pages;
+};
 
 const rich = (content: string) => ({ rich_text: content ? [{ text: { content: content.slice(0, 2000) } }] : [] });
 const title = (content: string) => ({ title: [{ text: { content: content.slice(0, 2000) } }] });
@@ -57,26 +81,46 @@ export const fetchStock = async (f: Fetch, token: string, db: string): Promise<S
     .filter((row) => row.id);
 
 /**
- * Desconta `qty` de Disponíveis do produto, sem passar de zero.
- * shortcut: lê e grava em dois passos; dois pagamentos do mesmo item no mesmo segundo podem descontar um só.
+ * Baixa o estoque das cartas de um pedido pago: uma consulta aos produtos e um PATCH por carta (cabe no limite de
+ * subrequests). `onEach` registra o progresso; `from` retoma de onde um aviso anterior parou.
+ * Devolve as cartas que não tinham estoque suficiente (venda acima do estoque: a loja precisa reembolsar).
  */
-export const decrementStock = async (f: Fetch, token: string, db: string, id: string, qty: number) => {
-  const [page] = await query(f, token, db, { property: 'ID', rich_text: { equals: id } }, 'achar produto');
-  const available = page?.properties.Disponíveis?.number;
-  if (!page || available == null) return;
-  await call(
-    f,
-    token,
-    `/pages/${page.id}`,
-    'PATCH',
-    { properties: { Disponíveis: { number: Math.max(0, available - qty) } } },
-    'baixar estoque',
+export const decrementStock = async (
+  f: Fetch,
+  token: string,
+  db: string,
+  items: { id: string; qty: number }[],
+  from: number,
+  onEach: (done: number) => Promise<unknown>,
+) => {
+  if (from >= items.length) return [];
+  const byId = new Map(
+    (await query(f, token, db, null, 'ler produtos')).map((p) => [plain(p.properties.ID), p] as const),
   );
+  const short: string[] = [];
+  for (let i = from; i < items.length; i++) {
+    const { id, qty } = items[i];
+    const page = byId.get(id);
+    const available = page?.properties.Disponíveis?.number;
+    if (page && available != null) {
+      if (available < qty) short.push(id);
+      await call(
+        f,
+        token,
+        `/pages/${page.id}`,
+        'PATCH',
+        { properties: { Disponíveis: { number: Math.max(0, available - qty) } } },
+        'baixar estoque',
+      );
+    }
+    await onEach(i + 1);
+  }
+  return short;
 };
 
 export interface OrderRecord {
   serial: string;
-  status: PaymentStatus | 'Novo';
+  status: PaymentStatus | 'Novo' | 'Falhou';
   customer: string;
   email: string;
   items: string;
@@ -113,7 +157,13 @@ export const findOrderPage = async (f: Fetch, token: string, db: string, serial:
   return page ? { id: page.id, status: page.properties.Status?.select?.name ?? '' } : null;
 };
 
-export const updatePaymentStatus = (f: Fetch, token: string, pageId: string, status: PaymentStatus, payment: string) =>
+export const updatePaymentStatus = (
+  f: Fetch,
+  token: string,
+  pageId: string,
+  status: PaymentStatus | 'Sem estoque',
+  payment: string,
+) =>
   call(
     f,
     token,

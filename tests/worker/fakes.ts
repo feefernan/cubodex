@@ -13,6 +13,7 @@ export const env = (over: Partial<Env> = {}): Env => ({
   ORIGIN_CEP: '01403020',
   ORDERS_LIMITER: ok,
   QUOTES_LIMITER: ok,
+  LOGIN_LIMITER: ok,
   NOTION_TOKEN: 'secret_notion',
   MELHOR_ENVIO_TOKEN: 'me-token',
   MP_ACCESS_TOKEN: 'APP_USR-mp',

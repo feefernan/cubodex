@@ -147,16 +147,41 @@ export const saveDex = (db: Db, userId: string, dex: Dex) =>
     ),
   ]);
 
-export const userVault = (db: Db, userId: string, ids: string[]) =>
-  ids.length
-    ? db
-        .prepare(
-          `SELECT id, product_id, name, meta, qty, status, created_at FROM vault_items WHERE user_id = ? AND status = 'cofre' AND id IN (${ids.map(() => '?').join(',')})`,
-        )
-        .bind(userId, ...ids)
-        .all<VaultRow>()
-        .then((r) => r.results)
-    : Promise.resolve([]);
+/** Item do cofre separado para um envio. */
+export type ReservedItem = Pick<VaultRow, 'id' | 'product_id' | 'name' | 'meta' | 'qty'>;
+
+const DAY = 24 * 60 * 60_000;
+
+/**
+ * Separa itens do cofre para um envio (#39): só os que estão no cofre e livres — ou presos a um envio de mais de
+ * um dia que não foi pago (carrinho abandonado no Mercado Pago). Devolve os separados; se faltar algum, desfaz.
+ */
+export const reserveForShipment = async (db: Db, userId: string, ids: string[], serial: string, now = Date.now()) => {
+  if (!ids.length) return [];
+  const marks = ids.map(() => '?').join(',');
+  const stale = new Date(now - DAY).toISOString();
+  const { results } = await db
+    .prepare(
+      `UPDATE vault_items SET shipment_serial = ? WHERE user_id = ? AND status = 'cofre' AND id IN (${marks})
+       AND (shipment_serial IS NULL OR shipment_serial IN
+         (SELECT serial FROM orders WHERE kind = 'envio' AND status <> 'Pago' AND created_at < ?))
+       RETURNING id, product_id, name, meta, qty`,
+    )
+    .bind(serial, userId, ...ids, stale)
+    .all<ReservedItem>();
+  if (results.length !== ids.length) {
+    await releaseShipment(db, serial);
+    return null;
+  }
+  return results;
+};
+
+/** Devolve ao cofre os itens separados para um envio que não vai acontecer (cobrança falhou ou foi recusada). */
+export const releaseShipment = (db: Db, serial: string) =>
+  db
+    .prepare("UPDATE vault_items SET shipment_serial = NULL WHERE shipment_serial = ? AND status = 'cofre'")
+    .bind(serial)
+    .run();
 
 export interface OrderMirror {
   serial: string;
@@ -165,14 +190,16 @@ export interface OrderMirror {
   status: string;
   total: number;
   summary: string;
-  /** compra: itens a guardar; envio: ids dos itens do cofre. */
+  /** compra: itens a guardar no cofre; envio: ids dos itens do cofre. */
   vault: VaultIntent[] | string[];
+  /** Cartas a baixar do estoque quando o pagamento confirmar. */
+  stock?: { id: string; qty: number }[];
 }
 
 export const recordOrder = (db: Db, o: OrderMirror, now = Date.now()) =>
   db
     .prepare(
-      'INSERT INTO orders (serial, user_id, kind, status, total, summary, vault_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO orders (serial, user_id, kind, status, total, summary, vault_json, items_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     )
     .bind(
       o.serial,
@@ -182,29 +209,56 @@ export const recordOrder = (db: Db, o: OrderMirror, now = Date.now()) =>
       o.total,
       o.summary,
       JSON.stringify(o.vault),
+      JSON.stringify(o.stock ?? []),
       new Date(now).toISOString(),
     )
     .run();
 
-/**
- * Pagamento confirmado: compra → itens marcados entram no cofre; envio → itens do cofre saem para envio.
- * Idempotente: o UPDATE só muda pedido que ainda não estava Pago, e só então mexe no cofre.
- */
-export const markOrderPaid = async (db: Db, serial: string, now = Date.now()) => {
-  const order = await db
+export interface OrderRow {
+  user_id: string | null;
+  kind: 'compra' | 'envio';
+  status: string;
+  total: number;
+  vault_json: string;
+  items_json: string;
+  stock_done: number;
+  vault_done: number;
+}
+
+export const getOrder = (db: Db, serial: string) =>
+  db
     .prepare(
-      "UPDATE orders SET status = 'Pago' WHERE serial = ? AND status <> 'Pago' RETURNING user_id, kind, vault_json",
+      'SELECT user_id, kind, status, total, vault_json, items_json, stock_done, vault_done FROM orders WHERE serial = ?',
     )
     .bind(serial)
-    .first<{ user_id: string | null; kind: 'compra' | 'envio'; vault_json: string }>();
-  if (!order?.user_id) return;
+    .first<OrderRow>();
+
+/** Marca como Pago só se ainda não estava (Pago ou Estornado). true = esta chamada fez a passagem. */
+export const claimPaid = async (db: Db, serial: string) =>
+  !!(await db
+    .prepare(
+      "UPDATE orders SET status = 'Pago' WHERE serial = ? AND status NOT IN ('Pago', 'Estornado') RETURNING serial",
+    )
+    .bind(serial)
+    .first());
+
+/** Registra até onde a baixa de estoque chegou (retomada segura se o aviso for reenviado). */
+export const setStockDone = (db: Db, serial: string, n: number) =>
+  db.prepare('UPDATE orders SET stock_done = ? WHERE serial = ?').bind(n, serial).run();
+
+/**
+ * Efeito do pagamento no cofre, uma vez só: compra → itens marcados entram no cofre; envio → itens separados
+ * saem para envio. Tudo num batch junto com vault_done = 1 (ou tudo, ou nada).
+ */
+export const applyVaultEffects = async (db: Db, serial: string, order: OrderRow, now = Date.now()) => {
+  if (order.vault_done || !order.user_id) return;
   const at = day(now);
-  const created = new Date(now).toISOString();
+  const done = db.prepare('UPDATE orders SET vault_done = 1 WHERE serial = ? AND vault_done = 0').bind(serial);
   if (order.kind === 'compra') {
     const items = JSON.parse(order.vault_json) as VaultIntent[];
-    if (!items.length) return;
-    await db.batch(
-      items.flatMap((it) => [
+    const created = new Date(now).toISOString();
+    await db.batch([
+      ...items.flatMap((it) => [
         db
           .prepare(
             "INSERT INTO vault_items (id, user_id, product_id, name, meta, qty, status, order_serial, created_at) VALUES (?, ?, ?, ?, ?, ?, 'cofre', ?, ?)",
@@ -214,23 +268,68 @@ export const markOrderPaid = async (db: Db, serial: string, now = Date.now()) =>
           .prepare('INSERT INTO vault_history (user_id, at, text) VALUES (?, ?, ?)')
           .bind(order.user_id, at, `guardado no cofre · ${it.name}${it.qty > 1 ? ` (${it.qty} un.)` : ''}`),
       ]),
-    );
+      done,
+    ]);
     return;
   }
-  const ids = JSON.parse(order.vault_json) as string[];
-  const items = await userVault(db, order.user_id, ids);
-  await db.batch(
-    items.flatMap((it) => [
-      db.prepare("UPDATE vault_items SET status = 'envio', shipment_serial = ? WHERE id = ?").bind(serial, it.id),
+  const { results } = await db
+    .prepare("SELECT name FROM vault_items WHERE shipment_serial = ? AND status = 'cofre'")
+    .bind(serial)
+    .all<{ name: string }>();
+  await db.batch([
+    db.prepare("UPDATE vault_items SET status = 'envio' WHERE shipment_serial = ? AND status = 'cofre'").bind(serial),
+    ...results.map((it) =>
       db
         .prepare('INSERT INTO vault_history (user_id, at, text) VALUES (?, ?, ?)')
         .bind(order.user_id, at, `pedido de envio · ${it.name}`),
-    ]),
-  );
+    ),
+    done,
+  ]);
 };
 
+/**
+ * Estorno ou chargeback de pedido pago: o pedido vira Estornado e as cartas dessa compra saem do cofre
+ * (não podem ser enviadas de graça depois). Itens já enviados ficam como estão — a loja resolve à parte.
+ */
+export const markRefunded = async (db: Db, serial: string, now = Date.now()) => {
+  const order = await db
+    .prepare("UPDATE orders SET status = 'Estornado' WHERE serial = ? AND status = 'Pago' RETURNING user_id, kind")
+    .bind(serial)
+    .first<{ user_id: string | null; kind: string }>();
+  if (!order?.user_id || order.kind !== 'compra') return;
+  const { results } = await db
+    .prepare("DELETE FROM vault_items WHERE order_serial = ? AND status = 'cofre' RETURNING name")
+    .bind(serial)
+    .all<{ name: string }>();
+  if (results.length)
+    await db.batch(
+      results.map((it) =>
+        db
+          .prepare('INSERT INTO vault_history (user_id, at, text) VALUES (?, ?, ?)')
+          .bind(order.user_id, day(now), `removido do cofre · pagamento estornado · ${it.name}`),
+      ),
+    );
+};
+
+/** Pedido que não vai ser pago: Cancelado (recusado) ou Falhou (não chegou ao painel). Pago e Estornado ficam. */
 export const markOrderStatus = (db: Db, serial: string, status: string) =>
-  db.prepare("UPDATE orders SET status = ? WHERE serial = ? AND status <> 'Pago'").bind(status, serial).run();
+  db
+    .prepare("UPDATE orders SET status = ? WHERE serial = ? AND status NOT IN ('Pago', 'Estornado')")
+    .bind(status, serial)
+    .run();
+
+/** Itens do cliente que impedem apagar a conta: no cofre, em envio ou numa compra para o cofre ainda aberta. */
+export const pendingCustody = async (db: Db, userId: string) => {
+  const row = await db
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM vault_items WHERE user_id = ? AND status IN ('cofre', 'envio'))
+            + (SELECT COUNT(*) FROM orders WHERE user_id = ? AND kind = 'compra' AND vault_json <> '[]'
+                 AND status = 'Aguardando pagamento') AS n`,
+    )
+    .bind(userId, userId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+};
 
 /** LGPD: tudo o que a conta guarda, para o cliente baixar. */
 export const exportAccount = async (db: Db, user: User) => {

@@ -152,7 +152,17 @@ const parseVault = (v: unknown): VaultEntry[] =>
   isText(v.date, 20) &&
   isQty(v.qty) &&
   VAULT_STATUS.has(v.st as string)
-    ? [{ id: v.id, name: v.name, meta: v.meta, date: v.date, qty: v.qty, st: v.st as VaultEntry['st'] }]
+    ? [
+        {
+          id: v.id,
+          ...(isText(v.productId, 40) ? { productId: v.productId } : {}),
+          name: v.name,
+          meta: v.meta,
+          date: v.date,
+          qty: v.qty,
+          st: v.st as VaultEntry['st'],
+        },
+      ]
     : [];
 
 const parseHist = (v: unknown): HistoryEntry[] =>
