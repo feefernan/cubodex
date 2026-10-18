@@ -16,13 +16,14 @@ export default defineConfig({
       SITE_URL: bindings.text('https://cubodex.contato-3dcubo.workers.dev'),
       CONTACT_EMAIL: bindings.text('contato@cubodex.com.br'),
       // IDs dos bancos do Notion do Cubodex (preencher ao criar o workspace; vazio = rota responde 503).
-      NOTION_PRODUCTS_DB: bindings.text(''),
-      NOTION_ORDERS_DB: bindings.text(''),
-      NOTION_SUBSCRIBERS_DB: bindings.text(''),
-      // Cotar no Melhor Envio é gratuito; só a compra de etiqueta é cobrada.
-      MELHOR_ENVIO_API: bindings.text('https://melhorenvio.com.br'),
+      NOTION_PRODUCTS_DB: bindings.text('3fc620acc67f81ce91b8c6174dbc0c83'),
+      NOTION_ORDERS_DB: bindings.text('3fc620acc67f81c4b79ee5e7e37d9183'),
+      NOTION_SUBSCRIBERS_DB: bindings.text('3fc620acc67f81d5868dda267d60041d'),
+      // MODO TESTE: o token cadastrado é do sandbox do Melhor Envio (e o do Mercado Pago é TEST-).
+      // No lançamento: token de produção + 'https://melhorenvio.com.br' aqui.
+      MELHOR_ENVIO_API: bindings.text('https://sandbox.melhorenvio.com.br'),
       // CEP de onde as peças saem (#21); vazio = frete desligado.
-      ORIGIN_CEP: bindings.text(''),
+      ORIGIN_CEP: bindings.text('01403020'),
       NOTION_TOKEN: bindings.secret(),
       MELHOR_ENVIO_TOKEN: bindings.secret(),
       MP_ACCESS_TOKEN: bindings.secret(),
