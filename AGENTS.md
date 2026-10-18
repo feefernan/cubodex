@@ -83,11 +83,12 @@ cloudflare.config.ts   Worker + assets + bindings (CLI `cf`)
    `notification_url`) confere a assinatura, muda o status e dá baixa no estoque das cartas.
 Dinheiro, frete e serial **nunca** são decididos no navegador.
 
-**Contas:** login por link mágico (sem senha). `POST /api/auth/request` manda o link; o link abre uma página com botão
-(verificadores de e-mail não gastam o token) e o `POST` cria a sessão em cookie `HttpOnly; Secure; SameSite=Lax`.
-Dex e cofre ficam no D1. Item comprado com "guardar no cofre" só entra no cofre com o pagamento confirmado; o envio do
-cofre é cobrado no Mercado Pago (`POST /api/vault/ship`). A conta não pode ser apagada com itens no cofre (são bens do
-cliente). O login em produção depende do domínio verificado no Email Service (#22) e de `EMAIL_FROM`.
+**Contas:** Entrar com Google (#43), sem senha e sem e-mail para enviar. `GET /api/auth/google` manda para o Google
+com state e PKCE num cookie de 10 min; `GET /api/auth/google/callback` confere o state, troca o código, exige
+`email_verified` e cria a sessão em cookie `HttpOnly; Secure; SameSite=Lax`. A conta é o e-mail. Dex e cofre ficam no
+D1. Item comprado com "guardar no cofre" só entra no cofre com o pagamento confirmado; o envio do cofre é cobrado no
+Mercado Pago (`POST /api/vault/ship`). A conta não pode ser apagada com itens no cofre (são bens do cliente). Sem
+`GOOGLE_CLIENT_ID` (config) e `GOOGLE_CLIENT_SECRET` (segredo), o login responde 503.
 
 - `domain/` **não importa** `infra/` nem `ui/` e não toca no DOM. Toda regra de negócio nova nasce aqui, com teste.
 - `infra/` **não importa** `ui/`.

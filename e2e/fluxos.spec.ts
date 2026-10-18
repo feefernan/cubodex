@@ -81,13 +81,13 @@ test.describe('fluxos principais', () => {
     await expect(page.locator('#setBody h1')).toHaveText('Base Set');
   });
 
-  test('entrar: pede o link por e-mail', async ({ page }) => {
-    await page.route('**/api/auth/request', (route) => route.fulfill({ json: { ok: true } }));
+  test('entrar: o botão leva ao login do Google', async ({ page }) => {
+    await page.route('**/api/auth/google', (route) =>
+      route.fulfill({ status: 303, headers: { Location: '/#/conta/erro-login' } }),
+    );
     await page.goto('/#/conta');
-    await page.locator('#lg-email').fill('ana@exemplo.com');
-    await page.locator('#lg-ok').check();
-    await page.locator('#formLogin button[type="submit"]').click();
-    await expect(page.locator('#lg-msg')).toContainText('Link enviado para ana@exemplo.com');
+    await page.getByRole('link', { name: 'entrar com Google' }).click();
+    await expect(page.locator('#lg-msg')).toContainText('Não deu para entrar com o Google');
   });
 
   test('carrinho e dex sobrevivem a recarregar a página', async ({ page }) => {

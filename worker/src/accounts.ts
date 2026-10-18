@@ -40,7 +40,6 @@ interface VaultIntent {
   meta: string;
 }
 
-const LOGIN_TTL = 15 * 60_000;
 export const SESSION_TTL = 30 * 24 * 60 * 60_000;
 
 const hex = (bytes: ArrayBuffer | Uint8Array) =>
@@ -50,31 +49,13 @@ const sha256 = async (text: string) => hex(await crypto.subtle.digest('SHA-256',
 const day = (now: number) =>
   new Date(now).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
 
-/** Cria um token de login de uso único para o e-mail; devolve o token (vai só no link do e-mail). */
-export const createLoginToken = async (db: Db, email: string, now = Date.now()) => {
-  const token = randomToken();
-  await db
-    .prepare('INSERT INTO login_tokens (hash, email, expires_at) VALUES (?, ?, ?)')
-    .bind(await sha256(token), email, now + LOGIN_TTL)
-    .run();
-  return token;
-};
-
-/**
- * Troca o token do link por uma sessão. O UPDATE … RETURNING marca o token como usado no mesmo passo:
- * dois cliques no link (ou um verificador de e-mail) não geram duas sessões.
- */
-export const redeemLoginToken = async (db: Db, token: string, now = Date.now()) => {
-  const row = await db
-    .prepare('UPDATE login_tokens SET used = 1 WHERE hash = ? AND used = 0 AND expires_at > ? RETURNING email')
-    .bind(await sha256(token), now)
-    .first<{ email: string }>();
-  if (!row) return null;
+/** Abre uma sessão para o e-mail (confirmado pelo Google), criando a conta na primeira vez; devolve o token do cookie. */
+export const startSession = async (db: Db, email: string, name: string, now = Date.now()) => {
   await db
     .prepare('INSERT INTO users (id, email, name, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING')
-    .bind(crypto.randomUUID(), row.email, row.email.split('@')[0], new Date(now).toISOString())
+    .bind(crypto.randomUUID(), email, name || email.split('@')[0], new Date(now).toISOString())
     .run();
-  const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(row.email).first<{ id: string }>();
+  const user = await db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first<{ id: string }>();
   if (!user) return null;
   const session = randomToken();
   await db

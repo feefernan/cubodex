@@ -1,30 +1,27 @@
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-import { createLoginToken, redeemLoginToken } from '../../worker/src/accounts';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { startSession } from '../../worker/src/accounts';
 import { clearStockCache, handle } from '../../worker/src/app';
-import type { Mailer } from '../../worker/src/email';
 import type { Env } from '../../worker/src/env';
 import { testDb } from './d1';
 import { ctx, env, fake, ORDER, req, sign } from './fakes';
 
 let api: ReturnType<typeof fake>;
 let d1: ReturnType<typeof testDb>;
-let mail: { send: Mock<Mailer['send']> };
 let E: Env;
 
 beforeEach(() => {
   clearStockCache();
   api = fake();
   d1 = testDb();
-  mail = { send: vi.fn<Mailer['send']>(async () => ({ messageId: 'm1' })) };
-  E = env({ DB: d1.db, EMAIL: mail, EMAIL_FROM: 'entrar@cubodex.test' });
+  E = env({ DB: d1.db });
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-/** Entra direto pelo banco (o caminho do e-mail tem teste próprio) e devolve o cookie. */
+/** Entra direto pelo banco (o caminho do Google tem teste próprio) e devolve o cookie. */
 const login = async (email = 'ana@exemplo.com') => {
-  const session = await redeemLoginToken(d1.db, await createLoginToken(d1.db, email));
+  const session = await startSession(d1.db, email, '');
   return { Cookie: `outro=1; cbx_sess=${session}` };
 };
 const withCookie = (path: string, cookie: Record<string, string>, body?: unknown, method?: string) => {
@@ -33,88 +30,123 @@ const withCookie = (path: string, cookie: Record<string, string>, body?: unknown
 };
 const rows = (sql: string) => d1.sqlite.prepare(sql).all() as Record<string, unknown>[];
 
-describe('link mágico', () => {
-  it('manda o link por e-mail, sem dizer se a conta existe', async () => {
-    const res = await handle(req('/api/auth/request', { email: ' Ana@Exemplo.com ' }), E, ctx, api.f);
-    expect(await res.json()).toEqual({ ok: true });
-    const msg = mail.send.mock.calls[0][0];
-    expect(msg).toMatchObject({
-      to: 'ana@exemplo.com',
-      from: 'entrar@cubodex.test',
-      subject: expect.stringContaining('entrar'),
+describe('entrar com Google', () => {
+  const G = () => ({ ...E, GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'segredo' });
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const claims = (over: Record<string, unknown> = {}) => ({
+    iss: 'https://accounts.google.com',
+    aud: 'cid.apps.googleusercontent.com',
+    email: 'Ana@Exemplo.com',
+    email_verified: true,
+    given_name: 'Ana',
+    ...over,
+  });
+  /** Google falso: o endpoint de token devolve um id_token com as claims dadas (ou um erro). */
+  const google = (c: Record<string, unknown> | null) => {
+    const sent: URLSearchParams[] = [];
+    const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== 'https://oauth2.googleapis.com/token') return api.f(input, init);
+      sent.push(new URLSearchParams(String(init?.body)));
+      return c ? Response.json({ id_token: `h.${b64(c)}.sig` }) : new Response('{}', { status: 400 });
+    }) as typeof fetch;
+    return { f, sent };
+  };
+  /** Começa o login e devolve o state e o cookie que o navegador guardaria. */
+  const start = async (origin = 'https://cubodex.test') => {
+    const res = await handle(new Request(`${origin}/api/auth/google`), G(), ctx, api.f);
+    const to = new URL(res.headers.get('Location') ?? '');
+    const cookie = (res.headers.get('Set-Cookie') ?? '').split(';')[0];
+    return { res, to, cookie, state: to.searchParams.get('state') ?? '' };
+  };
+  const back = (state: string, cookie: string, extra = 'code=c1') =>
+    new Request(`https://cubodex.test/api/auth/google/callback?state=${state}&${extra}`, {
+      headers: { Cookie: cookie },
     });
-    expect(msg.text).toMatch(/https:\/\/cubodex\.test\/api\/auth\/verify\?t=[0-9a-f]{64}/);
-    expect(rows('SELECT email, used FROM login_tokens')).toEqual([{ email: 'ana@exemplo.com', used: 0 }]);
-    // Só o hash fica no banco.
-    expect(msg.text).not.toContain(String(rows('SELECT hash FROM login_tokens')[0].hash));
-  });
 
-  it('e-mail inválido, limite por e-mail e login desligado', async () => {
-    expect((await handle(req('/api/auth/request', { email: 'x' }), E, ctx, api.f)).status).toBe(400);
-    const limiter = { limit: vi.fn(async ({ key }: { key: string }) => ({ success: !key.startsWith('login:') })) };
-    expect(
-      (await handle(req('/api/auth/request', { email: 'a@b.co' }), { ...E, LOGIN_LIMITER: limiter }, ctx, api.f))
-        .status,
-    ).toBe(429);
-    expect(limiter.limit).toHaveBeenCalledWith({ key: 'login:a@b.co' });
-    expect(
-      (await handle(req('/api/auth/request', { email: 'a@b.co' }), { ...E, EMAIL_FROM: '' }, ctx, api.f)).status,
-    ).toBe(503);
-    expect(
-      (await handle(req('/api/auth/request', { email: 'a@b.co' }), { ...E, DB: undefined }, ctx, api.f)).status,
-    ).toBe(503);
-  });
-
-  it('em localhost, sem e-mail configurado, o link vai para o log', async () => {
-    const local = new Request('http://localhost:5173/api/auth/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'dev@exemplo.com' }),
-    });
-    expect((await handle(local, { ...E, EMAIL_FROM: '' }, ctx, api.f)).status).toBe(200);
-    expect(console.log).toHaveBeenCalledWith(expect.stringMatching(/http:\/\/localhost:5173\/api\/auth\/verify\?t=/));
-  });
-
-  it('o link abre uma página com botão; só o clique (POST da própria origem) entra', async () => {
-    const token = await createLoginToken(d1.db, 'ana@exemplo.com');
-    const pageRes = await handle(req(`/api/auth/verify?t=${token}`), E, ctx, api.f);
-    expect(await pageRes.text()).toContain(`value="${token}"`);
-    expect(rows('SELECT used FROM login_tokens')).toEqual([{ used: 0 }]);
-    expect((await handle(req('/api/auth/verify?t=<x>'), E, ctx, api.f)).status).toBe(400);
-
-    const post = (origin: string, t = token) =>
-      new Request('https://cubodex.test/api/auth/verify', {
-        method: 'POST',
-        headers: { Origin: origin, 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `t=${t}`,
-      });
-    expect((await handle(post('https://malicioso.test'), E, ctx, api.f)).status).toBe(403);
-    const ok = await handle(post('https://cubodex.test'), E, ctx, api.f);
-    expect(ok.status).toBe(303);
-    expect(ok.headers.get('Location')).toBe('/#/conta');
-    expect(ok.headers.get('Set-Cookie')).toMatch(
-      /^cbx_sess=[0-9a-f]{64}; HttpOnly; Secure; SameSite=Lax; Path=\/; Max-Age=2592000$/,
-    );
-    const again = await handle(post('https://cubodex.test'), E, ctx, api.f);
-    expect(again.headers.get('Location')).toBe('/#/conta/link-expirado');
-    const bad = await handle(post('https://cubodex.test', 'x'), E, ctx, api.f);
-    expect(bad.headers.get('Location')).toBe('/#/conta/link-expirado');
-  });
-
-  it('corpo que não é formulário volta para "link expirado"', async () => {
-    const r = new Request('https://cubodex.test/api/auth/verify', {
-      method: 'POST',
-      body: '{}',
-      headers: { Origin: 'https://cubodex.test', 'Content-Type': 'application/json' },
-    });
-    const res = await handle(r, E, ctx, api.f);
+  it('manda para o Google com state e PKCE, e volta para o mesmo endereço', async () => {
+    const { res, to, cookie } = await start();
     expect(res.status).toBe(303);
-    expect(res.headers.get('Location')).toBe('/#/conta/link-expirado');
+    expect(to.origin + to.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+    expect(Object.fromEntries(to.searchParams)).toMatchObject({
+      client_id: 'cid.apps.googleusercontent.com',
+      redirect_uri: 'https://cubodex.test/api/auth/google/callback',
+      scope: 'openid email profile',
+      code_challenge_method: 'S256',
+    });
+    expect(cookie).toMatch(/^cbx_oauth=[\w-]{43}\.[\w-]{43}$/);
+    expect(res.headers.get('Set-Cookie')).toContain(
+      'HttpOnly; Secure; SameSite=Lax; Path=/api/auth/google; Max-Age=600',
+    );
+    const local = await start('http://localhost:5173');
+    expect(local.to.searchParams.get('redirect_uri')).toBe('http://localhost:5173/api/auth/google/callback');
   });
 
-  it('token vencido não entra', async () => {
-    const token = await createLoginToken(d1.db, 'ana@exemplo.com', Date.now() - 16 * 60_000);
-    expect(await redeemLoginToken(d1.db, token)).toBeNull();
+  it('volta do Google: troca o código com o verificador, cria a conta e abre a sessão', async () => {
+    const { state, cookie, to } = await start();
+    const g = google(claims());
+    const res = await handle(back(state, cookie), G(), ctx, g.f);
+    expect(res.status).toBe(303);
+    expect(res.headers.get('Location')).toBe('/#/conta');
+    expect(res.headers.get('Set-Cookie')).toMatch(/cbx_oauth=; .*Max-Age=0, cbx_sess=[0-9a-f]{64}; HttpOnly/);
+    const verifier = cookie.split('.')[1];
+    const challenge = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))).toString(
+      'base64url',
+    );
+    expect(to.searchParams.get('code_challenge')).toBe(challenge);
+    expect(Object.fromEntries(g.sent[0])).toMatchObject({
+      code: 'c1',
+      code_verifier: verifier,
+      client_secret: 'segredo',
+      redirect_uri: 'https://cubodex.test/api/auth/google/callback',
+      grant_type: 'authorization_code',
+    });
+    expect(rows('SELECT email, name FROM users')).toEqual([{ email: 'ana@exemplo.com', name: 'Ana' }]);
+    const session = (res.headers.get('Set-Cookie') ?? '').match(/cbx_sess=([0-9a-f]{64})/)?.[1];
+    const me = await handle(req('/api/me', undefined, { Cookie: `cbx_sess=${session}` }), E, ctx, api.f);
+    expect((await me.json()).user).toMatchObject({ email: 'ana@exemplo.com', name: 'Ana' });
+    // Segunda entrada: mesma conta, sessão nova.
+    const again = await start();
+    await handle(back(again.state, again.cookie), G(), ctx, google(claims()).f);
+    expect(rows('SELECT COUNT(*) AS n FROM users')).toEqual([{ n: 1 }]);
+    expect(rows('SELECT COUNT(*) AS n FROM sessions')).toEqual([{ n: 2 }]);
+  });
+
+  it('recusa state trocado, cancelamento, e-mail não verificado, outro app e erro do Google', async () => {
+    const { state, cookie } = await start();
+    const refused = async (r: Request, c: Record<string, unknown> | null = claims()) => {
+      const res = await handle(r, G(), ctx, google(c).f);
+      expect(res.headers.get('Location')).toBe('/#/conta/erro-login');
+      expect(res.headers.get('Set-Cookie')).toContain('cbx_oauth=; ');
+    };
+    await refused(back('outro', cookie));
+    await refused(back(state, ''));
+    await refused(back(state, cookie, 'error=access_denied'));
+    await refused(back(state, cookie), claims({ email_verified: false }));
+    await refused(back(state, cookie), claims({ aud: 'outro-app' }));
+    await refused(back(state, cookie), claims({ iss: 'https://evil.test' }));
+    await refused(back(state, cookie), claims({ email: 'sem-arroba' }));
+    await refused(back(state, cookie), null);
+    expect(rows('SELECT * FROM users')).toEqual([]);
+  });
+
+  it('sem client ID, segredo ou banco o login fica desligado; limite por IP', async () => {
+    for (const off of [{ GOOGLE_CLIENT_ID: '' }, { GOOGLE_CLIENT_SECRET: undefined }, { DB: undefined }]) {
+      expect((await handle(req('/api/auth/google'), { ...G(), ...off }, ctx, api.f)).status).toBe(503);
+      const res = await handle(back('s', 'cbx_oauth=s.v'), { ...G(), ...off }, ctx, api.f);
+      expect(res.headers.get('Location')).toBe('/#/conta/erro-login');
+    }
+    const blocked = { limit: async () => ({ success: false }) };
+    expect((await handle(req('/api/auth/google'), { ...G(), QUOTES_LIMITER: blocked }, ctx, api.f)).status).toBe(429);
+  });
+
+  it('id_token ilegível ou Google fora do ar volta para a conta com erro', async () => {
+    const { state, cookie } = await start();
+    const garbage = (async () => Response.json({ id_token: 'x.!!!.y' })) as unknown as typeof fetch;
+    expect((await handle(back(state, cookie), G(), ctx, garbage)).headers.get('Location')).toBe('/#/conta/erro-login');
+    const down = (async () => {
+      throw new Error('rede');
+    }) as unknown as typeof fetch;
+    expect((await handle(back(state, cookie), G(), ctx, down)).headers.get('Location')).toBe('/#/conta/erro-login');
   });
 });
 

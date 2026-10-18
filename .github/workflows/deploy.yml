@@ -64,9 +64,10 @@ jobs:
           MP_ACCESS_TOKEN: ${{ secrets.MP_ACCESS_TOKEN }}
           MP_WEBHOOK_SECRET: ${{ secrets.MP_WEBHOOK_SECRET }}
           MELHOR_ENVIO_TOKEN: ${{ secrets.MELHOR_ENVIO_TOKEN }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           umask 077
           # Só os segredos que existem: um vazio sobrescreveria o que já está no Worker (#39).
-          node -e 'const e = process.env; require("fs").writeFileSync(e.RUNNER_TEMP + "/secrets.json", JSON.stringify(Object.fromEntries(["NOTION_TOKEN", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET", "MELHOR_ENVIO_TOKEN"].filter((k) => e[k]).map((k) => [k, e[k]]))))'
+          node -e 'const e = process.env; require("fs").writeFileSync(e.RUNNER_TEMP + "/secrets.json", JSON.stringify(Object.fromEntries(["NOTION_TOKEN", "MP_ACCESS_TOKEN", "MP_WEBHOOK_SECRET", "MELHOR_ENVIO_TOKEN", "GOOGLE_CLIENT_SECRET"].filter((k) => e[k]).map((k) => [k, e[k]]))))'
           npx cf deploy --secrets-file "$RUNNER_TEMP/secrets.json" --message "${{ github.sha }}"
           rm -f "$RUNNER_TEMP/secrets.json"

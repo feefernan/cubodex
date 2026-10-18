@@ -1,11 +1,10 @@
 import { dexTotals } from '../domain/collection';
 import { brl, escapeHtml as esc } from '../domain/format';
 import { demoAccount } from '../domain/state';
-import { isEmail } from '../domain/validation';
 import { api } from '../infra/api';
 import { alertMsg, progress } from './cart';
 import { dexBar } from './collectibles';
-import { $, check, onAction, onSubmit } from './dom';
+import { $, onAction } from './dom';
 import { refresh, registerView } from './router';
 import { isRealUser } from './session';
 import { persist, S } from './store';
@@ -14,8 +13,11 @@ import { toast } from './toast';
 const DEMO_LINK =
   '<p style="margin-top:20px"><button class="linkbtn" data-action="login-demo">ver a demonstração</button> <span class="muted" style="font-size:13px">(dados de exemplo, só neste navegador)</span></p>';
 
+const GOOGLE_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>';
+
 const LOGGED_OUT = (msg: string) =>
-  `<div class="cols-2"><div class="card"><h2>entrar ou criar conta</h2><p class="soft" style="font-size:15px">Sem senha: mandamos um link para o seu e-mail. Abra no mesmo aparelho.</p><form id="formLogin" class="form-stack" novalidate><div class="field"><label for="lg-email">e-mail</label><input class="input" id="lg-email" type="email" autocomplete="email" placeholder="voce@exemplo.com"></div><label class="check"><input type="checkbox" id="lg-ok"><span>Li os termos de uso e a política de privacidade, e autorizo o uso dos meus dados para pedidos, entrega e para guardar minha Dex e meu cofre.</span></label><button class="btn" type="submit">mandar link</button><div id="lg-msg" role="status" aria-live="polite">${msg}</div></form></div>` +
+  `<div class="cols-2"><div class="card"><h2>entrar ou criar conta</h2><p class="soft" style="font-size:15px">Sem senha: entre com a sua conta Google. Na primeira vez, a conta da Cubodex é criada com o seu e-mail.</p><div class="form-stack"><a class="btn btn--google" href="/api/auth/google">${GOOGLE_ICON}<span>entrar com Google</span></a><p class="muted" style="font-size:13px">Ao entrar, você aceita os termos de uso e a política de privacidade e autoriza o uso do seu nome e e-mail para pedidos, entrega e para guardar sua Dex e seu cofre.</p><div id="lg-msg" role="status" aria-live="polite">${msg}</div></div></div>` +
   '<div class="card"><h2>por que ter conta</h2><p class="soft">A Dex fica salva em qualquer aparelho, o cofre guarda as cartas que você comprou até pedir o envio, e os pedidos ficam todos num lugar.</p></div></div>' +
   DEMO_LINK;
 
@@ -62,9 +64,9 @@ const clearAccount = () => {
 
 export const initAccount = () => {
   registerView('conta', () => {
-    // #/conta/link-expirado: o link do e-mail já foi usado ou passou dos 15 minutos.
-    if (location.hash.endsWith('/link-expirado') && !S.user)
-      S.accountMsg = alertMsg('Esse link já foi usado ou expirou. Peça um novo abaixo.');
+    // #/conta/erro-login: o Google não confirmou a entrada (cancelada, expirada ou e-mail não verificado).
+    if (location.hash.endsWith('/erro-login') && !S.user)
+      S.accountMsg = alertMsg('Não deu para entrar com o Google. Tente de novo.');
     renderConta();
   });
   onAction('login-demo', () => {
@@ -90,26 +92,6 @@ export const initAccount = () => {
       refresh();
     } catch (e) {
       msg.innerHTML = alertMsg((e as Error).message);
-    }
-  });
-  onSubmit('formLogin', async (form) => {
-    const msg = $('#lg-msg');
-    const email = $<HTMLInputElement>('#lg-email');
-    const ok = $<HTMLInputElement>('#lg-ok');
-    if (!check(email, msg, isEmail(email.value.trim()), alertMsg('Digite um e-mail válido.'))) return;
-    const consent = 'O aceite dos termos de uso e da política de privacidade é obrigatório para entrar.';
-    if (!check(ok, msg, ok.checked, alertMsg(consent))) return;
-    const button = $<HTMLButtonElement>('button[type="submit"]', form);
-    button.disabled = true;
-    msg.innerHTML = progress('mandando o link…');
-    try {
-      await api.requestLogin(email.value.trim());
-      S.accountMsg = `<div class="msg"><b>Link enviado para ${esc(email.value.trim())}.</b> Abra o e-mail neste aparelho e toque em “entrar”. Vale por 15 minutos.</div>`;
-      msg.innerHTML = S.accountMsg;
-    } catch (e) {
-      msg.innerHTML = alertMsg((e as Error).message);
-    } finally {
-      button.disabled = false;
     }
   });
 };

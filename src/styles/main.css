@@ -95,6 +95,9 @@ button{font:inherit;color:inherit}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn--ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
 .btn--ghost:hover{background:var(--surface-2)}
+/* Entrar com Google: botão claro com o logo, como o Google pede, nos dois temas. */
+.btn--google{display:inline-flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#1f1f1f;border:1px solid #dadce0}
+.btn--google:hover{background:#f8f9fa}
 .btn--sm{min-height:36px;padding:8px 14px;font-size:13px}
 .btn--full{width:100%}
 .chip{display:inline-flex;align-items:center;min-height:34px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:transparent;cursor:pointer;font:600 14px/1 var(--f-body);text-transform:lowercase;color:var(--soft)}
