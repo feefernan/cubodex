@@ -8,13 +8,14 @@ export default defineConfig({
     name: 'cubodex',
     compatibilityDate: '2026-10-12',
     entrypoint,
-    // shortcut: endereço provisório *.workers.dev até ter domínio próprio (#22).
+    // Domínio próprio (#22). O workers.dev continua respondendo, para não quebrar links antigos.
+    domains: ['acubodex.com.br', 'www.acubodex.com.br'],
     workersDev: true,
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*'] },
     observability: { enabled: true, logs: { enabled: true } },
     env: {
-      SITE_URL: bindings.text('https://cubodex.contato-3dcubo.workers.dev'),
-      CONTACT_EMAIL: bindings.text('contato@cubodex.com.br'),
+      SITE_URL: bindings.text('https://acubodex.com.br'),
+      CONTACT_EMAIL: bindings.text('contato@acubodex.com.br'),
       // IDs dos bancos do Notion do Cubodex (preencher ao criar o workspace; vazio = rota responde 503).
       NOTION_PRODUCTS_DB: bindings.text('3fc620acc67f81ce91b8c6174dbc0c83'),
       NOTION_ORDERS_DB: bindings.text('3fc620acc67f81c4b79ee5e7e37d9183'),
