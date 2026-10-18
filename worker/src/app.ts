@@ -475,7 +475,7 @@ export const handle = async (request: Request, env: Env, _ctx: Ctx, f: typeof fe
   if (path === '/api/avisos/sair' && method === 'GET') return unsubscribePage(url);
   if (path === '/api/avisos/sair' && method === 'POST') return unsubscribe(request, env, f);
   if (path === '/api/vault/ship' && method === 'POST') return shipVault(request, env, f);
-  const account = await accountRoutes(request, env, path);
+  const account = await accountRoutes(request, env, path, f);
   if (account) return account;
   const status = path.match(/^\/api\/orders\/([^/]+)\/status$/);
   if (status && method === 'GET') return orderStatus(request, status[1], env, f);

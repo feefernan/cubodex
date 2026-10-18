@@ -62,7 +62,6 @@ export const api = {
   status: (serial: string) =>
     call<{ status: string }>(`/api/orders/${encodeURIComponent(serial)}/status`).then((d) => d.status),
   subscribe: (email: string) => post<{ ok: true }>('/api/avisos', { email, consent: true }),
-  requestLogin: (email: string) => post<{ ok: true }>('/api/auth/request', { email }),
   logout: () => post<{ ok: true }>('/api/auth/logout', {}),
   me: () => call<Account>('/api/me'),
   saveDex: (dex: Dex) => send<{ dex: Dex }>('PUT', '/api/dex', { dex }),

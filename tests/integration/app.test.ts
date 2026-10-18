@@ -95,7 +95,7 @@ const apiFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     return Response.json({ serial: 'CBX-20261016-ABCDEF', total: 1, checkoutUrl: api.checkoutUrl }, { status: 201 });
   if (url.endsWith('/status')) return Response.json({ status: api.status });
   if (url === '/api/avisos') return Response.json({ ok: true }, { status: 201 });
-  if (url === '/api/auth/request' || url === '/api/auth/logout') return Response.json({ ok: true });
+  if (url === '/api/auth/logout') return Response.json({ ok: true });
   if (url === '/api/me' && init?.method === 'DELETE')
     return api.account?.vault.some((v) => v.st === 'cofre')
       ? Response.json(
@@ -405,7 +405,7 @@ describe('colecionáveis, dex e cofre', () => {
     goTo('cofre');
     expect($('#cofreBody [data-action="login-demo"]')).not.toBeNull();
     goTo('conta');
-    expect($('#formLogin')).not.toBeNull();
+    expect($('a[href="/api/auth/google"]')).not.toBeNull();
   });
 
   it('séries, contagem da dex e marcações', () => {
@@ -446,24 +446,16 @@ describe('conta e formulários', () => {
     goTo('conta');
     expect($('#contaBody').textContent).toContain('#1042');
     click('[data-action="logout"]');
-    expect($('#formLogin')).not.toBeNull();
+    expect($('a[href="/api/auth/google"]')).not.toBeNull();
     expect(saved()).toMatchObject({ user: null, dex: {}, vault: [], hist: [] });
   });
 
-  it('entrar pede só o e-mail e o aceite, e manda o link', async () => {
+  it('entrar leva ao Google; a volta com erro avisa na conta', async () => {
     goTo('conta');
-    type('#lg-email', 'x');
-    submit('#formLogin');
-    expect($('#lg-msg').textContent).toContain('e-mail válido');
-    type('#lg-email', 'ana@exemplo.com');
-    submit('#formLogin');
-    expect($('#lg-msg').textContent).toContain('obrigatório');
-    $<HTMLInputElement>('#lg-ok').checked = true;
-    submit('#formLogin');
-    await vi.waitFor(() => expect($('#lg-msg').textContent).toContain('Link enviado para ana@exemplo.com'));
-    expect(lastSent('/api/auth/request')).toEqual({ email: 'ana@exemplo.com' });
-    location.hash = '#/conta/link-expirado';
-    await vi.waitFor(() => expect($('#lg-msg').textContent).toContain('expirou'));
+    expect($<HTMLAnchorElement>('a[href="/api/auth/google"]').textContent).toContain('entrar com Google');
+    expect($('#contaBody').textContent).toContain('termos de uso');
+    location.hash = '#/conta/erro-login';
+    await vi.waitFor(() => expect($('#lg-msg').textContent).toContain('Não deu para entrar com o Google'));
   });
 
   it('com sessão, a conta vem do servidor: pedidos, dex salva na conta e cofre real', async () => {

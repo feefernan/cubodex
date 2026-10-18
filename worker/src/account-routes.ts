@@ -1,35 +1,21 @@
-/** Rotas de conta (#29): login por link mágico, sessão, dados da conta, Dex e LGPD (exportar e apagar). */
+/** Rotas de conta (#29): Entrar com Google (#43), sessão, dados da conta, Dex e LGPD (exportar e apagar). */
 import { parseDex } from '../../src/domain/collection';
 import { OrderError } from '../../src/domain/order';
 import { isEmail } from '../../src/domain/validation';
 import {
-  createLoginToken,
   deleteAccount,
   endSession,
   exportAccount,
   getAccount,
   pendingCustody,
-  redeemLoginToken,
   SESSION_TTL,
   saveDex,
   sessionUser,
+  startSession,
   type User,
 } from './accounts';
-import { sendLoginEmail } from './email';
 import type { Env } from './env';
-import {
-  handleError,
-  json,
-  limited,
-  log,
-  notice,
-  page,
-  readCookie,
-  readJson,
-  SESSION_COOKIE,
-  sessionCookie,
-  unavailable,
-} from './http';
+import { handleError, json, limited, log, notice, readCookie, readJson, SESSION_COOKIE, sessionCookie } from './http';
 
 /** Usuário da sessão do cookie; null sem sessão (ou sem banco). */
 export const currentUser = async (request: Request, env: Env): Promise<User | null> => {
@@ -37,64 +23,96 @@ export const currentUser = async (request: Request, env: Env): Promise<User | nu
   return env.DB && token && /^[0-9a-f]{64}$/.test(token) ? sessionUser(env.DB, token) : null;
 };
 
-/** Desenvolvimento na própria máquina (cf dev / vite): o link de login vai para o log, sem e-mail. */
-const isLocal = (request: Request) => ['localhost', '127.0.0.1'].includes(new URL(request.url).hostname);
+const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
+const OAUTH_COOKIE = 'cbx_oauth';
+const oauthCookie = (value: string, maxAge: number) =>
+  `${OAUTH_COOKIE}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/api/auth/google; Max-Age=${maxAge}`;
 
-/** POST /api/auth/request — { email } → manda o link de entrada. Mesma resposta exista a conta ou não. */
-const requestLogin = async (request: Request, env: Env) => {
+const b64url = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+const random = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
+/** Volta para este mesmo endereço (domínio, www ou localhost): o cookie do state só existe nele. */
+const callbackUrl = (request: Request) => `${new URL(request.url).origin}/api/auth/google/callback`;
+
+/** GET /api/auth/google — manda para o Google com state (contra CSRF) e PKCE, guardados num cookie de 10 min. */
+const googleStart = async (request: Request, env: Env) => {
+  if (!env.DB || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET)
+    return notice('O login ainda não está disponível. Tente mais tarde.', 503);
   const blocked = await limited(request, env.QUOTES_LIMITER);
   if (blocked) return blocked;
-  const mailOn = !!env.EMAIL && !!env.EMAIL_FROM;
-  if (!env.DB || (!mailOn && !isLocal(request))) return unavailable();
+  const state = random();
+  const verifier = random();
+  const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  const to = new URL(GOOGLE_AUTH);
+  to.search = new URLSearchParams({
+    client_id: env.GOOGLE_CLIENT_ID,
+    redirect_uri: callbackUrl(request),
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    prompt: 'select_account',
+  }).toString();
+  return redirect(to.toString(), [oauthCookie(`${state}.${verifier}`, 600)]);
+};
+
+/** Dados do id_token. Veio direto do Google por HTTPS, autenticado com o segredo: dispensa conferir a assinatura. */
+const idClaims = (idToken: string) => {
+  const part = (idToken.split('.')[1] ?? '').replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(part), (c) => c.charCodeAt(0)))) as Record<
+    string,
+    unknown
+  >;
+};
+
+/** GET /api/auth/google/callback — confere o state, troca o código e abre a sessão pelo e-mail confirmado. */
+const googleCallback = async (request: Request, env: Env, f: typeof fetch) => {
+  const url = new URL(request.url);
+  const fail = (why: string) => {
+    log('warn', 'login com Google recusado', { motivo: why });
+    return redirect('/#/conta/erro-login', [oauthCookie('', 0)]);
+  };
+  if (!env.DB || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return fail('desligado');
+  const [state, verifier] = (readCookie(request, OAUTH_COOKIE) ?? '').split('.');
+  const code = url.searchParams.get('code');
+  if (!state || !verifier || url.searchParams.get('state') !== state) return fail('state');
+  if (!code) return fail(url.searchParams.get('error') ?? 'sem código');
   try {
-    const input = await readJson(request);
-    const email = String(input.email ?? '')
-      .trim()
-      .toLowerCase()
-      .slice(0, 200);
-    if (!isEmail(email)) throw new OrderError(400, 'Digite um e-mail válido.');
-    // Um e-mail não recebe uma enxurrada de links, mesmo vindo de IPs diferentes.
-    // Limite próprio e apertado (#39): com IPs trocados, ninguém inunda a caixa de alguém com links.
-    const perEmail = await limited(request, env.LOGIN_LIMITER, `login:${email}`);
-    if (perEmail) return perEmail;
-    const token = await createLoginToken(env.DB, email);
-    const origin = isLocal(request) ? new URL(request.url).origin : env.SITE_URL;
-    const link = `${origin}/api/auth/verify?t=${token}`;
-    if (mailOn && env.EMAIL) await sendLoginEmail(env.EMAIL, env.EMAIL_FROM, email, link);
-    // Desenvolvimento local sem domínio de e-mail: o link aparece no log do Worker.
-    else log('info', 'link de login (só em localhost)', { link });
-    return json({ ok: true });
+    const res = await f(GOOGLE_TOKEN, {
+      method: 'POST',
+      body: new URLSearchParams({
+        code,
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: callbackUrl(request),
+        grant_type: 'authorization_code',
+        code_verifier: verifier,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return fail(`token ${res.status}`);
+    const claims = idClaims(String(((await res.json()) as { id_token?: string }).id_token ?? ''));
+    const email = String(claims.email ?? '').toLowerCase();
+    const issuer = claims.iss === 'https://accounts.google.com' || claims.iss === 'accounts.google.com';
+    if (claims.aud !== env.GOOGLE_CLIENT_ID || !issuer || claims.email_verified !== true || !isEmail(email))
+      return fail('id_token');
+    const session = await startSession(env.DB, email, String(claims.given_name ?? claims.name ?? '').slice(0, 80));
+    if (!session) return fail('sessão');
+    return redirect('/#/conta', [oauthCookie('', 0), sessionCookie(session, SESSION_TTL / 1000)]);
   } catch (e) {
-    return handleError(e, 'envio do link de login');
+    return fail(String(e).slice(0, 80));
   }
 };
 
-/**
- * GET /api/auth/verify?t= — página com um botão. Verificadores de link dos e-mails abrem a URL sozinhos;
- * se o GET já entrasse, gastariam o token antes da pessoa. Só o POST (clique) troca o token pela sessão.
- */
-const verifyPage = (url: URL) => {
-  const token = url.searchParams.get('t') ?? '';
-  if (!/^[0-9a-f]{64}$/.test(token)) return notice('Link inválido. Peça um novo na página da conta.', 400);
-  return page(
-    `<h1 style="font-size:24px">entrar na cubodex</h1><form method="post" action="/api/auth/verify"><input type="hidden" name="t" value="${token}"><button style="font:700 16px system-ui;padding:12px 20px;border:0;border-radius:8px;background:#D21F3C;color:#fff;cursor:pointer">entrar</button></form>`,
-  );
-};
-
-const redirect = (to: string, cookie?: string) =>
-  new Response(null, { status: 303, headers: { Location: to, ...(cookie ? { 'Set-Cookie': cookie } : {}) } });
-
-/** POST /api/auth/verify — troca o token pela sessão (cookie) e volta para a conta. */
-const verify = async (request: Request, env: Env) => {
-  // Formulário do próprio site: a origem tem que ser a deste endereço (barra login forçado por outro site).
-  if (request.headers.get('Origin') !== new URL(request.url).origin) return notice('Origem inválida.', 403);
-  if (!env.DB) return notice('Login indisponível no momento.', 503);
-  const token = String((await request.formData().catch(() => null))?.get('t') ?? '');
-  if (!/^[0-9a-f]{64}$/.test(token)) return redirect('/#/conta/link-expirado');
-  const session = await redeemLoginToken(env.DB, token);
-  return session
-    ? redirect('/#/conta', sessionCookie(session, SESSION_TTL / 1000))
-    : redirect('/#/conta/link-expirado');
+const redirect = (to: string, cookies: string[] = []) => {
+  const headers = new Headers({ Location: to });
+  for (const c of cookies) headers.append('Set-Cookie', c);
+  return new Response(null, { status: 303, headers });
 };
 
 const clearCookie = { 'Set-Cookie': sessionCookie('', 0) };
@@ -121,12 +139,16 @@ const withUser = async (
   return run(user, env.DB);
 };
 
-export const accountRoutes = async (request: Request, env: Env, path: string): Promise<Response | null> => {
+export const accountRoutes = async (
+  request: Request,
+  env: Env,
+  path: string,
+  f: typeof fetch,
+): Promise<Response | null> => {
   const { method } = request;
   try {
-    if (path === '/api/auth/request' && method === 'POST') return await requestLogin(request, env);
-    if (path === '/api/auth/verify' && method === 'GET') return verifyPage(new URL(request.url));
-    if (path === '/api/auth/verify' && method === 'POST') return await verify(request, env);
+    if (path === '/api/auth/google' && method === 'GET') return await googleStart(request, env);
+    if (path === '/api/auth/google/callback' && method === 'GET') return await googleCallback(request, env, f);
     if (path === '/api/auth/logout' && method === 'POST') return await logout(request, env);
     if (path === '/api/me' && method === 'GET')
       return await withUser(request, env, async (u, db) => json(await getAccount(db, u)));
