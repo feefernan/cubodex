@@ -30,7 +30,17 @@ export const loadState = (): unknown => {
 };
 
 export const saveState = (s: PersistedState) =>
-  write(STATE_KEY, JSON.stringify({ user: s.user, cart: s.cart, dex: s.dex, vault: s.vault, hist: s.hist }));
+  write(
+    STATE_KEY,
+    JSON.stringify({
+      user: s.user,
+      cart: s.cart,
+      dex: s.dex,
+      vault: s.vault,
+      hist: s.hist,
+      pendingSerial: s.pendingSerial,
+    }),
+  );
 
 export const loadTheme = () => read(THEME_KEY);
 export const saveTheme = (id: string) => write(THEME_KEY, id);

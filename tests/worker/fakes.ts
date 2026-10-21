@@ -134,7 +134,7 @@ export const ORDER = {
     { id: 'i2', qty: 1 },
     { id: 'm1', qty: 2 },
   ],
-  customer: { name: 'Ana Lima', email: 'ana@exemplo.com' },
+  customer: { name: 'Ana Lima', email: 'ana@exemplo.com', cpf: '529.982.247-25', phone: '(11) 99999-8888' },
   address: {
     cep: '01310100',
     street: 'Av. Paulista',

@@ -1,6 +1,6 @@
 import { type CartLine, parseCartEntries, resolveCart } from './cart';
 import { productById } from './catalog';
-import { isEmail } from './validation';
+import { isCpf, isEmail, isPhone } from './validation';
 
 /** Linhas por pedido: cabe no limite de chamadas do Worker e no texto do pedido no Notion. */
 export const MAX_LINES = 15;
@@ -18,6 +18,9 @@ export interface Address {
 interface Customer {
   name: string;
   email: string;
+  /** Só dígitos: a nota fiscal e a etiqueta do Melhor Envio precisam dos dois. */
+  cpf: string;
+  phone: string;
 }
 
 /** Erro de pedido com o status HTTP que a API devolve e a mensagem que o cliente vê. */
@@ -86,9 +89,16 @@ export const validateOrder = (raw: unknown, opts: { vaultAllowed: boolean }): Va
     throw new OrderError(401, 'Para guardar cartas no cofre, entre na sua conta.');
 
   const c = (o.customer ?? {}) as Record<string, unknown>;
-  const customer = { name: text(c.name, 120), email: text(c.email, 200).toLowerCase() };
+  const customer = {
+    name: text(c.name, 120),
+    email: text(c.email, 200).toLowerCase(),
+    cpf: text(c.cpf, 14).replace(/\D/g, ''),
+    phone: text(c.phone, 20).replace(/\D/g, ''),
+  };
   if (customer.name.length < 2) throw new OrderError(400, 'Digite seu nome.');
   if (!isEmail(customer.email)) throw new OrderError(400, 'Digite um e-mail válido.');
+  if (!isCpf(customer.cpf)) throw new OrderError(400, 'Digite um CPF válido.');
+  if (!isPhone(customer.phone)) throw new OrderError(400, 'Digite um telefone com DDD.');
 
   const shipLines = lines.filter((l) => l.dest !== 'vault');
   let address: Address | null = null;

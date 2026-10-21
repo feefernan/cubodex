@@ -17,7 +17,7 @@ describe('armazenamento no navegador', () => {
     expect(loadState()).toBeNull();
     expect(loadTheme()).toBeNull();
     expect(() => saveTheme('1a')).not.toThrow();
-    expect(() => saveState({ user: null, cart: [], dex: {}, vault: [], hist: [] })).not.toThrow();
+    expect(() => saveState({ user: null, cart: [], dex: {}, vault: [], hist: [], pendingSerial: '' })).not.toThrow();
   });
   it('JSON corrompido é ignorado', () => {
     const store: Record<string, string> = { 'cubodex-proto-v1': '{quebrado' };

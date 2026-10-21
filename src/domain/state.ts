@@ -1,5 +1,6 @@
 import { type CartEntry, parseCartEntries } from './cart';
 import { type Dex, type DexFilter, type HistoryEntry, parseDex, type VaultEntry } from './collection';
+import { SERIAL_PATTERN } from './order';
 import type { ShippingOption } from './shipping';
 
 interface User {
@@ -16,6 +17,8 @@ export interface PersistedState {
   dex: Dex;
   vault: VaultEntry[];
   hist: HistoryEntry[];
+  /** Pedido que saiu para o pagamento no Mercado Pago e ainda não voltou confirmado: só ele esvazia o carrinho. */
+  pendingSerial: string;
 }
 
 interface AccountOrderView {
@@ -26,7 +29,17 @@ interface AccountOrderView {
   summary: string;
 }
 
-export type BuyerField = 'name' | 'email' | 'street' | 'number' | 'complement' | 'district' | 'city' | 'uf';
+export type BuyerField =
+  | 'name'
+  | 'email'
+  | 'cpf'
+  | 'phone'
+  | 'street'
+  | 'number'
+  | 'complement'
+  | 'district'
+  | 'city'
+  | 'uf';
 
 export interface AppState extends PersistedState {
   pack: string[];
@@ -102,6 +115,7 @@ export const initialState = (): AppState => ({
   dex: {},
   vault: [],
   hist: [],
+  pendingSerial: '',
   pack: [],
   dexF: 'todos',
   dexS: 's1',
@@ -112,7 +126,18 @@ export const initialState = (): AppState => ({
   checkout: false,
   paying: false,
   payError: '',
-  buyer: { name: '', email: '', street: '', number: '', complement: '', district: '', city: '', uf: '' },
+  buyer: {
+    name: '',
+    email: '',
+    cpf: '',
+    phone: '',
+    street: '',
+    number: '',
+    complement: '',
+    district: '',
+    city: '',
+    uf: '',
+  },
   cep: '',
   orderSerial: '',
   apoio: 'sobre',
@@ -179,5 +204,7 @@ export const mergePersisted = (base: AppState, saved: unknown): AppState => {
   base.dex = parseDex(saved.dex);
   if (Array.isArray(saved.vault)) base.vault = saved.vault.flatMap(parseVault);
   if (Array.isArray(saved.hist)) base.hist = saved.hist.flatMap(parseHist);
+  if (typeof saved.pendingSerial === 'string' && SERIAL_PATTERN.test(saved.pendingSerial))
+    base.pendingSerial = saved.pendingSerial;
   return base;
 };

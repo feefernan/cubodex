@@ -46,7 +46,8 @@ export interface Route {
 
 /** `#/carta/base1-4` → { view: 'carta', id: 'base1-4' }. Aceita o formato antigo `#tcg`; tela desconhecida → home. */
 export const parseRoute = (hash: string): Route => {
-  const [view = '', id = ''] = hash.replace(/^#\/?/, '').split('/');
+  // O Mercado Pago devolve `#/pedido/CBX-…?collection_id=…`: a query não faz parte do id.
+  const [view = '', id = ''] = (hash.replace(/^#\/?/, '').split('?')[0] ?? '').split('/');
   // Ids são [a-z0-9-]: o resto é descartado (nada vindo da URL chega cru ao HTML).
   const clean = id.replace(/[^\w-]/g, '');
   return isView(view) ? { view, id: clean || null } : { view: 'home', id: null };

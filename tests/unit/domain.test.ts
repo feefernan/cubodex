@@ -24,7 +24,16 @@ import { brl, escapeHtml, normalize, pad3, uniq } from '../../src/domain/format'
 import { areaOf, isView, navGroup, parseRoute, routeHref, subnavKey } from '../../src/domain/routes';
 import { demoAccount, initialState, mergePersisted } from '../../src/domain/state';
 import { cardsOfSet, cardsOnSale, emptyFilters, filterItems, filterSets, itemsOfCard } from '../../src/domain/tcg';
-import { cepDigits, countdown, formatCep, isEmail } from '../../src/domain/validation';
+import {
+  cepDigits,
+  countdown,
+  formatCep,
+  formatCpf,
+  formatPhone,
+  isCpf,
+  isEmail,
+  isPhone,
+} from '../../src/domain/validation';
 
 describe('formatação', () => {
   it('escapa HTML, inclusive aspas de atributo', () => {
@@ -200,6 +209,27 @@ describe('Dex e cofre', () => {
 });
 
 describe('validação', () => {
+  it('CPF: dígitos verificadores, não aceita sequência repetida nem tamanho errado', () => {
+    expect(isCpf('529.982.247-25')).toBe(true);
+    expect(isCpf('52998224725')).toBe(true);
+    expect(isCpf('529.982.247-24')).toBe(false);
+    expect(isCpf('111.111.111-11')).toBe(false);
+    expect(isCpf('1234')).toBe(false);
+    // Resto 10 no primeiro dígito verificador vale 0.
+    expect(isCpf('000.000.006-04')).toBe(true);
+  });
+  it('telefone com DDD, celular ou fixo, e as máscaras enquanto digita', () => {
+    expect(isPhone('(11) 99999-8888')).toBe(true);
+    expect(isPhone('1133334444')).toBe(true);
+    expect(isPhone('99999-8888')).toBe(false);
+    expect(isPhone('123')).toBe(false);
+    expect(formatPhone('11999998888')).toBe('(11) 99999-8888');
+    expect(formatPhone('1133334444')).toBe('(11) 3333-4444');
+    expect(formatPhone('119')).toBe('(11) 9');
+    expect(formatPhone('1')).toBe('1');
+    expect(formatCpf('52998224725')).toBe('529.982.247-25');
+    expect(formatCpf('5299')).toBe('529.9');
+  });
   it('e-mail e CEP', () => {
     expect(isEmail('a@b.co')).toBe(true);
     expect(isEmail('a@b')).toBe(false);
@@ -222,6 +252,12 @@ describe('validação', () => {
 describe('rotas', () => {
   it('lê e monta URLs com tela e id (#8)', () => {
     expect(parseRoute('#/carta/base1-4')).toEqual({ view: 'carta', id: 'base1-4' });
+    // A volta do Mercado Pago traz a query depois do serial.
+    expect(parseRoute('#/pedido/CBX-20261016-ABCDEF?collection_id=1&status=approved')).toEqual({
+      view: 'pedido',
+      id: 'CBX-20261016-ABCDEF',
+    });
+    expect(parseRoute('#/carrinho?x=1')).toEqual({ view: 'carrinho', id: null });
     expect(parseRoute('#/apoio/faq')).toEqual({ view: 'apoio', id: 'faq' });
     expect(parseRoute('#tcg')).toEqual({ view: 'tcg', id: null });
     expect(parseRoute('')).toEqual({ view: 'home', id: null });
@@ -246,6 +282,12 @@ describe('rotas', () => {
 });
 
 describe('estado salvo', () => {
+  it('só guarda o pedido pendente se o serial for válido', () => {
+    const ok = mergePersisted(initialState(), { pendingSerial: 'CBX-20261016-ABCDEF' });
+    expect(ok.pendingSerial).toBe('CBX-20261016-ABCDEF');
+    expect(mergePersisted(initialState(), { pendingSerial: '<x>' }).pendingSerial).toBe('');
+    expect(mergePersisted(initialState(), { pendingSerial: 7 }).pendingSerial).toBe('');
+  });
   it('visitante novo começa deslogado e sem dados de exemplo (#5)', () => {
     const s = mergePersisted(initialState(), null);
     expect(s.user).toBeNull();
