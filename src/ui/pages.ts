@@ -3,6 +3,7 @@ import { quoteRequestText, whatsappUrl } from '../domain/contact';
 import { escapeHtml as esc } from '../domain/format';
 import { isEmail } from '../domain/validation';
 import { api } from '../infra/api';
+import { APOIO } from './apoio';
 import { alertMsg, progress } from './cart';
 import { tickCountdowns } from './collectibles';
 import { $, $$, check, onAction, onSubmit } from './dom';
@@ -25,22 +26,6 @@ const renderHome = () => {
   fillProducts($('#hl-criar'), ['k1', 'k2', 'k3', 'k4']);
   $('#news').innerHTML = NEWS;
   tickCountdowns();
-};
-
-const APOIO: Record<string, string> = {
-  sobre:
-    '<h2>sobre a cubodex</h2><p>A Cubodex junta duas coisas: cartas de pokémon originais e peças impressas em 3D. Colecionar e criar na mesma loja.</p>',
-  comprar:
-    '<h2>como comprar</h2><p>Escolha os itens, calcule o frete pelo CEP no carrinho e pague pelo checkout do Mercado Pago. Para peças sob medida, peça um orçamento em Criar antes.</p>',
-  frete:
-    '<h2>frete e prazos</h2><p>O frete é calculado por CEP no carrinho. Peças impressas sob encomenda têm prazo combinado no orçamento.</p>',
-  contato:
-    '<h2>contato</h2><p>Instagram e TikTok: <b style="color:var(--fg)">@cubodex</b>. Peças sob medida: peça o orçamento em <a href="#/criar" data-action="go" data-view="criar">criar</a>.</p>',
-  privacidade:
-    '<h2>política de privacidade</h2><p>Usamos seu nome, e-mail e endereço só para processar pedidos e entregas, manter sua conta (Dex e cofre) e, se você pedir, mandar avisos de lançamento.</p><p>O pagamento acontece no Mercado Pago: a Cubodex não vê nem guarda dados de cartão.</p><p>Na sua conta você baixa uma cópia dos seus dados ou apaga a conta. Para sair da lista de avisos, use o link que vai em todo e-mail.</p><p>A versão completa desta política está em revisão e será publicada aqui.</p>',
-  termos:
-    '<h2>termos de uso</h2><p>Os termos de uso da Cubodex, incluindo as regras do cofre virtual, estão em revisão e serão publicados aqui.</p><p>Dúvidas: Instagram <b style="color:var(--fg)">@cubodex</b>.</p>',
-  faq: '<h2>faq</h2><div class="faq"><details open><summary>O que é o cofre virtual?</summary><p>É onde ficam as cartas que você comprou na Cubodex e escolheu guardar. Você junta vários itens e pede um envio só.</p></details><details><summary>Como escolho entre enviar agora e guardar?</summary><p>No carrinho, cada carta tem as opções enviar agora ou guardar no cofre.</p></details><details><summary>Posso guardar cartas que já tenho?</summary><p>Na primeira versão não. O cofre guarda só itens comprados na Cubodex.</p></details><details><summary>Por quanto tempo posso guardar uma carta?</summary><p>O prazo máximo ainda não foi definido.</p></details><details><summary>A Cubodex é afiliada à The Pokémon Company?</summary><p>Não.</p></details><details><summary>Posso pedir uma peça sob medida?</summary><p>Sim, em Criar. O orçamento vem pelo WhatsApp.</p></details></div>',
 };
 
 const renderApoio = () => {
