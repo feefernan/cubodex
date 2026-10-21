@@ -48,7 +48,7 @@ export interface Account {
 
 export interface OrderRequest {
   items: CartEntry[];
-  customer: { name: string; email: string };
+  customer: { name: string; email: string; cpf: string; phone: string };
   address: Address | null;
   shipping: { serviceId: number } | null;
 }

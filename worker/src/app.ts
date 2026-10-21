@@ -25,7 +25,7 @@ import {
   shippingLabel,
 } from '../../src/domain/shipping';
 import { applyStock, type StockRow } from '../../src/domain/stock';
-import { cepDigits, isEmail } from '../../src/domain/validation';
+import { cepDigits, formatCpf, formatPhone, isEmail } from '../../src/domain/validation';
 import { accountRoutes, currentUser } from './account-routes';
 import {
   applyVaultEffects,
@@ -177,7 +177,8 @@ const createOrder = async (request: Request, env: Env, f: typeof fetch) => {
     await createOrderPage(f, env.NOTION_TOKEN, env.NOTION_ORDERS_DB, {
       serial,
       status,
-      customer: order.customer.name,
+      // shortcut: sem colunas CPF/Telefone no Notion, vão junto do nome em "Cliente"; separe em colunas se o volume pedir.
+      customer: `${order.customer.name} · CPF ${formatCpf(order.customer.cpf)} · ${formatPhone(order.customer.phone)}`,
       email: order.customer.email,
       items: order.lines.map(describeLine).join('\n'),
       shipping: shipping ? `${shipping.label} · R$ ${shipping.price.toFixed(2)}` : 'sem envio (cofre)',

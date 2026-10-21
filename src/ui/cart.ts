@@ -12,7 +12,7 @@ import {
 import { brl, escapeHtml as esc } from '../domain/format';
 import { type ShippingOption, shippingDays, shippingLabel } from '../domain/shipping';
 import type { BuyerField } from '../domain/state';
-import { cepDigits, formatCep, isEmail } from '../domain/validation';
+import { cepDigits, formatCep, formatCpf, formatPhone, isCpf, isEmail, isPhone } from '../domain/validation';
 import { api, lookupCep } from '../infra/api';
 import { cube, emptyState } from './art';
 import { $, check, disabledAttr, onAction, onInput, onSubmit } from './dom';
@@ -82,16 +82,16 @@ const field = (name: BuyerField, label: string, attrs: string, full = false) =>
 
 /** Campos de endereço (checkout e envio do cofre), preenchidos pelo ViaCEP quando possível. */
 export const addressFields = (cep: string) =>
-  `<p class="mono muted full">entrega no CEP ${esc(formatCep(cep))}</p>${field('street', 'rua', 'autocomplete="address-line1" maxlength="200"', true)}${field('number', 'número', 'inputmode="numeric" maxlength="20"')}${field('complement', 'complemento', 'autocomplete="address-line2" maxlength="100"')}${field('district', 'bairro', 'maxlength="100"')}${field('city', 'cidade', 'autocomplete="address-level2" maxlength="100"')}${field('uf', 'UF', 'autocomplete="address-level1" maxlength="2"')}`;
+  `<p class="mono muted full">entrega no CEP ${esc(formatCep(cep))}</p>${field('street', 'rua', 'autocomplete="address-line1" maxlength="200"', true)}${field('number', 'número (ou S/N)', 'autocomplete="off" maxlength="20" placeholder="S/N se não tiver"')}${field('complement', 'complemento', 'autocomplete="address-line2" maxlength="100"')}${field('district', 'bairro', 'maxlength="100"')}${field('city', 'cidade', 'autocomplete="address-level2" maxlength="100"')}${field('uf', 'UF', 'autocomplete="address-level1" maxlength="2"')}`;
 
 const checkoutForm = (shipped: boolean) =>
-  `<form id="formCheckout" class="form-grid" novalidate style="gap:10px"><h3 class="display full" style="font-size:24px">seus dados</h3>${field('name', 'nome', 'autocomplete="name" maxlength="120"', true)}${field('email', 'e-mail', 'type="email" autocomplete="email" maxlength="200"', true)}${
+  `<form id="formCheckout" class="form-grid" novalidate style="gap:10px"><h3 class="display full" style="font-size:24px">seus dados</h3>${field('name', 'nome', 'autocomplete="name" maxlength="120"', true)}${field('email', 'e-mail', 'type="email" autocomplete="email" maxlength="200"', true)}${field('cpf', 'CPF', 'inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00"')}${field('phone', 'telefone com DDD', 'type="tel" inputmode="tel" autocomplete="tel-national" maxlength="15" placeholder="(11) 99999-8888"')}${
     shipped ? addressFields(S.cep) : ''
   }<div class="full">${
     S.paying
       ? `<button class="btn btn--full" type="submit" disabled>registrando pedido…</button>`
       : '<button class="btn btn--full" type="submit">pagar com mercado pago</button>'
-  }</div><div class="full" id="ck-msg" role="status" aria-live="polite">${alertMsg(S.payError)}</div><p class="muted full" style="font-size:12px">O pagamento (Pix ou cartão) acontece no site do Mercado Pago. Os itens do cofre só entram nele depois do pagamento confirmado.</p></form>`;
+  }</div><div class="full" id="ck-msg" role="status" aria-live="polite">${alertMsg(S.payError)}</div><p class="muted full" style="font-size:12px">CPF e telefone saem na nota fiscal e na etiqueta de envio. O pagamento (Pix ou cartão) acontece no site do Mercado Pago. Os itens do cofre só entram nele depois do pagamento confirmado.</p></form>`;
 
 /**
  * Confere o carrinho salvo contra o catálogo atual: item que sumiu ou esgotou sai (com aviso) e a
@@ -160,6 +160,19 @@ const changed = () => {
   else renderCart();
 };
 
+/**
+ * Preenche rua, bairro, cidade e UF vindos do ViaCEP direto nos campos, sem desenhar o formulário de novo
+ * (desenhar de novo tirava o foco de quem já estava digitando) e sem pisar no que a pessoa já escreveu.
+ */
+const fillAddress = (found: Partial<Record<'street' | 'district' | 'city' | 'uf', string>>) => {
+  for (const k of ['street', 'district', 'city', 'uf'] as const) {
+    const input = document.getElementById(`ck-${k}`) as HTMLInputElement | null;
+    if (S.buyer[k] || !found[k]) continue;
+    S.buyer[k] = found[k] ?? '';
+    if (input) input.value = S.buyer[k];
+  }
+};
+
 /** Abre o checkout: nome e e-mail da conta e endereço do CEP já preenchidos quando possível. */
 const openCheckout = async () => {
   S.checkout = true;
@@ -167,28 +180,39 @@ const openCheckout = async () => {
   if (S.user && !S.buyer.name) S.buyer.name = S.user.name;
   if (S.user && !S.buyer.email) S.buyer.email = S.user.email;
   renderCart();
+  document.getElementById(S.buyer.name ? 'ck-cpf' : 'ck-name')?.focus();
   if (S.cep && !S.buyer.street) {
     const found = await lookupCep(S.cep);
-    if (found) Object.assign(S.buyer, found);
-    renderIfOpen();
+    if (found) fillAddress(found);
   }
-  document.getElementById(S.buyer.name ? 'ck-number' : 'ck-name')?.focus();
 };
 
 const REQUIRED: [BuyerField, string][] = [
   ['name', 'Digite seu nome.'],
+  ['cpf', 'Digite um CPF válido.'],
+  ['phone', 'Digite um telefone com DDD.'],
   ['street', 'Digite a rua.'],
   ['number', 'Digite o número.'],
   ['city', 'Digite a cidade.'],
   ['uf', 'Digite a UF (2 letras).'],
 ];
 
+const filled = (v: string) => v.length > 0;
+const FIELD_OK: Record<string, (v: string) => boolean> = {
+  name: (v) => v.length > 1,
+  cpf: isCpf,
+  phone: isPhone,
+  street: filled,
+  number: filled,
+  city: filled,
+};
+
 /** Confere os campos visíveis do comprador, marcando o primeiro com erro; false = parar. */
 export const buyerValid = (fields: BuyerField[], msg: HTMLElement): boolean => {
   const b = S.buyer;
   for (const [k, text] of REQUIRED) {
     if (!fields.includes(k)) continue;
-    const ok = k === 'uf' ? /^[A-Za-z]{2}$/.test(b.uf.trim()) : b[k].trim().length > (k === 'name' ? 1 : 0);
+    const ok = k === 'uf' ? /^[A-Za-z]{2}$/.test(b.uf.trim()) : (FIELD_OK[k] ?? filled)(b[k].trim());
     if (!check($(`#ck-${k}`), msg, ok, alertMsg(text))) return false;
   }
   return (
@@ -213,7 +237,7 @@ export const buyerAddress = (cep: string) => ({
 const submitOrder = async () => {
   const shipped = needsShipping(resolveCart(S.cart).lines);
   const b = S.buyer;
-  if (!buyerValid(['name', ...(shipped ? ADDRESS_FIELDS : []), 'email'], $('#ck-msg'))) return;
+  if (!buyerValid(['name', 'cpf', 'phone', ...(shipped ? ADDRESS_FIELDS : []), 'email'], $('#ck-msg'))) return;
 
   S.paying = true;
   S.payError = '';
@@ -221,13 +245,15 @@ const submitOrder = async () => {
   try {
     const order = await api.order({
       items: S.cart,
-      customer: { name: b.name.trim(), email: b.email.trim() },
+      customer: { name: b.name.trim(), email: b.email.trim(), cpf: b.cpf, phone: b.phone },
       address: shipped ? buyerAddress(S.cep) : null,
       shipping: shipped && S.ship ? { serviceId: S.ship.id } : null,
     });
     S.paying = false;
     S.checkout = false;
-    // O carrinho só esvazia quando o pagamento for confirmado (página do pedido).
+    // O carrinho só esvazia quando o pagamento deste pedido for confirmado (página do pedido, na volta do Mercado Pago).
+    S.pendingSerial = order.serial;
+    persist();
     if (order.checkoutUrl) nav.to(order.checkoutUrl);
     else go('pedido', order.serial);
   } catch (e) {
@@ -275,6 +301,8 @@ export const initCart = () => {
   onAction('checkout-open', () => void openCheckout());
   onInput('buyer', (el) => {
     const input = el as HTMLInputElement;
+    if (input.name === 'cpf') input.value = formatCpf(input.value);
+    if (input.name === 'phone') input.value = formatPhone(input.value);
     S.buyer[input.name as BuyerField] = input.value;
   });
   onInput('cep', (el) => {

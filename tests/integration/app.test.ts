@@ -130,6 +130,24 @@ beforeEach(() => {
   click('.site-head .brand');
 });
 
+/** Fecha o checkout aberto e limpa o comprador: o estado da tela é um só entre os testes. */
+const resetCheckout = async () => {
+  const { S } = await import('../../src/ui/store');
+  Object.assign(S, { checkout: false, paying: false, payError: '', pendingSerial: '' });
+  Object.assign(S.buyer, {
+    name: '',
+    email: '',
+    cpf: '',
+    phone: '',
+    street: '',
+    number: '',
+    complement: '',
+    district: '',
+    city: '',
+    uf: '',
+  });
+};
+
 describe('navegação', () => {
   it('começa na home com destaques e contagem regressiva', () => {
     expect(visible()).toEqual(['v-home']);
@@ -268,6 +286,8 @@ describe('carrinho', () => {
     expect($('#ck-name').getAttribute('aria-invalid')).toBe('true');
     type('#ck-name', 'Ana Lima');
     type('#ck-email', 'ana@exemplo.com');
+    type('#ck-cpf', '52998224725');
+    type('#ck-phone', '11999998888');
     submit('#formCheckout');
     expect($('#ck-msg').textContent).toContain('número');
     type('#ck-number', '1000');
@@ -276,7 +296,7 @@ describe('carrinho', () => {
     await vi.waitFor(() => expect(to).toHaveBeenCalledWith('https://mp.test/pagar'));
     expect(lastSent('/api/orders')).toEqual({
       items: [{ id: 'i1', qty: 1, dest: 'send' }],
-      customer: { name: 'Ana Lima', email: 'ana@exemplo.com' },
+      customer: { name: 'Ana Lima', email: 'ana@exemplo.com', cpf: '529.982.247-25', phone: '(11) 99999-8888' },
       address: {
         cep: '01310100',
         street: 'Avenida Paulista',
@@ -289,6 +309,48 @@ describe('carrinho', () => {
       shipping: { serviceId: 2 },
     });
     expect(saved().cart).toHaveLength(1);
+    // O pedido que saiu para o pagamento fica guardado: é só ele que esvazia o carrinho na volta.
+    expect(saved().pendingSerial).toBe('CBX-20261016-ABCDEF');
+  });
+
+  it('CPF e telefone inválidos são recusados no checkout; "S/N" vale como número', async () => {
+    goTo('carrinho');
+    $<HTMLInputElement>('#cep').value = '01310100';
+    submit('#formFrete');
+    await vi.waitFor(() => expect(document.querySelectorAll('.ship-opt')).toHaveLength(2));
+    click('[data-action="ship"][data-i="1"]');
+    click('[data-action="checkout-open"]');
+    await vi.waitFor(() => expect($<HTMLInputElement>('#ck-street').value).toBe('Avenida Paulista'));
+    type('#ck-name', 'Ana Lima');
+    type('#ck-email', 'ana@exemplo.com');
+    type('#ck-cpf', '11111111111');
+    submit('#formCheckout');
+    expect($('#ck-msg').textContent).toContain('CPF válido');
+    type('#ck-cpf', '52998224725');
+    type('#ck-phone', '123');
+    submit('#formCheckout');
+    expect($('#ck-msg').textContent).toContain('telefone com DDD');
+    type('#ck-phone', '11999998888');
+    type('#ck-number', 'S/N');
+    submit('#formCheckout');
+    await vi.waitFor(() => expect(lastSent('/api/orders')).toMatchObject({ address: { number: 'S/N' } }));
+    await resetCheckout();
+  });
+
+  it('o ViaCEP preenche os campos que ainda estão vazios, sem pisar no que já foi digitado nem desenhar o formulário de novo', async () => {
+    goTo('carrinho');
+    $<HTMLInputElement>('#cep').value = '01310100';
+    submit('#formFrete');
+    await vi.waitFor(() => expect(document.querySelectorAll('.ship-opt')).toHaveLength(2));
+    click('[data-action="ship"][data-i="1"]');
+    const { S } = await import('../../src/ui/store');
+    S.buyer.district = 'Meu bairro';
+    click('[data-action="checkout-open"]');
+    const form = $('#formCheckout');
+    await vi.waitFor(() => expect($<HTMLInputElement>('#ck-street').value).toBe('Avenida Paulista'));
+    expect($('#formCheckout')).toBe(form);
+    expect($<HTMLInputElement>('#ck-district').value).toBe('Meu bairro');
+    await resetCheckout();
   });
 
   it('frete indisponível aparece como alerta e não deixa finalizar', async () => {
@@ -306,6 +368,12 @@ describe('carrinho', () => {
   it('erro da API no pedido aparece no formulário e o carrinho fica', async () => {
     goTo('carrinho');
     click('[data-action="checkout-open"]');
+    await vi.waitFor(() => expect($<HTMLInputElement>('#ck-street').value).toBe('Avenida Paulista'));
+    type('#ck-name', 'Ana Lima');
+    type('#ck-email', 'ana@exemplo.com');
+    type('#ck-cpf', '52998224725');
+    type('#ck-phone', '11999998888');
+    type('#ck-number', '1000');
     api.fail = { status: 409, error: 'Essa opção de frete mudou. Calcule o frete de novo.' };
     submit('#formCheckout');
     await vi.waitFor(() => expect($('#ck-msg').textContent).toContain('opção de frete mudou'));
@@ -313,13 +381,22 @@ describe('carrinho', () => {
     expect(saved().cart).toHaveLength(1);
   });
 
-  it('volta do pagamento: mostra o status e, pago, esvazia o carrinho', async () => {
+  it('volta do pagamento: mostra o status e, pago, esvazia o carrinho do pedido que saiu para o pagamento', async () => {
+    const { S } = await import('../../src/ui/store');
     location.hash = '#/pedido/CBX-20261016-ABCDEF';
     await vi.waitFor(() => expect($('#pedidoBody').textContent).toContain('Aguardando a confirmação'));
+    // Pedido que não é o da compra em andamento (link antigo): mostra "Pago", mas o carrinho de agora fica.
     api.status = 'Pago';
+    S.pendingSerial = 'CBX-20261016-ZZZZZZ';
     click('[data-action="order-refresh"]');
     await vi.waitFor(() => expect($('#pedidoBody').textContent).toContain('Pagamento confirmado'));
-    expect($('#cartCount').textContent).toBe('0');
+    expect($('#cartCount').textContent).toBe('1');
+    // O pedido da própria compra: confirma e esvazia.
+    S.pendingSerial = 'CBX-20261016-ABCDEF';
+    click('[data-action="order-refresh"]');
+    await vi.waitFor(() => expect($('#cartCount').textContent).toBe('0'));
+    expect(saved().pendingSerial).toBe('');
+
     api.fail = { status: 502, error: 'Não foi possível consultar o pedido agora' };
     click('[data-action="order-refresh"]');
     await vi.waitFor(() => expect($('#pedidoBody [role="alert"]').textContent).toContain('consultar o pedido'));
@@ -331,6 +408,45 @@ describe('carrinho', () => {
     expect($('#pedidoBody').textContent).toContain('consultando');
     location.hash = '#/pedido/xyz';
     await vi.waitFor(() => expect($('#pedidoBody').textContent).toContain('não encontrado'));
+    api.status = 'Aguardando pagamento';
+  });
+
+  it('Pix ou boleto ainda pendente: consulta de novo a cada 5 s por até 2 min e para', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const polls = () => api.sent.filter((c) => c.url.endsWith('/status')).length;
+      const before = polls();
+      location.hash = '#/pedido/CBX-20261016-ABCDEF';
+      await vi.advanceTimersByTimeAsync(0);
+      expect(polls() - before).toBe(1);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(polls() - before).toBe(2);
+      // Confirmou: a próxima consulta mostra "Pago" e o relógio não arma outra.
+      api.status = 'Pago';
+      await vi.advanceTimersByTimeAsync(5000);
+      expect($('#pedidoBody').textContent).toContain('Pagamento confirmado');
+      const done = polls();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(polls()).toBe(done);
+      // Sem confirmar, para sozinho depois de 24 consultas (2 min).
+      api.status = 'Aguardando pagamento';
+      const start = polls();
+      click('[data-action="order-refresh"]');
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(polls() - start).toBe(25);
+    } finally {
+      vi.useRealTimers();
+      api.status = 'Aguardando pagamento';
+    }
+  });
+
+  it('pedido cancelado no pagamento: o carrinho continua e a tela leva de volta a ele', async () => {
+    const { S } = await import('../../src/ui/store');
+    api.status = 'Cancelado';
+    S.pendingSerial = 'CBX-20261016-ABCDEF';
+    location.hash = '#/pedido/CBX-20261016-ABCDEF';
+    await vi.waitFor(() => expect($('#pedidoBody a[data-view="carrinho"]').textContent).toBe('voltar ao carrinho'));
+    expect(saved().pendingSerial).toBe('');
     api.status = 'Aguardando pagamento';
   });
 

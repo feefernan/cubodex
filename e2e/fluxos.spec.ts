@@ -51,6 +51,8 @@ test.describe('fluxos principais', () => {
     await expect(page.locator('#ck-street')).toHaveValue('Avenida Paulista');
     await page.locator('#ck-name').fill('Ana Lima');
     await page.locator('#ck-email').fill('ana@exemplo.com');
+    await page.locator('#ck-cpf').fill('52998224725');
+    await page.locator('#ck-phone').fill('11999998888');
     await page.locator('#ck-number').fill('1000');
     await page.locator('#formCheckout button[type="submit"]').click();
     await expect(page).toHaveURL(/#\/pedido\/CBX-20261016-E2E2E2$/);

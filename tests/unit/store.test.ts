@@ -110,7 +110,11 @@ describe('pedido', () => {
     city: 'São Paulo',
     uf: 'sp',
   };
-  const base = { customer: { name: 'Ana Lima', email: 'ANA@exemplo.com ' }, address, shipping: { serviceId: 2 } };
+  const base = {
+    customer: { name: 'Ana Lima', email: 'ANA@exemplo.com ', cpf: '529.982.247-25', phone: '(11) 99999-8888' },
+    address,
+    shipping: { serviceId: 2 },
+  };
   const fails = (input: unknown, status: number, msg: RegExp, vaultAllowed = false) => {
     try {
       validateOrder(input, { vaultAllowed });
@@ -135,7 +139,12 @@ describe('pedido', () => {
       { vaultAllowed: false },
     );
     expect(o.goods).toBe(862);
-    expect(o.customer).toEqual({ name: 'Ana Lima', email: 'ana@exemplo.com' });
+    expect(o.customer).toEqual({
+      name: 'Ana Lima',
+      email: 'ana@exemplo.com',
+      cpf: '52998224725',
+      phone: '11999998888',
+    });
     expect(o.address).toMatchObject({ cep: '01310100', uf: 'SP', complement: '' });
     expect(o.serviceId).toBe(2);
     expect(o.shipLines).toHaveLength(2);
@@ -152,8 +161,14 @@ describe('pedido', () => {
     fails({ ...base, items: [] }, 400, /vazio/);
     fails({ ...base, items: [{ id: 'i7', qty: 1 }] }, 409, /esgotou/);
     fails({ ...base, items: [{ id: 'i1', qty: 2 }] }, 409, /esgotou/);
-    fails({ ...base, items: [{ id: 'm1', qty: 1 }], customer: { name: 'A', email: 'a@b.co' } }, 400, /nome/);
-    fails({ ...base, items: [{ id: 'm1', qty: 1 }], customer: { name: 'Ana', email: 'x' } }, 400, /e-mail/);
+    fails({ ...base, items: [{ id: 'm1', qty: 1 }], customer: { ...base.customer, name: 'A' } }, 400, /nome/);
+    fails({ ...base, items: [{ id: 'm1', qty: 1 }], customer: { ...base.customer, email: 'x' } }, 400, /e-mail/);
+    fails(
+      { ...base, items: [{ id: 'm1', qty: 1 }], customer: { ...base.customer, cpf: '111.111.111-11' } },
+      400,
+      /CPF/,
+    );
+    fails({ ...base, items: [{ id: 'm1', qty: 1 }], customer: { ...base.customer, phone: '123' } }, 400, /telefone/);
     fails({ ...base, items: [{ id: 'm1', qty: 1 }], address: { ...address, uf: 'São' } }, 400, /Endereço/);
     fails({ ...base, items: [{ id: 'm1', qty: 1 }], address: null }, 400, /Endereço/);
     fails({ ...base, items: [{ id: 'm1', qty: 1 }], shipping: { serviceId: 'x' } }, 400, /frete/);
