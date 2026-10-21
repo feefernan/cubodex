@@ -31,7 +31,7 @@ test.describe('fluxos principais', () => {
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('colecione');
-    await expect(page.locator('#hl-tcg .tile')).toHaveCount(3);
+    await expect(page.locator('#hl-tcg .tile')).toHaveCount(4);
     expect(errors).toEqual([]);
   });
 

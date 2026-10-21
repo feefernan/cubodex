@@ -17,12 +17,12 @@ const NEWS =
   '<a class="news" href="#avisos" data-action="scroll" data-target="avisos"><span class="mono tag">lista de avisos</span><h3>receba o próximo lançamento primeiro</h3><span class="mono soft">entrar na lista →</span></a>';
 
 const renderHome = () => {
-  $('#hl-tcg').innerHTML = ['i1', 'i2', 'i8']
+  $('#hl-tcg').innerHTML = ['i1', 'i2', 'i8', 'i5']
     .flatMap((id) => ITEMS.filter((it) => it.id === id))
     .map(itemTile)
     .join('');
-  fillProducts($('#hl-col'), ['m1', 'm6', 'm10']);
-  fillProducts($('#hl-criar'), ['k1', 'k2', 'k3']);
+  fillProducts($('#hl-col'), ['m1', 'm6', 'm10', 'm12']);
+  fillProducts($('#hl-criar'), ['k1', 'k2', 'k3', 'k4']);
   $('#news').innerHTML = NEWS;
   tickCountdowns();
 };

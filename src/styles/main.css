@@ -18,7 +18,6 @@ img{max-width:100%}
   --surface-2:color-mix(in srgb,var(--fg) 5%,var(--surface));
   --grid:color-mix(in srgb,var(--fg) 5%,var(--bg));
   --ph-a:color-mix(in srgb,var(--fg) 3%,var(--surface));
-  --ph-b:color-mix(in srgb,var(--fg) 7%,var(--surface));
   /* ação: vermelho um tom abaixo do da marca para texto branco passar AA (5,25:1); a marca fica nos elementos grandes */
   --action:#D21F3C; --action-hover:var(--cubo-shadow);
   /* tipo */
@@ -73,6 +72,8 @@ button{font:inherit;color:inherit}
 .icon-link svg{width:18px;height:18px;display:block;flex:none}
 .count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--action);color:#fff;font:600 12px/1 var(--f-mono)}
 .count[data-n="0"]{background:var(--surface-2);color:var(--muted)}
+/* Entre 701 e 1000px os rótulos dos botões não cabem ao lado da navegação (a página rolava de lado em 768). */
+@media (max-width:1000px){.icon-link .lbl{display:none}}
 @media (max-width:700px){
   .head-row{grid-template-columns:1fr auto}
   .main-nav{grid-column:1/-1;order:3}
@@ -104,8 +105,8 @@ button{font:inherit;color:inherit}
 .chip:hover{background:var(--surface-2)}
 .chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .pill{display:inline-block;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--soft)}
-.price{display:inline-block;background:var(--action);color:#fff;padding:6px 10px;font:600 14px/1 var(--f-mono);letter-spacing:.02em;border-radius:var(--btn-r,4px)}
-.a-col .price{border-radius:8px}
+/* Preço em tinta: o vermelho fica só no botão de ação. */
+.price{display:inline-block;color:var(--fg);font:700 16px/1 var(--f-mono);letter-spacing:.01em}
 
 /* seções */
 .view{padding-bottom:64px}
@@ -148,6 +149,8 @@ button{font:inherit;color:inherit}
 .news:hover{background:var(--surface-2)}
 .news h3{font-size:22px;line-height:1.05;letter-spacing:-.03em;font-weight:800;text-transform:lowercase}
 .news .cd{font:500 18px/1.2 var(--f-mono);letter-spacing:.04em;font-variant-numeric:tabular-nums;color:var(--fg)}
+/* No celular a faixa empilha: rolar de lado cortava o último card na borda da tela. */
+@media (max-width:700px){.strip{grid-auto-flow:row;grid-auto-columns:auto;overflow:visible}.news{min-height:0}}
 .news--hot{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 .news--hot:hover{background:var(--fg);filter:brightness(1.12)}
 .news--hot .mono{color:inherit;opacity:.75}
@@ -176,17 +179,26 @@ button{font:inherit;color:inherit}
 /* tiles de produto */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
 @media (min-width:700px){.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}
+/* Destaques da home: quatro itens que ocupam a largura toda (auto-fill deixava colunas vazias à direita). */
+@media (min-width:700px){.grid--hl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1000px){.grid--hl{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* Peças de criar (6 itens): 3 colunas fecham as fileiras sem sobra. */
+@media (min-width:700px){.grid--3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1000px){.grid--3{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .tile{display:flex;flex-direction:column;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
 .tile .body{display:flex;flex-direction:column;gap:8px;padding:14px;flex:1;min-width:0}
 .tile h3{font:800 18px/1.1 var(--f-body);letter-spacing:-.03em;text-transform:lowercase;text-wrap:balance}
 .tile .row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:6px}
 .tile .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .media{position:relative;display:grid;place-items:center;overflow:hidden}
-.ph{background:repeating-linear-gradient(135deg,var(--ph-a) 0 10px,var(--ph-b) 10px 20px)}
-.ph-label{color:var(--faint);font-size:11px;text-align:center;padding:8px}
-.media--card{aspect-ratio:63/88;margin:12px 12px 0;border:1px solid var(--line);border-radius:4px}
+/* Lugar de foto que ainda não existe: campo liso, sem texto (some quando a foto chegar). */
+.ph{background:var(--ph-a)}
+/* Carta: a imagem do TCGdex já tem a moldura e os cantos da carta; o fundo só aparece enquanto ela carrega. */
+.media--card{aspect-ratio:63/88;margin:12px 12px 0;border-radius:4.5%/3.2%;background:var(--ph-a)}
+.media--card img{display:block;width:100%;height:100%;object-fit:contain}
 .media--sq{aspect-ratio:1/1;border-bottom:1px solid var(--line)}
-.media--craft{aspect-ratio:4/3;border-bottom:1px solid var(--line);background:repeating-linear-gradient(0deg,var(--ph-a) 0 3px,var(--ph-b) 3px 6px)}
+.media--craft{aspect-ratio:4/3;border-bottom:1px solid var(--line);color:var(--muted)}
+.media--craft .plan{width:82%;height:auto;display:block}
 .media--mini{aspect-ratio:1/1;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--c) 42%,var(--media-base)),var(--media-base) 78%)}
 .media--mini svg{width:58%;height:auto;display:block}
 .media .num-tag{position:absolute;top:12px;left:14px;color:var(--soft)}
@@ -208,7 +220,6 @@ button{font:inherit;color:inherit}
 .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted);display:block}
 
 .empty{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:48px 16px;border:1px dashed var(--line-strong);border-radius:var(--radius)}
-.mascot-slot{width:88px;height:88px;border-radius:50%;border:1.5px dashed var(--line-strong);display:grid;place-items:center;color:var(--muted);text-align:center;font-size:10px;line-height:1.2}
 .empty h3{font-size:24px}
 .empty p{color:var(--soft);max-width:42ch}
 
@@ -305,7 +316,7 @@ button{font:inherit;color:inherit}
 .ship-opt b{font-weight:700}
 
 /* conta e apoio */
-.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px}
+.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;align-items:start}
 @media (max-width:860px){.cols-2{grid-template-columns:1fr}}
 .card{padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;gap:14px;min-width:0}
 .card h2,.card h3{font:900 26px/1 var(--f-display);letter-spacing:-.04em;text-transform:lowercase}
