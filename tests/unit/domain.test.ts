@@ -11,7 +11,7 @@ import {
   resolveCart,
   toEntry,
 } from '../../src/domain/cart';
-import { ITEMS, itemName, productById, productSubtitle } from '../../src/domain/catalog';
+import { cardById, cardImage, ITEMS, itemName, productById, productSubtitle } from '../../src/domain/catalog';
 import {
   dexTotals,
   filterDex,
@@ -49,6 +49,13 @@ describe('catálogo', () => {
     expect(productSubtitle(productById.m3)).toBe('colecionável #003');
     expect(productSubtitle(productById.k1)).toBe('criar');
     expect(productSubtitle(productById.a1)).toBe('acessório');
+  });
+  it('imagem da carta no TCGdex: número com os dígitos do set e português só onde o set existe em PT', () => {
+    expect(cardImage(cardById['base1-4'])).toBe('https://assets.tcgdex.net/en/base/base1/4/low.webp');
+    expect(cardImage(cardById['base1-4'], 'PT', 'high')).toBe('https://assets.tcgdex.net/en/base/base1/4/high.webp');
+    expect(cardImage(cardById['jungle-11'])).toBe('https://assets.tcgdex.net/en/base/base2/11/low.webp');
+    expect(cardImage(cardById['sv151-6'], 'PT')).toBe('https://assets.tcgdex.net/pt/sv/sv03.5/006/low.webp');
+    expect(cardImage(cardById['sv151-151'], 'EN', 'high')).toBe('https://assets.tcgdex.net/en/sv/sv03.5/151/high.webp');
   });
 });
 

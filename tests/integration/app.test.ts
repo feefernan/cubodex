@@ -133,8 +133,8 @@ beforeEach(() => {
 describe('navegação', () => {
   it('começa na home com destaques e contagem regressiva', () => {
     expect(visible()).toEqual(['v-home']);
-    expect(document.querySelectorAll('#hl-tcg .tile')).toHaveLength(3);
-    expect(document.querySelectorAll('#hl-col .tile')).toHaveLength(3);
+    expect(document.querySelectorAll('#hl-tcg .tile')).toHaveLength(4);
+    expect(document.querySelectorAll('#hl-col .tile')).toHaveLength(4);
     // Sem data de lançamento definida, nada de contagem inventada.
     expect($('#news .cd').textContent).toBe('em breve');
     expect(document.body.textContent).not.toMatch(/protótipo|data de exemplo|versão real|no site real/i);

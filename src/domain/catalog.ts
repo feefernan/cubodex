@@ -47,6 +47,9 @@ export interface TcgSet {
   total: number;
   tone: string;
   langs: string[];
+  /** Pasta do set no CDN do TCGdex (`<série>/<set>`) e quantos dígitos o número da carta tem lá. */
+  tcgdex: string;
+  pad: number;
 }
 export interface Card {
   id: string;
@@ -97,9 +100,39 @@ export const SERIES = [
 ];
 
 export const SETS: TcgSet[] = [
-  { id: 'base1', name: 'Base Set', serie: 'Base', year: 1999, total: 102, tone: '#F42744', langs: ['EN'] },
-  { id: 'jungle', name: 'Jungle', serie: 'Base', year: 1999, total: 64, tone: '#3ED9F0', langs: ['EN'] },
-  { id: 'fossil', name: 'Fossil', serie: 'Base', year: 1999, total: 62, tone: '#D9A441', langs: ['EN'] },
+  {
+    id: 'base1',
+    name: 'Base Set',
+    serie: 'Base',
+    year: 1999,
+    total: 102,
+    tone: '#F42744',
+    langs: ['EN'],
+    tcgdex: 'base/base1',
+    pad: 1,
+  },
+  {
+    id: 'jungle',
+    name: 'Jungle',
+    serie: 'Base',
+    year: 1999,
+    total: 64,
+    tone: '#3ED9F0',
+    langs: ['EN'],
+    tcgdex: 'base/base2',
+    pad: 1,
+  },
+  {
+    id: 'fossil',
+    name: 'Fossil',
+    serie: 'Base',
+    year: 1999,
+    total: 62,
+    tone: '#D9A441',
+    langs: ['EN'],
+    tcgdex: 'base/base3',
+    pad: 1,
+  },
   {
     id: 'sv151',
     name: '151',
@@ -108,6 +141,8 @@ export const SETS: TcgSet[] = [
     total: 165,
     tone: '#8FE3F2',
     langs: ['PT', 'EN'],
+    tcgdex: 'sv/sv03.5',
+    pad: 3,
   },
 ];
 
@@ -173,6 +208,16 @@ export const ITEMS: Item[] = [
 // Stryker restore all
 export const setById: Record<string, TcgSet> = Object.fromEntries(SETS.map((s) => [s.id, s]));
 export const cardById: Record<string, Card> = Object.fromEntries(CARDS.map((c) => [c.id, c]));
+
+/**
+ * Imagem oficial da carta no CDN aberto do TCGdex (#16). Em português só quando o set existe em PT;
+ * `low` (245×337) nas grades, `high` (600×825) na página da carta.
+ */
+export const cardImage = (c: Card, lang = 'EN', size: 'low' | 'high' = 'low'): string => {
+  const set = setById[c.set];
+  const l = lang === 'PT' && set.langs.includes('PT') ? 'pt' : 'en';
+  return `https://assets.tcgdex.net/${l}/${set.tcgdex}/${String(c.n).padStart(set.pad, '0')}/${size}.webp`;
+};
 
 /** "charizard 4/102" */
 export const itemName = (it: Item): string => {

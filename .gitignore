@@ -14,3 +14,6 @@ playwright-report/
 # cópias de conflito do iCloud (pasta Documentos sincronizada)
 * 2
 * 2.*
+
+# design-taste-frontend: screenshots e relatórios do inspetor (locais)
+.taste-skill/
