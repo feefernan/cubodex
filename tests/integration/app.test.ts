@@ -670,6 +670,9 @@ describe('conta e formulários', () => {
     expect($('#apoioBody h2').textContent).toBe('termos de uso');
     expect($('#apoioTabs [data-tab="termos"]').getAttribute('aria-pressed')).toBe('true');
     expect(location.hash).toBe('#/apoio/termos');
+    click('[data-action="apoio-tab"][data-tab="trocas"]');
+    expect($('#apoioBody h2').textContent).toBe('trocas e devoluções');
+    expect($('#apoioBody').textContent).toContain('7 dias corridos');
   });
 
   it('botão de modo claro/escuro alterna, diz para onde vai e salva a escolha (#14)', () => {
