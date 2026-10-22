@@ -68,17 +68,26 @@ const plain = (p?: Prop) =>
     .join('')
     .trim();
 
-/** Preço e estoque de cada produto do banco Produtos, casando pela coluna ID. */
-export const fetchStock = async (f: Fetch, token: string, db: string): Promise<StockRow[]> =>
+/** Cada linha do banco Produtos, casando pela coluna ID; `pageId` serve para gravar o estoque de volta. */
+export const fetchProducts = async (f: Fetch, token: string, db: string): Promise<(StockRow & { pageId: string })[]> =>
   (await query(f, token, db, null, 'ler produtos'))
-    .map(({ properties: p }) => ({
+    .map(({ id: pageId, properties: p }) => ({
       id: plain(p.ID),
+      pageId,
       price: p.Preço?.number ?? null,
       available: p.Disponíveis?.number ?? null,
       active: p['Ativo no site']?.checkbox ?? true,
       presale: p['Pré-venda']?.checkbox ?? false,
     }))
     .filter((row) => row.id);
+
+/** Preço e estoque de cada produto do banco Produtos (sem o id da página). */
+export const fetchStock = async (f: Fetch, token: string, db: string): Promise<StockRow[]> =>
+  (await fetchProducts(f, token, db)).map(({ pageId: _page, ...row }) => row);
+
+/** Grava o estoque que o D1 já baixou na coluna Disponíveis da página do produto. */
+export const setAvailable = (f: Fetch, token: string, pageId: string, qty: number) =>
+  call(f, token, `/pages/${pageId}`, 'PATCH', { properties: { Disponíveis: { number: qty } } }, 'gravar estoque');
 
 /**
  * Baixa o estoque das cartas de um pedido pago: uma consulta aos produtos e um PATCH por carta (cabe no limite de
