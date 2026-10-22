@@ -1,6 +1,7 @@
 import { ITEMS } from '../domain/catalog';
 import { quoteRequestText, whatsappUrl } from '../domain/contact';
 import { escapeHtml as esc } from '../domain/format';
+import { homeNews, type NewsCard } from '../domain/news';
 import { isEmail } from '../domain/validation';
 import { api } from '../infra/api';
 import { APOIO } from './apoio';
@@ -11,20 +12,22 @@ import { go, registerView } from './router';
 import { S } from './store';
 import { fillProducts, itemTile } from './tiles';
 
-const NEWS =
-  `<a class="news news--hot" href="#/serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega</h3><span class="cd num">em breve</span><span class="mono">entre na lista para saber primeiro</span></a>` +
-  '<a class="news" href="#/tcg" data-action="go" data-view="tcg"><span class="mono tag">novidade · tcg</span><h3>charizard 4/102 · 1ª edição</h3><span class="mono soft">PSA 8 · última unidade</span></a>' +
-  '<a class="news" href="#/criar" data-action="go" data-view="criar"><span class="mono tag">novo em criar</span><h3>torre de dados</h3><span class="mono soft">PETG · 80 × 80 × 160 mm</span></a>' +
+const LAUNCH_NEWS =
+  '<a class="news news--hot" href="#/serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega</h3><span class="cd num">em breve</span><span class="mono">entre na lista para saber primeiro</span></a>';
+const OPT_IN_NEWS =
   '<a class="news" href="#avisos" data-action="scroll" data-target="avisos"><span class="mono tag">lista de avisos</span><h3>receba o próximo lançamento primeiro</h3><span class="mono soft">entrar na lista →</span></a>';
+
+const newsCard = (n: NewsCard) =>
+  `<a class="news" href="#/${n.view}${n.id ? `/${n.id}` : ''}" data-action="go" data-view="${n.view}"${n.id ? ` data-id="${esc(n.id)}"` : ''}><span class="mono tag">${esc(n.tag)}</span><h3>${esc(n.title)}</h3><span class="mono soft">${esc(n.sub)}</span></a>`;
 
 const renderHome = () => {
   $('#hl-tcg').innerHTML = ['i1', 'i2', 'i8', 'i5']
-    .flatMap((id) => ITEMS.filter((it) => it.id === id))
+    .flatMap((id) => ITEMS.filter((it) => it.id === id && it.status !== 'esgotado'))
     .map(itemTile)
     .join('');
   fillProducts($('#hl-col'), ['m1', 'm6', 'm10', 'm12']);
   fillProducts($('#hl-criar'), ['k1', 'k2', 'k3', 'k4']);
-  $('#news').innerHTML = NEWS;
+  $('#news').innerHTML = LAUNCH_NEWS + homeNews().map(newsCard).join('') + OPT_IN_NEWS;
   tickCountdowns();
 };
 

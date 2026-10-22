@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PRODUCTS } from '../../src/domain/catalog';
 import { clearStockCache, handle, SUBSCRIBE_CONSENT } from '../../worker/src/app';
 import { ctx, env, fake, ORDER, req, sign } from './fakes';
 
@@ -31,12 +32,17 @@ describe('rotas básicas', () => {
 
   it('catálogo vem do Notion; sem token, lista vazia', async () => {
     const res = await handle(req('/api/catalog'), env(), ctx, api.f);
-    expect(await res.json()).toEqual({
-      products: [
-        { id: 'i2', price: null, available: 2, active: true, presale: false },
-        { id: 'i9', price: null, available: 10, active: true, presale: false },
-      ],
+    const { products } = await res.json();
+    // O Notion de teste lista o catálogo todo; as cartas com estoque trazem a quantidade.
+    expect(products).toHaveLength(PRODUCTS.length);
+    expect(products.find((p: { id: string }) => p.id === 'i2')).toEqual({
+      id: 'i2',
+      price: null,
+      available: 2,
+      active: true,
+      presale: false,
     });
+    expect(products.find((p: { id: string }) => p.id === 'm1')).toMatchObject({ available: null, active: true });
     expect(res.headers.get('Cache-Control')).toContain('max-age=60');
     clearStockCache();
     expect(await (await handle(req('/api/catalog'), env({ NOTION_TOKEN: undefined }), ctx, api.f)).json()).toEqual({
@@ -126,6 +132,18 @@ describe('pedido', () => {
     expect(res.status).toBe(503);
     expect((await res.json()).error).toContain('ainda não está disponível');
     expect(api.state.orders).toEqual([]);
+  });
+
+  it('produto que não está no Notion, ou está inativo, não se vende (miniatura, peça e carta)', async () => {
+    const order = (items: unknown[]) => handle(req('/api/orders', { ...ORDER, items }), env(), ctx, api.f);
+    expect((await order([{ id: 'm1', qty: 1 }])).status).toBe(201);
+    // "Ativo no site" desligado no Notion: o item sai do carrinho e o pedido é recusado, mesmo com o id certo.
+    api.state.inactive.add('m1');
+    clearStockCache();
+    expect((await order([{ id: 'm1', qty: 1 }])).status).toBe(409);
+    api.state.inactive.delete('m1');
+    clearStockCache();
+    expect((await order([{ id: 'm1', qty: 1 }])).status).toBe(201);
   });
 
   it('recusa pacote forjado, carta repetida acima do estoque, linhas demais e quantidade acima de 99', async () => {

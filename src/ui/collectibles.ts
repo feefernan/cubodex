@@ -1,5 +1,5 @@
 import { packEntry } from '../domain/cart';
-import { LAUNCH_DATE, MINIS, type Mini, PACK_PRICE, PACK_SIZE, productById, SERIES } from '../domain/catalog';
+import { isListed, LAUNCH_DATE, MINIS, type Mini, PACK_PRICE, PACK_SIZE, productById, SERIES } from '../domain/catalog';
 import { type Dex, type DexFilter, type DexStatus, dexTotals, filterDex, toggleDex } from '../domain/collection';
 import { brl, escapeHtml as esc, pad3 } from '../domain/format';
 import { countdown } from '../domain/validation';
@@ -52,7 +52,7 @@ const renderSerie = () => {
     `<div class="slots">${slots}</div>` +
     `<div><h3 class="display" style="font-size:28px">monte seu pacote</h3><p class="soft" style="font-size:15px;margin-top:4px">Toque em “+ pacote” nas miniaturas abaixo. Pacote de ${PACK_SIZE}: <b class="num" style="color:var(--fg)">${brl(PACK_PRICE)}</b> </p></div>` +
     `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn--ghost btn--sm" data-action="pack-clear"${disabledAttr(!S.pack.length)}>esvaziar</button><button class="btn" data-action="pack-buy"${disabledAttr(!full)}>${full ? 'adicionar pacote' : `faltam ${PACK_SIZE - S.pack.length}`}</button></div>`;
-  $('#serieGrid').innerHTML = MINIS.map(productTile).join('');
+  $('#serieGrid').innerHTML = MINIS.filter(isListed).map(productTile).join('');
 };
 
 const STATUS_FILTERS: DexFilter[] = ['todos', 'tenho', 'quero', 'faltam'];

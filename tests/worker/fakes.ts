@@ -1,5 +1,6 @@
 /** Notion, Mercado Pago, Melhor Envio e pedidos falsos compartilhados pelos testes do Worker. */
 import { vi } from 'vitest';
+import { PRODUCTS } from '../../src/domain/catalog';
 import type { Env } from '../../worker/src/app';
 
 const ok = { limit: async () => ({ success: true }) };
@@ -42,6 +43,8 @@ export const fake = () => {
       },
     },
     mpFails: false,
+    /** Ids com "Ativo no site" desligado no Notion. */
+    inactive: new Set<string>(),
   };
   const reply = (body: unknown, status = 200) => Response.json(body, { status });
   const f = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -61,11 +64,17 @@ export const fake = () => {
     const db = url.match(/databases\/([^/]+)\/query/)?.[1];
     if (db === 'db-produtos') {
       const id = (body.filter as { rich_text?: { equals: string } })?.rich_text?.equals;
-      const rows = Object.entries(state.stock)
-        .filter(([k]) => !id || k === id)
-        .map(([k, n]) => ({
+      // O Notion do teste lista o catálogo todo (o que não está lá sai de venda); só as cartas têm estoque.
+      const rows = [...new Set([...PRODUCTS.map((p) => p.id), ...Object.keys(state.stock)])]
+        .filter((k) => !id || k === id)
+        .map((k) => ({
           id: `page-${k}`,
-          properties: { ID: { rich_text: [{ plain_text: k }] }, Disponíveis: { number: n }, Preço: { number: null } },
+          properties: {
+            ID: { rich_text: [{ plain_text: k }] },
+            Disponíveis: { number: state.stock[k] ?? null },
+            Preço: { number: null },
+            'Ativo no site': { checkbox: !state.inactive.has(k) },
+          },
         }));
       return reply({ results: rows });
     }

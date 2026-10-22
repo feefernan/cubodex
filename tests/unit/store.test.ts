@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ITEMS, productById } from '../../src/domain/catalog';
+import { addToCart, packEntry, resolveCart } from '../../src/domain/cart';
+import { ITEMS, isListed, PRODUCTS, productById } from '../../src/domain/catalog';
 import { quoteRequestText, whatsappUrl } from '../../src/domain/contact';
 import { describeLine, makeSerial, OrderError, SERIAL_PATTERN, validateOrder } from '../../src/domain/order';
 import {
@@ -53,23 +54,16 @@ describe('frete', () => {
 });
 
 describe('estoque do Notion', () => {
-  const original = ITEMS.map((it) => ({ ...it }));
-  const originalPrice = { m1: productById.m1.price, a1: productById.a1.price };
+  // O catálogo inteiro como o Notion o teria: aplicar tudo de uma vez devolve preço, estoque e "à venda".
+  const everything = PRODUCTS.map((p) => ({
+    id: p.id,
+    price: p.price,
+    available: p.kind === 'item' ? p.qty : null,
+    active: p.kind !== 'item' || p.status !== 'esgotado',
+    presale: p.kind === 'item' && p.status === 'prevenda',
+  }));
   afterEach(() => {
-    for (const it of original)
-      applyStock([
-        {
-          id: it.id,
-          price: it.price,
-          available: it.qty,
-          active: it.status !== 'esgotado',
-          presale: it.status === 'prevenda',
-        },
-      ]);
-    applyStock([
-      { id: 'm1', price: originalPrice.m1, available: null, active: true, presale: false },
-      { id: 'a1', price: originalPrice.a1, available: null, active: true, presale: false },
-    ]);
+    applyStock(everything);
   });
 
   it('aplica preço, quantidade e status às cartas e preço às peças', () => {
@@ -86,6 +80,31 @@ describe('estoque do Notion', () => {
     expect(productById.i3).toMatchObject({ price: 150, qty: 7, status: 'prevenda' });
     expect(productById.i4).toMatchObject({ status: 'esgotado' });
     expect(productById.m1.price).toBe(25);
+  });
+  it('o que não está no Notion, ou está sem "Ativo no site", sai de venda (qualquer tipo de produto)', () => {
+    applyStock([
+      { id: 'i2', price: null, available: 2, active: true, presale: false },
+      { id: 'm1', price: null, available: null, active: true, presale: false },
+      { id: 'm2', price: null, available: null, active: false, presale: false },
+      { id: 'k1', price: null, available: null, active: true, presale: false },
+    ]);
+    expect(isListed(productById.m1)).toBe(true);
+    expect(isListed(productById.m2)).toBe(false); // inativo
+    expect(isListed(productById.m3)).toBe(false); // não está no Notion
+    expect(isListed(productById.a1)).toBe(false);
+    expect(productById.i3).toMatchObject({ status: 'esgotado' }); // carta fora do Notion
+    expect(isListed(undefined)).toBe(false);
+    // Fora de venda não entra no carrinho (item, miniatura ou pacote), mesmo que esteja salvo no navegador.
+    expect(addToCart([], 'm3')).toEqual({ ok: false, error: 'item indisponível' });
+    expect(addToCart([], 'm1').ok).toBe(true);
+    expect(
+      resolveCart([
+        { id: 'm2', qty: 1 },
+        { id: 'm1', qty: 1 },
+      ]).dropped,
+    ).toBe(1);
+    expect(packEntry(['m1', 'm1', 'm2'], 1)).toBeNull();
+    expect(resolveCart([{ id: 'pack-1', qty: 1, pack: ['m1', 'm1', 'm2'] }]).lines).toEqual([]);
   });
   it('lê com segurança o que veio da API', () => {
     expect(parseStockRows(null)).toEqual([]);

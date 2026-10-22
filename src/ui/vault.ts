@@ -11,6 +11,7 @@ import {
   buyerAddress,
   buyerValid,
   cepForm,
+  contactFields,
   nav,
   progress,
   shipOptionsHtml,
@@ -55,7 +56,7 @@ const shipPanel = (units: number) => {
   html += alertMsg(S.vError);
   if (opts.length && units > 0) html += shipOptionsHtml(opts, 'vault-ship', (i) => S.vShipIdx === i);
   if (real && S.vShipIdx !== null && units > 0)
-    html += `<div class="form-grid" style="gap:10px">${addressFields(S.vCep)}</div><div id="ck-msg" role="status" aria-live="polite"></div>`;
+    html += `<div class="form-grid" style="gap:10px">${contactFields('vk')}${addressFields(S.vCep, 'vk')}</div><div id="vk-msg" role="status" aria-live="polite"></div>`;
   html += `<button class="btn btn--full" data-action="vault-pay"${disabledAttr(!ready)}>pagar frete e pedir envio</button>`;
   html += real
     ? '<p class="muted" style="font-size:12px">O frete é pago no Mercado Pago. Os itens saem do cofre quando o pagamento confirmar.</p>'
@@ -129,7 +130,7 @@ const quoteVault = async () => {
 const payVault = async () => {
   const chosen = selectedInVault(S.vault, S.vSel);
   const option = S.vOpts[S.vShipIdx ?? -1];
-  if (!chosen.length || !option || !buyerValid(ADDRESS_FIELDS, $('#ck-msg'))) return;
+  if (!chosen.length || !option || !buyerValid(['cpf', 'phone', ...ADDRESS_FIELDS], $('#vk-msg'), 'vk')) return;
   S.vBusy = 'registrando o envio…';
   S.vError = '';
   renderCofre();
@@ -137,6 +138,7 @@ const payVault = async () => {
     const res = await api.shipVault({
       items: chosen.map((v) => v.id),
       address: buyerAddress(S.vCep),
+      contact: { cpf: S.buyer.cpf, phone: S.buyer.phone },
       shipping: { serviceId: option.id },
     });
     nav.to(res.checkoutUrl);

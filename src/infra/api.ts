@@ -66,8 +66,12 @@ export const api = {
   me: () => call<Account>('/api/me'),
   saveDex: (dex: Dex) => send<{ dex: Dex }>('PUT', '/api/dex', { dex }),
   deleteMe: () => send<{ ok: true }>('DELETE', '/api/me', {}),
-  shipVault: (body: { items: string[]; address: Address; shipping: { serviceId: number } }) =>
-    post<{ serial: string; total: number; checkoutUrl: string }>('/api/vault/ship', body),
+  shipVault: (body: {
+    items: string[];
+    address: Address;
+    contact: { cpf: string; phone: string };
+    shipping: { serviceId: number };
+  }) => post<{ serial: string; total: number; checkoutUrl: string }>('/api/vault/ship', body),
 };
 
 /** Endereço pelo CEP (ViaCEP); null se o CEP não existe ou o serviço falhou — o cliente digita à mão. */
