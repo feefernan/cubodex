@@ -1,6 +1,9 @@
 import { bindings, defineConfig, triggers } from 'cf/config';
 import * as entrypoint from './worker/src/entry.ts' with { type: 'cf-worker' };
 
+// A config roda no Node (cf build/deploy); o tsconfig do projeto não carrega os tipos do Node.
+declare const process: { env: Record<string, string | undefined> };
+
 // Site (build do Vite) + API /api/* no mesmo Worker, na conta própria do Cubodex.
 // A conta vem de CLOUDFLARE_ACCOUNT_ID no CI — nunca a conta do Hortelã.
 export default defineConfig({
@@ -33,6 +36,9 @@ export default defineConfig({
       MP_WEBHOOK_SECRET: bindings.secret(),
       // Contas (#29): Dex, cofre e pedidos. O CI cria o banco e aplica worker/migrations antes do deploy.
       DB: bindings.d1({ name: 'cubodex-db' }),
+      // Fotos dos produtos (Fase 2.2). O balde é criado pelo deploy; sem R2 ativo na conta, o deploy segue sem ele
+      // (CUBODEX_R2 só é definido quando o balde existe) e o site fica sem fotos próprias, sem quebrar.
+      ...(process.env.CUBODEX_R2 ? { FOTOS: bindings.r2({ name: 'cubodex-fotos' }) } : {}),
       // Entrar com Google (#43). O client ID é público; vazio (ou sem o segredo) = login desligado.
       GOOGLE_CLIENT_ID: bindings.text('812025645528-r0nmle0ecuaacvmoqji17l218oho69t9.apps.googleusercontent.com'),
       GOOGLE_CLIENT_SECRET: bindings.secret(),

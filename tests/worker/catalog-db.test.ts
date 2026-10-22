@@ -31,9 +31,9 @@ describe('sync Notion → D1', () => {
     await syncProducts(d1.db, [row('a', { price: 10 }), row('b'), row('c', { available: null })], 't1');
     await syncProducts(d1.db, [row('a', { price: 12, available: 9 }), row('b', { active: false })], 't2');
     expect(await readProducts(d1.db)).toEqual([
-      { id: 'a', price: 12, available: 9, active: true, presale: false },
-      { id: 'b', price: null, available: 5, active: false, presale: false },
-      { id: 'c', price: null, available: null, active: false, presale: false }, // sumiu do Notion
+      { id: 'a', price: 12, available: 9, active: true, presale: false, photos: [] },
+      { id: 'b', price: null, available: 5, active: false, presale: false, photos: [] },
+      { id: 'c', price: null, available: null, active: false, presale: false, photos: [] }, // sumiu do Notion
     ]);
   });
 

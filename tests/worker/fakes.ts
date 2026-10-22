@@ -43,6 +43,10 @@ export const fake = () => {
       },
     },
     mpFails: false,
+    /** Fotos da coluna Fotos do Notion por produto (`internal` = arquivo enviado ao Notion, com link assinado). */
+    photos: {} as Record<string, { name: string; url: string; internal?: boolean }[]>,
+    /** Tipo devolvido ao baixar uma foto (padrão image/jpeg); `null` = link vencido (403). */
+    fileType: 'image/jpeg' as string | null,
     /** Ids com "Ativo no site" desligado no Notion. */
     inactive: new Set<string>(),
   };
@@ -58,6 +62,10 @@ export const fake = () => {
         { id: 2, name: 'SEDEX', custom_price: '38.90', custom_delivery_time: 3, company: { name: 'Correios' } },
         { id: 3, name: 'Falha', error: 'indisponível' },
       ]);
+    if (url.startsWith('https://files.test/'))
+      return state.fileType
+        ? new Response(new Uint8Array([1, 2, 3]), { headers: { 'Content-Type': state.fileType } })
+        : new Response('expirou', { status: 403 });
     if (url === 'https://api.mercadopago.com/checkout/preferences')
       return state.mpFails ? reply({ message: 'erro' }, 500) : reply({ init_point: 'https://mp.test/pagar' });
     if (url.startsWith('https://api.mercadopago.com/v1/payments/')) return reply(state.payment);
@@ -74,6 +82,12 @@ export const fake = () => {
             Disponíveis: { number: state.stock[k] ?? null },
             Preço: { number: null },
             'Ativo no site': { checkbox: !state.inactive.has(k) },
+            Fotos: {
+              files: (state.photos[k] ?? []).map((x) => ({
+                name: x.name,
+                ...(x.internal ? { file: { url: x.url } } : { external: { url: x.url } }),
+              })),
+            },
           },
         }));
       return reply({ results: rows });

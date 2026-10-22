@@ -197,6 +197,7 @@ button{font:inherit;color:inherit}
 .media--card{aspect-ratio:63/88;margin:12px 12px 0;border-radius:4.5%/3.2%;background:var(--ph-a)}
 .media--card img{display:block;width:100%;height:100%;object-fit:contain}
 .media--sq{aspect-ratio:1/1;border-bottom:1px solid var(--line)}
+.media .photo{display:block;width:100%;height:100%;object-fit:cover}
 .media--craft{aspect-ratio:4/3;border-bottom:1px solid var(--line);color:var(--muted)}
 .media--craft .plan{width:82%;height:auto;display:block}
 .media--mini{aspect-ratio:1/1;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--c) 42%,var(--media-base)),var(--media-base) 78%)}

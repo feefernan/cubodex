@@ -18,6 +18,8 @@ interface BaseProduct {
    * servidor recusa). Indefinido = ainda não consultamos o Notion (desenvolvimento sem API): o catálogo de exemplo vale.
    */
   listed?: boolean;
+  /** Chaves das fotos próprias (copiadas do Notion para o R2), na ordem do Notion. */
+  photos?: string[];
 }
 interface Accessory extends BaseProduct {
   kind: 'acc';
@@ -44,6 +46,9 @@ interface SaleItem extends BaseProduct {
 }
 export type Product = Accessory | Craft | Mini | SaleItem;
 
+/** Endereço da foto própria no site: o Worker serve do R2 (as chaves são fixas, então o navegador guarda por 1 ano). */
+export const photoUrl = (key: string): string => `/api/img/${key}`;
+
 export const isListed = (p: Product | undefined): p is Product => !!p && p.listed !== false;
 
 export interface TcgSet {
@@ -68,6 +73,7 @@ export interface Card {
 }
 export interface Item {
   id: string;
+  photos?: string[];
   card: string;
   variant: string;
   lang: string;

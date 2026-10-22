@@ -6,6 +6,7 @@ import {
   isListed,
   itemName,
   type Product,
+  photoUrl,
   productById,
   setById,
 } from '../domain/catalog';
@@ -14,9 +15,16 @@ import { itemsOfCard } from '../domain/tcg';
 import { cube, flag, plan } from './art';
 import { disabledAttr } from './dom';
 
-/** Imagem da carta (TCGdex) numa grade; o nome vem do link em volta, então a imagem é decorativa. */
-const cardImg = (c: Card, lang?: string) =>
-  `<img src="${cardImage(c, lang)}" alt="" width="245" height="337" loading="lazy" decoding="async">`;
+/**
+ * Imagem da carta numa grade: a foto própria do item (R2) tem prioridade; sem ela, a imagem oficial do TCGdex.
+ * O nome vem do link em volta, então a imagem é decorativa.
+ */
+const cardImg = (c: Card, lang?: string, own?: string) =>
+  `<img src="${own ? photoUrl(own) : cardImage(c, lang)}" alt="" width="245" height="337" loading="lazy" decoding="async">`;
+
+/** Foto própria do produto, preenchendo o espaço da mídia. */
+const photoImg = (p: Product, key: string) =>
+  `<img class="photo" src="${photoUrl(key)}" alt="${esc(p.name)}" width="400" height="400" loading="lazy" decoding="async">`;
 
 const gradeChip = (it: Item) => (it.grade ? `<span class="mono grade">${esc(it.grade.co)} ${it.grade.n}</span>` : '');
 
@@ -24,6 +32,9 @@ const addButton = (id: string) => `<button class="btn btn--sm" data-action="add"
 const soldOutButton = `<button class="btn btn--sm"${disabledAttr(true)}>esgotado</button>`;
 
 const media = (p: Product): string => {
+  const own = p.photos?.[0];
+  if (own && p.kind !== 'item')
+    return `<div class="media media--${p.kind === 'craft' ? 'craft' : 'sq'}">${photoImg(p, own)}</div>`;
   switch (p.kind) {
     case 'acc':
       // shortcut: acessórios ainda sem foto (#15); o campo liso guarda o lugar até a foto chegar.
@@ -75,7 +86,7 @@ export const itemTile = (it: Item): string => {
       ? '<span class="state-tag pre">pré-venda</span>'
       : '';
   const name = esc(itemName(it));
-  return `<article class="tile${soldOut ? ' soldout' : ''}">${cardLink(c, `${tag}${cardImg(c, it.lang)}`, 'media media--card', `Ver a carta ${name}`)}<div class="body"><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(setById[c.set].name)}</p><div class="badges">${flag(it.lang)}<span class="mono pill">${esc(it.variant)}</span>${gradeChip(it)}</div><p class="mono qty-un num">${soldOut ? 0 : it.qty} un.</p><div class="row"><span class="price num">${brl(it.price)}</span>${soldOut ? soldOutButton : addButton(it.id)}</div></div></article>`;
+  return `<article class="tile${soldOut ? ' soldout' : ''}">${cardLink(c, `${tag}${cardImg(c, it.lang, it.photos?.[0])}`, 'media media--card', `Ver a carta ${name}`)}<div class="body"><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(setById[c.set].name)}</p><div class="badges">${flag(it.lang)}<span class="mono pill">${esc(it.variant)}</span>${gradeChip(it)}</div><p class="mono qty-un num">${soldOut ? 0 : it.qty} un.</p><div class="row"><span class="price num">${brl(it.price)}</span>${soldOut ? soldOutButton : addButton(it.id)}</div></div></article>`;
 };
 
 /** Linha de venda na página da carta. */
