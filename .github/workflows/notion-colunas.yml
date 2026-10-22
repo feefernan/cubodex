@@ -1,0 +1,22 @@
+# Carga única do catálogo no Notion (Fase 2.3): cria as colunas e preenche as linhas atuais. Rode em
+# Actions → "Notion: colunas do catálogo". Sem marcar "aplicar", só simula e mostra o que faria.
+name: "Notion: colunas do catálogo"
+on:
+  workflow_dispatch:
+    inputs:
+      aplicar:
+        description: "Gravar no Notion (desmarcado = só simular)"
+        type: boolean
+        default: false
+permissions: {}
+jobs:
+  colunas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node scripts/notion-colunas.mjs ${{ inputs.aplicar && '--aplicar' || '' }}
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_PRODUCTS_DB: 3fc620acc67f81a8b180cfb6bdc5f8ae
