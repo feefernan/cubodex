@@ -1,0 +1,25 @@
+# Enciclopédia TCG (Fase 3): traz sets e cartas do TCGdex para o D1. Roda toda segunda de manhã e quando alguém dispara
+# em Actions → "TCG sync". Disparado à mão, só simula, a menos que se marque "aplicar".
+name: TCG sync
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      aplicar:
+        description: "Gravar no D1 (desmarcado = só simular)"
+        type: boolean
+        default: false
+permissions: { contents: read }
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node --experimental-strip-types scripts/tcg-sync.ts ${{ (github.event_name == 'schedule' || inputs.aplicar) && '--aplicar' || '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
