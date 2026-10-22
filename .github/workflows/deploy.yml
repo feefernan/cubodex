@@ -55,6 +55,18 @@ jobs:
           [ -n "$id" ] || id=$(npx cf d1 create --name cubodex-db | uuid)
           [ -n "$id" ] || { echo "::error::não achei nem criei o banco cubodex-db"; exit 1; }
           npx cf d1 migrations apply "$id" --dir worker/migrations
+      - name: Fotos (R2)
+        # Cria o balde das fotos na primeira vez. Sem R2 ativo na conta, só avisa: o site publica sem fotos próprias.
+        if: steps.cred.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if npx cf r2 buckets list | grep -q '"cubodex-fotos"' || npx cf r2 buckets create-by-name cubodex-fotos >/dev/null; then
+            echo "CUBODEX_R2=1" >> "$GITHUB_ENV"
+          else
+            echo "::warning::R2 não está ativo na conta do Cloudflare: o site publica sem fotos próprias. Ative o R2 e rode o deploy de novo."
+          fi
       - name: Publicar
         if: steps.cred.outputs.ready == 'true'
         env:

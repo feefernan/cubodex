@@ -6,11 +6,13 @@
  */
 import type { StockRow } from '../../src/domain/stock';
 import type { Db } from './accounts';
+import type { Bucket } from './bucket';
 import { log } from './http';
-import { fetchProducts, setAvailable } from './notion';
+import { fetchProducts, type PhotoFile, setAvailable } from './notion';
+import { readPhotos, syncPhotos } from './photos';
 
 type Fetch = typeof fetch;
-type Row = StockRow & { pageId: string };
+type Row = StockRow & { pageId: string; files?: PhotoFile[] };
 
 interface ProductRow {
   id: string;
@@ -21,14 +23,19 @@ interface ProductRow {
 }
 
 /** Produtos no formato que o domínio já usa (`applyStock`) e que `/api/catalog` devolve. */
-export const readProducts = async (db: Db): Promise<StockRow[]> =>
-  (await db.prepare('SELECT id, price, qty, active, presale FROM products').all<ProductRow>()).results.map((r) => ({
-    id: r.id,
-    price: r.price,
-    available: r.qty,
-    active: r.active === 1,
-    presale: r.presale === 1,
-  }));
+export const readProducts = async (db: Db): Promise<StockRow[]> => {
+  const photos = await readPhotos(db);
+  return (await db.prepare('SELECT id, price, qty, active, presale FROM products').all<ProductRow>()).results.map(
+    (r) => ({
+      id: r.id,
+      price: r.price,
+      available: r.qty,
+      active: r.active === 1,
+      presale: r.presale === 1,
+      photos: photos.get(r.id) ?? [],
+    }),
+  );
+};
 
 const UPSERT = `INSERT INTO products (id, price, qty, active, presale, page_id, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET price = excluded.price,
@@ -106,9 +113,18 @@ export const flushStock = async (db: Db, f: Fetch, token: string, limit = 20) =>
   return done;
 };
 
-/** Uma rodada do cron: grava as baixas pendentes e traz o Notion de volta. */
-export const refreshCatalog = async (db: Db, env: { NOTION_TOKEN?: string; NOTION_PRODUCTS_DB: string }, f: Fetch) => {
+/** Uma rodada do cron: grava as baixas pendentes, traz o Notion de volta e copia as fotos novas para o R2. */
+export const refreshCatalog = async (
+  db: Db,
+  env: { NOTION_TOKEN?: string; NOTION_PRODUCTS_DB: string; FOTOS?: Bucket },
+  f: Fetch,
+) => {
   if (!env.NOTION_TOKEN || !env.NOTION_PRODUCTS_DB) return 0;
   await flushStock(db, f, env.NOTION_TOKEN);
-  return syncProducts(db, await fetchProducts(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB));
+  const rows = await fetchProducts(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB);
+  const synced = await syncProducts(db, rows);
+  // Fotos não derrubam o catálogo: o que não copiou agora tenta de novo na próxima rodada.
+  if (env.FOTOS)
+    await syncPhotos(db, env.FOTOS, rows, f).catch((e) => log('warn', 'fotos não copiadas', { error: String(e) }));
+  return synced;
 };

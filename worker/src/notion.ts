@@ -1,7 +1,7 @@
 /**
  * Cliente mínimo da API do Notion (workspace próprio do Cubodex). Bancos e colunas esperados:
  * - Produtos: Nome (título), ID (texto, ex.: i1, m3, k2), Preço (número), Disponíveis (número),
- *   Ativo no site (caixa), Pré-venda (caixa).
+ *   Ativo no site (caixa), Pré-venda (caixa), Fotos (arquivos e mídia, opcional).
  * - Pedidos: Serial (título), Status (seleção), Cliente, Itens, Frete, Endereço, Pagamento MP (textos),
  *   E-mail (e-mail), Total (número), Data (data).
  * - Avisos: E-mail (título), Inscrito em (data), Consentimento (texto), Token (texto), Saiu (caixa).
@@ -19,6 +19,7 @@ type Prop = {
   rich_text?: { plain_text: string }[];
   title?: { plain_text: string }[];
   select?: { name: string } | null;
+  files?: { name: string; file?: { url: string }; external?: { url: string } }[];
 };
 type Page = { id: string; properties: Record<string, Prop> };
 
@@ -68,12 +69,27 @@ const plain = (p?: Prop) =>
     .join('')
     .trim();
 
+/** Um arquivo da coluna Fotos: `internal` = enviado ao Notion (o link expira e tem assinatura na query). */
+export interface PhotoFile {
+  name: string;
+  url: string;
+  internal: boolean;
+}
+
 /** Cada linha do banco Produtos, casando pela coluna ID; `pageId` serve para gravar o estoque de volta. */
-export const fetchProducts = async (f: Fetch, token: string, db: string): Promise<(StockRow & { pageId: string })[]> =>
+export const fetchProducts = async (
+  f: Fetch,
+  token: string,
+  db: string,
+): Promise<(StockRow & { pageId: string; files: PhotoFile[] })[]> =>
   (await query(f, token, db, null, 'ler produtos'))
     .map(({ id: pageId, properties: p }) => ({
       id: plain(p.ID),
       pageId,
+      files: (p.Fotos?.files ?? []).flatMap((x) => {
+        const url = x.file?.url ?? x.external?.url;
+        return url ? [{ name: x.name, url, internal: !!x.file }] : [];
+      }),
       price: p.Preço?.number ?? null,
       available: p.Disponíveis?.number ?? null,
       active: p['Ativo no site']?.checkbox ?? true,
@@ -83,7 +99,7 @@ export const fetchProducts = async (f: Fetch, token: string, db: string): Promis
 
 /** Preço e estoque de cada produto do banco Produtos (sem o id da página). */
 export const fetchStock = async (f: Fetch, token: string, db: string): Promise<StockRow[]> =>
-  (await fetchProducts(f, token, db)).map(({ pageId: _page, ...row }) => row);
+  (await fetchProducts(f, token, db)).map(({ pageId: _page, files: _files, ...row }) => row);
 
 /** Grava o estoque que o D1 já baixou na coluna Disponíveis da página do produto. */
 export const setAvailable = (f: Fetch, token: string, pageId: string, qty: number) =>

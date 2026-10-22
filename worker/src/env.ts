@@ -1,4 +1,5 @@
 import type { Db } from './accounts';
+import type { Bucket } from './bucket';
 
 export interface Limiter {
   limit(options: { key: string }): Promise<{ success: boolean }>;
@@ -22,6 +23,8 @@ export interface Env {
   MP_WEBHOOK_SECRET?: string;
   /** Contas (#29): banco D1. */
   DB?: Db;
+  /** Fotos dos produtos (R2). Sem o balde, o site segue sem fotos próprias. */
+  FOTOS?: Bucket;
   /** Entrar com Google (#43): sem os dois, o login responde 503. */
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET?: string;

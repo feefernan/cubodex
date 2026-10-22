@@ -8,7 +8,12 @@ export interface StockRow {
   available: number | null;
   active: boolean;
   presale: boolean;
+  /** Chaves das fotos próprias no R2 (vazio = sem foto própria). */
+  photos?: string[];
 }
+
+/** Chave de foto no R2: `fotos/<id do produto>/<16 hex>.<extensão de imagem>`. */
+export const PHOTO_KEY = /^fotos\/[a-z0-9-]+\/[0-9a-f]{16}\.(?:jpe?g|png|webp|gif)$/;
 
 const statusOf = (row: StockRow): StockStatus => {
   if (!row.active || row.available === 0) return 'esgotado';
@@ -38,11 +43,12 @@ export const applyStock = (rows: StockRow[]): string[] => {
       continue;
     }
     if (row.price !== null && row.price >= 0) p.price = row.price;
+    p.photos = row.photos ?? [];
     if (p.kind !== 'item') continue;
     const item = ITEMS.find((it) => it.id === row.id);
     p.status = statusOf(row);
     if (row.available !== null) p.qty = Math.max(0, Math.floor(row.available));
-    if (item) Object.assign(item, { price: p.price, qty: p.qty, status: p.status });
+    if (item) Object.assign(item, { price: p.price, qty: p.qty, status: p.status, photos: p.photos });
   }
   return unknown;
 };
@@ -62,6 +68,9 @@ export const parseStockRows = (data: unknown): StockRow[] => {
         available: num(o.available),
         active: o.active !== false,
         presale: o.presale === true,
+        photos: Array.isArray(o.photos)
+          ? o.photos.filter((k): k is string => typeof k === 'string' && PHOTO_KEY.test(k))
+          : [],
       },
     ];
   });

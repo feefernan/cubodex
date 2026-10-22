@@ -1,4 +1,4 @@
-import { CARDS, cardById, cardImage, ITEMS, SETS, setById, type TcgSet } from '../domain/catalog';
+import { CARDS, cardById, cardImage, ITEMS, photoUrl, SETS, setById, type TcgSet } from '../domain/catalog';
 import { escapeHtml as esc, uniq } from '../domain/format';
 import { cardsOfSet, cardsOnSale, emptyFilters, type Filters, filterItems, filterSets } from '../domain/tcg';
 import { emptyState } from './art';
@@ -131,7 +131,7 @@ const renderCarta = () => {
     : '<p class="soft">A Cubodex não tem item à venda desta carta agora.</p>';
   $('#cartaBody').innerHTML =
     `<p style="padding-top:20px"><a class="link-more" href="#/set/${x.id}" data-action="go" data-view="set" data-id="${x.id}">← ${esc(x.name)}</a></p>` +
-    `<div class="cardpage"><div class="media media--card" style="margin:0;width:100%"><img src="${cardImage(c, its[0]?.lang, 'high')}" alt="Carta ${esc(c.name)}, ${esc(x.name)} ${c.n}/${x.total}" width="600" height="825" decoding="async"></div>` +
+    `<div class="cardpage"><div class="media media--card" style="margin:0;width:100%"><img src="${its[0]?.photos?.[0] ? photoUrl(its[0].photos[0]) : cardImage(c, its[0]?.lang, 'high')}" alt="Carta ${esc(c.name)}, ${esc(x.name)} ${c.n}/${x.total}" width="600" height="825" decoding="async"></div>` +
     `<div><span class="eyebrow mono">${esc(x.name)} · ${c.n}/${x.total}</span><h1 class="display" style="font-size:clamp(44px,7vw,84px)">${esc(c.name)}</h1>` +
     `<dl class="spec"><dt>set</dt><dd>${esc(x.name)}</dd><dt>número</dt><dd>${c.n}/${x.total}</dd><dt>raridade</dt><dd>${esc(c.rar)}</dd><dt>tipo</dt><dd>${esc(c.tipo)}</dd><dt>idiomas</dt><dd>${x.langs.join(', ')}</dd></dl>` +
     `<div class="section-head" style="margin-bottom:0"><h2 class="display" style="font-size:28px">à venda</h2></div>${rows}</div></div>`;

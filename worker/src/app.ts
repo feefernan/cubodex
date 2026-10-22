@@ -24,7 +24,7 @@ import {
   shippingDays,
   shippingLabel,
 } from '../../src/domain/shipping';
-import { applyStock, type StockRow } from '../../src/domain/stock';
+import { applyStock, PHOTO_KEY, type StockRow } from '../../src/domain/stock';
 import { cepDigits, formatCpf, formatPhone, isCpf, isEmail, isPhone } from '../../src/domain/validation';
 import { accountRoutes, currentUser } from './account-routes';
 import {
@@ -91,6 +91,29 @@ const loadStock = async (env: Env, f: typeof fetch): Promise<StockRow[]> => {
     stockCache = { at: Date.now(), rows };
   }
   return stockCache.rows;
+};
+
+/**
+ * GET /api/img/fotos/<id>/<hash>.<ext> — foto de produto do R2. A chave tem o hash do arquivo: foto trocada é outra
+ * chave, então a resposta nunca muda e o navegador e a borda guardam por 1 ano (cada leitura que o cache evita é
+ * uma chamada a menos do Worker e do R2).
+ */
+const photo = async (request: Request, env: Env, key: string, ctx: Ctx) => {
+  if (!PHOTO_KEY.test(key)) return json({ error: 'Não encontrado' }, 404);
+  const cache = typeof caches === 'undefined' ? null : (caches as unknown as { default: Cache }).default;
+  const hit = await cache?.match(request);
+  if (hit) return hit;
+  const obj = await env.FOTOS?.get(key);
+  if (!obj?.body) return json({ error: 'Não encontrado' }, 404);
+  const res = new Response(obj.body, {
+    headers: {
+      'Content-Type': obj.httpMetadata?.contentType ?? 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+  if (cache) ctx.waitUntil(cache.put(request, res.clone()));
+  return res;
 };
 
 /** GET /api/catalog — preço e estoque atuais; lista vazia = o site segue com o catálogo do código. */
@@ -488,11 +511,12 @@ const unsubscribe = async (request: Request, env: Env, f: typeof fetch) => {
   }
 };
 
-export const handle = async (request: Request, env: Env, _ctx: Ctx, f: typeof fetch = fetch): Promise<Response> => {
+export const handle = async (request: Request, env: Env, ctx: Ctx, f: typeof fetch = fetch): Promise<Response> => {
   const url = new URL(request.url);
   const { method } = request;
   const path = url.pathname;
   if (path === '/api/health') return json({ ok: true });
+  if (path.startsWith('/api/img/') && method === 'GET') return photo(request, env, path.slice('/api/img/'.length), ctx);
   if (path === '/api/catalog' && method === 'GET') return catalog(env, f);
   if (path === '/api/shipping/quote' && method === 'POST') return shippingQuote(request, env, f);
   if (path === '/api/orders' && method === 'POST') return createOrder(request, env, f);

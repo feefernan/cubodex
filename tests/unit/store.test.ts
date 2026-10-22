@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { addToCart, packEntry, resolveCart } from '../../src/domain/cart';
-import { ITEMS, isListed, PRODUCTS, productById } from '../../src/domain/catalog';
+import { ITEMS, isListed, PRODUCTS, photoUrl, productById } from '../../src/domain/catalog';
 import { quoteRequestText, whatsappUrl } from '../../src/domain/contact';
 import { describeLine, makeSerial, OrderError, SERIAL_PATTERN, validateOrder } from '../../src/domain/order';
 import {
@@ -106,16 +106,29 @@ describe('estoque do Notion', () => {
     expect(packEntry(['m1', 'm1', 'm2'], 1)).toBeNull();
     expect(resolveCart([{ id: 'pack-1', qty: 1, pack: ['m1', 'm1', 'm2'] }]).lines).toEqual([]);
   });
+  it('fotos próprias: vão para o produto e para o item da carta, e voltam a ficar vazias quando saem do Notion', () => {
+    const key = 'fotos/i2/0123456789abcdef.jpg';
+    applyStock(everything.map((r) => (r.id === 'i2' ? { ...r, photos: [key] } : r)));
+    expect(productById.i2.photos).toEqual([key]);
+    expect(ITEMS.find((i) => i.id === 'i2')?.photos).toEqual([key]);
+    expect(photoUrl(key)).toBe(`/api/img/${key}`);
+    applyStock(everything);
+    expect(productById.i2.photos).toEqual([]);
+  });
   it('lê com segurança o que veio da API', () => {
     expect(parseStockRows(null)).toEqual([]);
     expect(parseStockRows({ products: 'x' })).toEqual([]);
     expect(
       parseStockRows({
-        products: [{ id: 'i1', price: 10, available: 'x' }, { price: 1 }, { id: 'i2', active: false, presale: true }],
+        products: [
+          { id: 'i1', price: 10, available: 'x', photos: ['fotos/i1/0123456789abcdef.jpg', '../x', 7] },
+          { price: 1 },
+          { id: 'i2', active: false, presale: true },
+        ],
       }),
     ).toEqual([
-      { id: 'i1', price: 10, available: null, active: true, presale: false },
-      { id: 'i2', price: null, available: null, active: false, presale: true },
+      { id: 'i1', price: 10, available: null, active: true, presale: false, photos: ['fotos/i1/0123456789abcdef.jpg'] },
+      { id: 'i2', price: null, available: null, active: false, presale: true, photos: [] },
     ]);
   });
 });

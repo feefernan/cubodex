@@ -90,6 +90,12 @@ D1. Item comprado com "guardar no cofre" só entra no cofre com o pagamento conf
 Mercado Pago (`POST /api/vault/ship`). A conta não pode ser apagada com itens no cofre (são bens do cliente). Sem
 `GOOGLE_CLIENT_ID` (config) e `GOOGLE_CLIENT_SECRET` (segredo), o login responde 503.
 
+**Catálogo:** o Notion é onde o dono edita (preço, estoque, "Ativo no site", pré-venda, Fotos); o D1 é onde o site lê e
+onde o estoque baixa (`UPDATE … WHERE qty >= ?`, atômico). O cron de 10 min (`worker/src/catalog-db.ts`) grava no Notion as
+baixas pendentes (`dirty`) e traz o que o dono editou; o que não está no Notion, ou está inativo, sai de venda (`listed`).
+As fotos da coluna Fotos são copiadas para o R2 (`worker/src/photos.ts`) e servidas em `/api/img/fotos/…`, com chave pelo
+hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na conta, o site publica sem fotos próprias.
+
 - `domain/` **não importa** `infra/` nem `ui/` e não toca no DOM. Toda regra de negócio nova nasce aqui, com teste.
 - `infra/` **não importa** `ui/`.
 - `worker/src` **só importa** `src/domain/` (nada de DOM, `ui/` ou `infra/` do site).
