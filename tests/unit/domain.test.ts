@@ -165,8 +165,9 @@ describe('carrinho', () => {
     expect(packEntry(['m1', 'm2', 'i1'], 1)).toBeNull();
     const pack = packEntry(['m1', 'm2', 'm10'], 7);
     expect(pack).toEqual({ id: 'pack-7', qty: 1, pack: ['m1', 'm2', 'm10'] });
+    // Preço do pacote: soma das miniaturas (22 + 22 + 39) menos o desconto padrão de 10%.
     expect(describeEntry(pack as CartEntry)).toMatchObject({
-      price: 54,
+      price: 74.7,
       sub: 'base, ciano, brilha no escuro',
       kind: 'pack',
     });
@@ -316,7 +317,7 @@ describe('estado salvo', () => {
         { id: 'pack-2', qty: 1, pack: ['m1', 'x'] },
         'lixo',
       ],
-      dex: { m1: 'have', m2: 'talvez', zz: 'have' },
+      dex: { m1: 'have', m2: 'talvez', zz: 'have', 'Mal Formado!': 'have' },
       vault: [
         { id: 'v1', name: 'a', meta: 'b', date: '1/1', qty: 1, st: 'cofre' },
         { id: 'v2', name: 'a', meta: 'b', date: '1/1', qty: '1"><b>', st: 'cofre' },
@@ -334,7 +335,8 @@ describe('estado salvo', () => {
       { id: 'i2', qty: 1 },
       { id: 'pack-1', qty: 1, pack: ['m1', 'm2', 'm3'] },
     ]);
-    expect(s.dex).toEqual({ m1: 'have' });
+    // Id bem formado fica (a miniatura pode chegar depois, do Notion); status e id inválidos saem.
+    expect(s.dex).toEqual({ m1: 'have', zz: 'have' });
     expect(s.vault.map((v) => v.id)).toEqual(['v1']);
     expect(s.hist).toEqual([{ d: '1/1', t: 'ok' }]);
   });

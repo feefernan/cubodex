@@ -4,6 +4,7 @@
  * - A baixa é um UPDATE atômico: duas vendas da mesma carta ao mesmo tempo nunca passam do estoque.
  * - `dirty` protege a baixa: enquanto o Notion não recebeu o valor novo, o sync não o sobrescreve.
  */
+import { type ProductDef, parseDef } from '../../src/domain/catalog';
 import type { StockRow } from '../../src/domain/stock';
 import type { Db } from './accounts';
 import type { Bucket } from './bucket';
@@ -15,6 +16,7 @@ type Fetch = typeof fetch;
 type Row = StockRow & { pageId: string; files?: PhotoFile[] };
 
 interface ProductRow {
+  def: string | null;
   id: string;
   price: number | null;
   qty: number | null;
@@ -25,7 +27,7 @@ interface ProductRow {
 /** Produtos no formato que o domínio já usa (`applyStock`) e que `/api/catalog` devolve. */
 export const readProducts = async (db: Db): Promise<StockRow[]> => {
   const photos = await readPhotos(db);
-  return (await db.prepare('SELECT id, price, qty, active, presale FROM products').all<ProductRow>()).results.map(
+  return (await db.prepare('SELECT id, price, qty, active, presale, def FROM products').all<ProductRow>()).results.map(
     (r) => ({
       id: r.id,
       price: r.price,
@@ -33,12 +35,22 @@ export const readProducts = async (db: Db): Promise<StockRow[]> => {
       active: r.active === 1,
       presale: r.presale === 1,
       photos: photos.get(r.id) ?? [],
+      ...(parseStoredDef(r.def) && { def: parseStoredDef(r.def) as ProductDef }),
     }),
   );
 };
 
-const UPSERT = `INSERT INTO products (id, price, qty, active, presale, page_id, synced_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-  ON CONFLICT(id) DO UPDATE SET price = excluded.price,
+/** O JSON guardado no D1 passa de novo pela validação do domínio (um valor estragado vira "sem descrição"). */
+const parseStoredDef = (json: string | null) => {
+  try {
+    return json ? parseDef(JSON.parse(json)) : null;
+  } catch {
+    return null;
+  }
+};
+
+const UPSERT = `INSERT INTO products (id, price, qty, active, presale, page_id, synced_at, def) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(id) DO UPDATE SET price = excluded.price, def = excluded.def,
     qty = CASE WHEN products.dirty = 1 THEN products.qty ELSE excluded.qty END,
     active = excluded.active, presale = excluded.presale, page_id = excluded.page_id, synced_at = excluded.synced_at`;
 
@@ -53,7 +65,18 @@ export const syncProducts = async (db: Db, rows: Row[], now = new Date().toISOSt
       rows
         .slice(i, i + 50)
         .map((r) =>
-          db.prepare(UPSERT).bind(r.id, r.price, r.available, r.active ? 1 : 0, r.presale ? 1 : 0, r.pageId, now),
+          db
+            .prepare(UPSERT)
+            .bind(
+              r.id,
+              r.price,
+              r.available,
+              r.active ? 1 : 0,
+              r.presale ? 1 : 0,
+              r.pageId,
+              now,
+              r.def ? JSON.stringify(r.def) : null,
+            ),
         ),
     );
   await db.prepare('UPDATE products SET active = 0 WHERE synced_at <> ?').bind(now).run();

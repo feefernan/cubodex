@@ -1,16 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { PRODUCTS } from '../../src/domain/catalog';
 import { homeNews } from '../../src/domain/news';
 import { applyStock } from '../../src/domain/stock';
+import { everything, resetCatalog } from '../catalog';
 
-const everything = PRODUCTS.map((p) => ({
-  id: p.id,
-  price: p.price,
-  available: p.kind === 'item' ? p.qty : null,
-  active: p.kind !== 'item' || p.status !== 'esgotado',
-  presale: p.kind === 'item' && p.status === 'prevenda',
-}));
-afterEach(() => applyStock(everything));
+afterEach(resetCatalog);
 
 describe('novidades da home', () => {
   it('vêm do catálogo: a carta à venda mais recente e a peça de criar mais nova', () => {

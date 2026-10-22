@@ -3,11 +3,10 @@ import {
   cardById,
   cardImage,
   type Item,
-  isListed,
   itemName,
+  PACK,
   type Product,
   photoUrl,
-  productById,
   setById,
 } from '../domain/catalog';
 import { brl, escapeHtml as esc, pad3 } from '../domain/format';
@@ -59,18 +58,14 @@ const details = (p: Product): string => {
 /** Card de acessório, peça de "criar" ou miniatura. */
 export const productTile = (p: Product): string => {
   const pack =
-    p.kind === 'mini'
+    p.kind === 'mini' && PACK.listed
       ? `<button class="btn btn--ghost btn--sm" data-action="pack-add" data-id="${p.id}">+ pacote</button>`
       : '';
   return `<article class="tile">${media(p)}<div class="body"><h3>${esc(p.name)}</h3>${details(p)}<div class="row"><span class="price num">${brl(p.price)}</span><div class="actions">${pack}${addButton(p.id)}</div></div></div></article>`;
 };
 
-export const fillProducts = (container: HTMLElement, ids: string[]) => {
-  container.innerHTML = ids
-    .map((id) => productById[id])
-    .filter(isListed)
-    .map(productTile)
-    .join('');
+export const fillProducts = (container: HTMLElement, products: Product[]) => {
+  container.innerHTML = products.map(productTile).join('');
 };
 
 const cardLink = (c: Card, inner: string, cls: string, label: string) =>

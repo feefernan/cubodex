@@ -4,6 +4,9 @@ import { PRODUCTS } from '../../src/domain/catalog';
 import type { Env } from '../../worker/src/app';
 
 const ok = { limit: async () => ({ success: true }) };
+/** A linha do pacote no Notion de teste: Tipo "pacote" com 10% de desconto. */
+const PACK_ROW = { Tipo: { select: { name: 'pacote' } }, 'Desconto do pacote': { number: 10 } };
+
 export const env = (over: Partial<Env> = {}): Env => ({
   SITE_URL: 'https://cubodex.test',
   CONTACT_EMAIL: 'contato@cubodex.test',
@@ -47,6 +50,8 @@ export const fake = () => {
     photos: {} as Record<string, { name: string; url: string; internal?: boolean }[]>,
     /** Tipo devolvido ao baixar uma foto (padrão image/jpeg); `null` = link vencido (403). */
     fileType: 'image/jpeg' as string | null,
+    /** Colunas extras por id do produto (Tipo, Cor, Preço…); ids novos entram como linhas novas. */
+    rows: {} as Record<string, Record<string, unknown>>,
     /** Ids com "Ativo no site" desligado no Notion. */
     inactive: new Set<string>(),
   };
@@ -73,7 +78,9 @@ export const fake = () => {
     if (db === 'db-produtos') {
       const id = (body.filter as { rich_text?: { equals: string } })?.rich_text?.equals;
       // O Notion do teste lista o catálogo todo (o que não está lá sai de venda); só as cartas têm estoque.
-      const rows = [...new Set([...PRODUCTS.map((p) => p.id), ...Object.keys(state.stock)])]
+      const rows = [
+        ...new Set([...PRODUCTS.map((p) => p.id), 'pack', ...Object.keys(state.stock), ...Object.keys(state.rows)]),
+      ]
         .filter((k) => !id || k === id)
         .map((k) => ({
           id: `page-${k}`,
@@ -81,6 +88,8 @@ export const fake = () => {
             ID: { rich_text: [{ plain_text: k }] },
             Disponíveis: { number: state.stock[k] ?? null },
             Preço: { number: null },
+            ...(k === 'pack' ? PACK_ROW : {}),
+            ...(state.rows[k] ?? {}),
             'Ativo no site': { checkbox: !state.inactive.has(k) },
             Fotos: {
               files: (state.photos[k] ?? []).map((x) => ({

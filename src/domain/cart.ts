@@ -1,4 +1,4 @@
-import { isListed, PACK_PRICE, PACK_SIZE, type Product, productById, productSubtitle } from './catalog';
+import { isListed, PACK, PACK_SIZE, type Product, packPrice, productById, productSubtitle } from './catalog';
 
 export type Destination = 'send' | 'vault';
 
@@ -38,14 +38,14 @@ const stockLimit = (id: string): number | null => {
 /** Monta a linha a partir do catálogo; null quando o item não existe mais ou esgotou. */
 export const describeEntry = (e: CartEntry): CartLine | null => {
   if (e.pack) {
-    if (e.pack.length !== PACK_SIZE || !e.pack.every(isMiniOnSale)) return null;
+    if (!PACK.listed || e.pack.length !== PACK_SIZE || !e.pack.every(isMiniOnSale)) return null;
     const names = e.pack.map((id) => productById[id].name.replace('fiozinho ', '')).join(', ');
     return {
       id: e.id,
       qty: e.qty,
       pack: e.pack,
       name: 'pacote fiozinho',
-      price: PACK_PRICE,
+      price: packPrice(e.pack),
       color: '#F42744',
       sub: names,
       kind: 'pack',
@@ -105,7 +105,9 @@ export const changeQty = (entry: CartEntry, delta: number): CartResult => {
 
 /** Pacote montado com as miniaturas escolhidas; null enquanto faltam miniaturas. */
 export const packEntry = (pack: string[], now: number): CartEntry | null =>
-  pack.length === PACK_SIZE && pack.every(isMiniOnSale) ? { id: `pack-${now}`, qty: 1, pack: [...pack] } : null;
+  PACK.listed && pack.length === PACK_SIZE && pack.every(isMiniOnSale)
+    ? { id: `pack-${now}`, qty: 1, pack: [...pack] }
+    : null;
 
 export const cartCount = (cart: CartEntry[]): number => cart.reduce((a, l) => a + l.qty, 0);
 

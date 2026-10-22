@@ -34,7 +34,7 @@ describe('rotas básicas', () => {
     const res = await handle(req('/api/catalog'), env(), ctx, api.f);
     const { products } = await res.json();
     // O Notion de teste lista o catálogo todo; as cartas com estoque trazem a quantidade.
-    expect(products).toHaveLength(PRODUCTS.length);
+    expect(products).toHaveLength(PRODUCTS.length + 1); // + a linha do pacote
     expect(products.find((p: { id: string }) => p.id === 'i2')).toEqual({
       id: 'i2',
       price: null,
