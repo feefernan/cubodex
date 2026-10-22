@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { startSession } from '../../worker/src/accounts';
-import { clearStockCache, handle } from '../../worker/src/app';
+import { clearStockCache, handle, refreshCatalog } from '../../worker/src/app';
 import type { Env } from '../../worker/src/env';
 import { testDb } from './d1';
 import { ctx, env, fake, ORDER, req, sign } from './fakes';
@@ -364,23 +364,18 @@ describe('pagamento sem baixa dupla (#39)', () => {
     return created.serial as string;
   };
 
-  it('aviso que falha no meio é reenviado e termina, sem baixar o estoque de novo', async () => {
+  it('a baixa é no D1; se o Notion falha, o aviso termina e o cron grava depois, sem baixar de novo', async () => {
     await create();
-    expect(
-      (
-        await hook(
-          E,
-          failOnce((u, m) => m === 'PATCH' && u.endsWith('/pages/page-i2')),
-        )
-      ).status,
-    ).toBe(500);
-    expect(api.state.stock.i2).toBe(2);
-    expect(api.state.orders[0].status).toBe('Aguardando pagamento');
-    expect((await hook(E)).status).toBe(200);
-    expect(api.state.stock.i2).toBe(1);
+    const patchI2 = (u: string, m: string) => m === 'PATCH' && u.endsWith('/pages/page-i2');
+    expect((await hook(E, failOnce(patchI2))).status).toBe(200);
     expect(api.state.orders[0].status).toBe('Pago');
-    await hook(E);
+    expect(rows("SELECT qty, dirty FROM products WHERE id = 'i2'")).toEqual([{ qty: 1, dirty: 1 }]);
+    expect(api.state.stock.i2).toBe(2); // o Notion ainda não recebeu a baixa
+    await refreshCatalog(d1.db, E, api.f);
     expect(api.state.stock.i2).toBe(1);
+    expect(rows("SELECT qty, dirty FROM products WHERE id = 'i2'")).toEqual([{ qty: 1, dirty: 0 }]);
+    await hook(E);
+    expect(rows("SELECT qty FROM products WHERE id = 'i2'")).toEqual([{ qty: 1 }]);
     expect(rows('SELECT status, stock_done FROM orders')).toEqual([{ status: 'Pago', stock_done: 1 }]);
   });
 
@@ -409,7 +404,8 @@ describe('pagamento sem baixa dupla (#39)', () => {
 
   it('venda acima do estoque fica "Sem estoque" para reembolso, e o reenvio não troca por Pago', async () => {
     await create();
-    api.state.stock.i2 = 0;
+    // Outra venda levou a última unidade entre o pedido e o pagamento.
+    d1.sqlite.exec("UPDATE products SET qty = 0 WHERE id = 'i2'");
     await hook(E);
     expect(api.state.orders[0].status).toBe('Sem estoque');
     await hook(E);

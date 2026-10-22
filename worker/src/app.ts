@@ -38,6 +38,7 @@ import {
   reserveForShipment,
   setStockDone,
 } from './accounts';
+import { flushStock, readProducts, refreshCatalog, takeStock } from './catalog-db';
 import type { Ctx, Env } from './env';
 import { handleError, json, limited, log, notice, page, readJson, unavailable } from './http';
 import { quoteShipping } from './melhor-envio';
@@ -52,6 +53,12 @@ import {
   updatePaymentStatus,
 } from './notion';
 
+export { refreshCatalog } from './catalog-db';
+
+/** Cron (a cada 10 minutos): grava no Notion as baixas de estoque pendentes e traz de lá o que o dono editou. */
+export const scheduled = (env: Env, ctx: Ctx, f: typeof fetch = fetch) => {
+  if (env.DB) ctx.waitUntil(refreshCatalog(env.DB, env, f));
+};
 export type { Env } from './env';
 
 /** Texto do aceite da lista de avisos; vai junto com a inscrição no Notion (prova do consentimento). */
@@ -63,9 +70,20 @@ export const clearStockCache = () => {
   stockCache = null;
 };
 
-/** Lê preço e estoque do banco Produtos (com cache) e aplica ao catálogo usado pelas regras do domínio. */
+/**
+ * Lê preço e estoque e aplica ao catálogo usado pelas regras do domínio. Com banco, vem do D1 (o cron o mantém
+ * igual ao Notion; na primeira vez, com a tabela vazia, busca do Notion uma vez). Sem banco (desenvolvimento),
+ * vem direto do Notion, com cache de 1 minuto para respeitar o limite de ~3 req/s.
+ */
 const loadStock = async (env: Env, f: typeof fetch): Promise<StockRow[]> => {
   if (!env.NOTION_TOKEN || !env.NOTION_PRODUCTS_DB) return [];
+  if (env.DB) {
+    let rows = await readProducts(env.DB);
+    if (!rows.length && (await refreshCatalog(env.DB, env, f))) rows = await readProducts(env.DB);
+    const unknown = applyStock(rows);
+    if (unknown.length) log('warn', 'produtos do Notion sem par no catálogo', { ids: unknown });
+    return rows;
+  }
   if (!stockCache || Date.now() - stockCache.at > 60_000) {
     const rows = await fetchStock(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB);
     const unknown = applyStock(rows);
@@ -194,19 +212,21 @@ const createOrder = async (request: Request, env: Env, f: typeof fetch) => {
   }
 };
 
-/** Efeitos de um pedido pago, cada um uma vez só e retomável: estoque (Notion) e cofre (D1). */
+/**
+ * Efeitos de um pedido pago, cada um uma vez só e retomável: estoque e cofre, ambos no D1. O estoque baixa por
+ * UPDATE atômico; o Notion recebe o valor em seguida (se falhar, o cron grava depois: não derruba o aviso do pagamento).
+ */
 const settlePaid = async (env: Env, f: typeof fetch, serial: string) => {
-  if (!env.DB || !env.NOTION_TOKEN) return [];
+  if (!env.DB) return [];
   const db = env.DB;
   const order = await getOrder(db, serial);
   if (!order) return [];
   const items = JSON.parse(order.items_json) as { id: string; qty: number }[];
   let short: string[] = [];
-  if (env.NOTION_PRODUCTS_DB && order.stock_done < items.length) {
-    short = await decrementStock(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB, items, order.stock_done, (n) =>
-      setStockDone(db, serial, n),
-    );
+  if (order.stock_done < items.length) {
+    short = await takeStock(db, items, order.stock_done, (n) => setStockDone(db, serial, n));
     clearStockCache();
+    if (env.NOTION_TOKEN) await flushStock(db, f, env.NOTION_TOKEN).catch(() => 0);
   }
   await applyVaultEffects(db, serial, order);
   return short;

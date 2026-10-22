@@ -1,4 +1,4 @@
-import { bindings, defineConfig } from 'cf/config';
+import { bindings, defineConfig, triggers } from 'cf/config';
 import * as entrypoint from './worker/src/entry.ts' with { type: 'cf-worker' };
 
 // Site (build do Vite) + API /api/* no mesmo Worker, na conta própria do Cubodex.
@@ -11,6 +11,8 @@ export default defineConfig({
     // Domínio próprio (#22). O workers.dev continua respondendo, para não quebrar links antigos.
     domains: ['acubodex.com.br', 'www.acubodex.com.br'],
     workersDev: true,
+    // Catálogo: Notion → D1 e baixas de estoque → Notion (Fase 2).
+    triggers: [triggers.scheduled({ schedule: '*/10 * * * *' })],
     assets: { notFoundHandling: 'single-page-application', runWorkerFirst: ['/api/*'] },
     observability: { enabled: true, logs: { enabled: true } },
     env: {
