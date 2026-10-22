@@ -1,4 +1,4 @@
-import { ITEMS } from '../domain/catalog';
+import { ITEMS, listedOf } from '../domain/catalog';
 import { quoteRequestText, whatsappUrl } from '../domain/contact';
 import { escapeHtml as esc } from '../domain/format';
 import { homeNews, type NewsCard } from '../domain/news';
@@ -25,8 +25,8 @@ const renderHome = () => {
     .flatMap((id) => ITEMS.filter((it) => it.id === id && it.status !== 'esgotado'))
     .map(itemTile)
     .join('');
-  fillProducts($('#hl-col'), ['m1', 'm6', 'm10', 'm12']);
-  fillProducts($('#hl-criar'), ['k1', 'k2', 'k3', 'k4']);
+  fillProducts($('#hl-col'), listedOf('mini', 4));
+  fillProducts($('#hl-criar'), listedOf('craft', 4));
   $('#news').innerHTML = LAUNCH_NEWS + homeNews().map(newsCard).join('') + OPT_IN_NEWS;
   tickCountdowns();
 };
@@ -50,7 +50,7 @@ const message = (el: HTMLElement, html: string) => {
 
 export const initPages = () => {
   registerView('home', renderHome);
-  registerView('criar', () => fillProducts($('#criarGrid'), ['k1', 'k2', 'k3', 'k4', 'k5', 'k6']));
+  registerView('criar', () => fillProducts($('#criarGrid'), listedOf('craft')));
   registerView('apoio', renderApoio);
   onAction('apoio-tab', (el) => go('apoio', el.dataset.tab));
   onSubmit('formAvisos', async (form) => {

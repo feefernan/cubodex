@@ -1,4 +1,13 @@
-import { ITEMS, PRODUCTS, productById, type StockStatus } from './catalog';
+import {
+  defineProduct,
+  ITEMS,
+  PACK,
+  PRODUCTS,
+  type ProductDef,
+  parseDef,
+  productById,
+  type StockStatus,
+} from './catalog';
 
 /** Uma linha do banco Produtos do Notion: o que a loja controla sem mudar código. */
 export interface StockRow {
@@ -10,6 +19,8 @@ export interface StockRow {
   presale: boolean;
   /** Chaves das fotos próprias no R2 (vazio = sem foto própria). */
   photos?: string[];
+  /** Descrição do produto (miniatura, peça, acessório) ou o desconto do pacote; cartas ainda vêm do código. */
+  def?: ProductDef;
 }
 
 /** Chave de foto no R2: `fotos/<id do produto>/<16 hex>.<extensão de imagem>`. */
@@ -27,9 +38,15 @@ const statusOf = (row: StockRow): StockStatus => {
  */
 export const applyStock = (rows: StockRow[]): string[] => {
   const unknown: string[] = [];
+  for (const row of rows) {
+    if (row.def?.kind === 'pack') PACK.discount = row.def.discount;
+    else if (row.def) defineProduct(row.id, row.def, row.price);
+  }
   const active = new Set(rows.filter((r) => r.active).map((r) => r.id));
+  PACK.listed = active.has('pack');
   for (const p of PRODUCTS) {
-    p.listed = active.has(p.id);
+    // Sem preço não vende: produto novo sem preço no Notion fica fora de venda até alguém preencher.
+    p.listed = active.has(p.id) && p.price > 0;
     if (p.kind === 'item' && !p.listed) {
       p.status = 'esgotado';
       const item = ITEMS.find((it) => it.id === p.id);
@@ -39,6 +56,7 @@ export const applyStock = (rows: StockRow[]): string[] => {
   for (const row of rows) {
     const p = productById[row.id];
     if (!p) {
+      if (row.id === 'pack') continue;
       unknown.push(row.id);
       continue;
     }
@@ -71,6 +89,7 @@ export const parseStockRows = (data: unknown): StockRow[] => {
         photos: Array.isArray(o.photos)
           ? o.photos.filter((k): k is string => typeof k === 'string' && PHOTO_KEY.test(k))
           : [],
+        ...(parseDef(o.def) && { def: parseDef(o.def) as ProductDef }),
       },
     ];
   });

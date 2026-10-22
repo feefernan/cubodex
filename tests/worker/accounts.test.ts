@@ -164,12 +164,16 @@ describe('conta', () => {
     });
   });
 
-  it('salva a Dex filtrando o que não existe', async () => {
+  it('salva a Dex filtrando status e ids inválidos (miniatura nova do Notion entra sem mudar o código)', async () => {
     const cookie = await login();
-    const put = withCookie('/api/dex', cookie, { dex: { m1: 'have', m2: 'talvez', zz: 'want', m3: 'want' } }, 'PUT');
-    expect(await (await handle(put, E, ctx, api.f)).json()).toEqual({ dex: { m1: 'have', m3: 'want' } });
+    const dex = { m1: 'have', m2: 'talvez', m99: 'want', m3: 'want', 'Mal Formado!': 'have' };
+    const put = withCookie('/api/dex', cookie, { dex }, 'PUT');
+    expect(await (await handle(put, E, ctx, api.f)).json()).toEqual({
+      dex: { m1: 'have', m99: 'want', m3: 'want' },
+    });
     expect((await (await handle(withCookie('/api/me', cookie), E, ctx, api.f)).json()).dex).toEqual({
       m1: 'have',
+      m99: 'want',
       m3: 'want',
     });
   });

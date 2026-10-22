@@ -96,6 +96,12 @@ baixas pendentes (`dirty`) e traz o que o dono editou; o que não está no Notio
 As fotos da coluna Fotos são copiadas para o R2 (`worker/src/photos.ts`) e servidas em `/api/img/fotos/…`, com chave pelo
 hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na conta, o site publica sem fotos próprias.
 
+**Produto novo só pelo Notion (miniatura, peça, acessório, pacote):** crie uma linha em Produtos com `ID` único (ex.: `m13`,
+`k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e o `Tipo`, e os campos do tipo: miniatura = `Cor` (#RRGGBB), `Raridade`
+(comum, rara, especial) e `Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota`; pacote = uma linha
+`pack` com `Desconto do pacote` (%). Em até 10 min o cron leva a linha ao D1 (`def`, validado por `parseDef`) e o site a mostra.
+Sem preço, o produto novo fica fora de venda. Cartas ainda vêm do código (Fase 3: TCGdex).
+
 - `domain/` **não importa** `infra/` nem `ui/` e não toca no DOM. Toda regra de negócio nova nasce aqui, com teste.
 - `infra/` **não importa** `ui/`.
 - `worker/src` **só importa** `src/domain/` (nada de DOM, `ui/` ou `infra/` do site).

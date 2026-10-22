@@ -1,18 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ITEMS, PRODUCTS, productById } from '../../src/domain/catalog';
+import { ITEMS, productById } from '../../src/domain/catalog';
 import { applyStock } from '../../src/domain/stock';
 import { itemTile, productTile } from '../../src/ui/tiles';
+import { everything, resetCatalog } from '../catalog';
 
-const everything = PRODUCTS.map((p) => ({
-  id: p.id,
-  price: p.price,
-  available: p.kind === 'item' ? p.qty : null,
-  active: p.kind !== 'item' || p.status !== 'esgotado',
-  presale: p.kind === 'item' && p.status === 'prevenda',
-}));
 const withPhoto = (id: string, key: string) =>
   applyStock(everything.map((r) => (r.id === id ? { ...r, photos: [key] } : r)));
-afterEach(() => applyStock(everything));
+afterEach(resetCatalog);
 
 describe('foto própria nas vitrines', () => {
   it('carta: a foto própria tem prioridade; sem ela, a imagem oficial do TCGdex', () => {

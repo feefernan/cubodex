@@ -61,11 +61,17 @@ export const requestShipment = (
   return chosen.length;
 };
 
-/** Dex vinda de fora (navegador ou API): só miniaturas que existem e status conhecidos. */
+const DEX_ID = /^[a-z0-9-]{1,40}$/;
+
+/**
+ * Dex vinda de fora (navegador ou API): ids bem formados e status conhecidos. Não confere se a miniatura existe
+ * no catálogo (que agora vem do Notion e chega depois da página): uma miniatura que sai de venda não apaga a marca,
+ * e as contas (`dexTotals`) só contam as que existem.
+ */
 export const parseDex = (v: unknown): Dex => {
   const dex: Dex = {};
   if (!v || typeof v !== 'object' || Array.isArray(v)) return dex;
-  const o = v as Record<string, unknown>;
-  for (const m of MINIS) if (o[m.id] === 'have' || o[m.id] === 'want') dex[m.id] = o[m.id] as DexStatus;
+  for (const [id, st] of Object.entries(v).slice(0, 500))
+    if (DEX_ID.test(id) && (st === 'have' || st === 'want')) dex[id] = st as DexStatus;
   return dex;
 };

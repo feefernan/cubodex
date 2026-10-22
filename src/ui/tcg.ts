@@ -1,4 +1,4 @@
-import { CARDS, cardById, cardImage, ITEMS, photoUrl, SETS, setById, type TcgSet } from '../domain/catalog';
+import { CARDS, cardById, cardImage, ITEMS, listedOf, photoUrl, SETS, setById, type TcgSet } from '../domain/catalog';
 import { escapeHtml as esc, uniq } from '../domain/format';
 import { cardsOfSet, cardsOnSale, emptyFilters, type Filters, filterItems, filterSets } from '../domain/tcg';
 import { emptyState } from './art';
@@ -143,7 +143,7 @@ export const initTcg = () => {
     syncFilters();
     renderGrid();
   });
-  registerView('acessorios', () => fillProducts($('#accGrid'), ['a1', 'a2', 'a3', 'a4']));
+  registerView('acessorios', () => fillProducts($('#accGrid'), listedOf('acc')));
   registerView('sets', renderSets);
   registerView('set', renderSet);
   registerView('carta', renderCarta);

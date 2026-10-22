@@ -6,6 +6,7 @@
  *   E-mail (e-mail), Total (número), Data (data).
  * - Avisos: E-mail (título), Inscrito em (data), Consentimento (texto), Token (texto), Saiu (caixa).
  */
+import { parseDef } from '../../src/domain/catalog';
 import type { PaymentStatus } from '../../src/domain/shipping';
 import type { StockRow } from '../../src/domain/stock';
 
@@ -20,6 +21,32 @@ type Prop = {
   title?: { plain_text: string }[];
   select?: { name: string } | null;
   files?: { name: string; file?: { url: string }; external?: { url: string } }[];
+};
+
+/** O que a linha descreve (Tipo, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
+const rowDef = (p: Record<string, Prop>, name: string) => {
+  const note = plain(p.Nota);
+  switch (p.Tipo?.select?.name) {
+    case 'miniatura':
+      return { kind: 'mini', name, n: p.Número?.number, rar: p.Raridade?.select?.name, color: plain(p.Cor) };
+    case 'peça':
+      return {
+        kind: 'craft',
+        name,
+        note,
+        spec: [
+          ['material', plain(p.Material)],
+          ['medidas', plain(p.Medidas)],
+          ['impressão', plain(p.Impressão)],
+        ].filter(([, v]) => v),
+      };
+    case 'acessório':
+      return { kind: 'acc', name, note };
+    case 'pacote':
+      return { kind: 'pack', discount: p['Desconto do pacote']?.number };
+    default:
+      return null;
+  }
 };
 type Page = { id: string; properties: Record<string, Prop> };
 
@@ -86,6 +113,7 @@ export const fetchProducts = async (
     .map(({ id: pageId, properties: p }) => ({
       id: plain(p.ID),
       pageId,
+      def: parseDef(rowDef(p, plain(p.Nome))) ?? undefined,
       files: (p.Fotos?.files ?? []).flatMap((x) => {
         const url = x.file?.url ?? x.external?.url;
         return url ? [{ name: x.name, url, internal: !!x.file }] : [];

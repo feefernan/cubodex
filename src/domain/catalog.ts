@@ -103,7 +103,18 @@ const VARIANTS: [string, string, Rarity][] = [
 const MINI_PRICE: Record<Rarity, number> = { comum: 22, rara: 29, especial: 39 };
 
 export const PACK_SIZE = 3;
-export const PACK_PRICE = 54;
+
+/**
+ * Pacote de miniaturas: o preço é a soma das 3 escolhidas menos o desconto da linha `pack` do Notion (Tipo "pacote").
+ * Sem a linha no Notion o pacote não se vende; sem API (desenvolvimento), vale o desconto padrão.
+ */
+export const DEFAULT_PACK_DISCOUNT = 10;
+export const PACK = { discount: DEFAULT_PACK_DISCOUNT, listed: true };
+
+export const packPrice = (ids: string[]): number => {
+  const sum = ids.reduce((a, id) => a + (productById[id]?.price ?? 0), 0);
+  return Math.round(sum * (100 - PACK.discount)) / 100;
+};
 // shortcut: data do lançamento da série 01 ainda não definida (#15); vazio = "em breve". Formato: '2026-11-14T12:00:00-03:00'.
 export const LAUNCH_DATE = '';
 
@@ -285,6 +296,74 @@ export const PRODUCTS: Product[] = [
 
 export const productById: Record<string, Product> = Object.fromEntries(PRODUCTS.map((p) => [p.id, p]));
 export const MINIS = PRODUCTS.filter((p): p is Mini => p.kind === 'mini');
+
+/** Produtos à venda de um tipo, na ordem do catálogo (limite opcional): vitrines e destaques saem daqui. */
+export const listedOf = (kind: Product['kind'], limit = Infinity): Product[] =>
+  PRODUCTS.filter((p) => p.kind === kind && isListed(p)).slice(0, limit);
+
+/**
+ * O que o Notion descreve de um produto que não é carta (as cartas ainda vêm do código): vem do Notion pelo cron,
+ * passa pelo D1 e chega ao navegador, então é sempre revalidado (`parseDef`) antes de entrar no catálogo.
+ */
+export type ProductDef =
+  | { kind: 'mini'; name: string; n: number; rar: Rarity; color: string }
+  | { kind: 'craft'; name: string; spec: [string, string][]; note: string }
+  | { kind: 'acc'; name: string; note: string }
+  | { kind: 'pack'; discount: number };
+
+const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+const RARITIES: Rarity[] = ['comum', 'rara', 'especial'];
+
+export const parseDef = (v: unknown): ProductDef | null => {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const name = str(o.name, 120);
+  switch (o.kind) {
+    case 'mini': {
+      const n = Number(o.n);
+      const color = str(o.color, 7);
+      const rar = RARITIES.find((r) => r === o.rar);
+      return name && rar && Number.isInteger(n) && n > 0 && /^#[0-9a-fA-F]{6}$/.test(color)
+        ? { kind: 'mini', name, n, rar, color }
+        : null;
+    }
+    case 'craft': {
+      const spec = (Array.isArray(o.spec) ? o.spec : []).flatMap((e): [string, string][] => {
+        const [k, val] = Array.isArray(e) ? e : [];
+        return str(k, 30) && str(val, 60) ? [[str(k, 30), str(val, 60)]] : [];
+      });
+      return name ? { kind: 'craft', name, spec, note: str(o.note, 120) } : null;
+    }
+    case 'acc':
+      return name ? { kind: 'acc', name, note: str(o.note, 120) } : null;
+    case 'pack': {
+      const discount = Number(o.discount);
+      return Number.isFinite(discount) && discount >= 0 && discount <= 90 ? { kind: 'pack', discount } : null;
+    }
+    default:
+      return null;
+  }
+};
+
+/**
+ * Cria ou atualiza no catálogo um produto vindo do Notion. Produto novo sem preço não vende (começa fora de venda).
+ * Mantém as listas (`PRODUCTS`, `productById`, `MINIS`) como estão, só mudando o conteúdo: quem as importou continua certo.
+ */
+export const defineProduct = (id: string, def: Exclude<ProductDef, { kind: 'pack' }>, price: number | null) => {
+  const old = productById[id];
+  const base = { id, name: def.name, price: price !== null && price >= 0 ? price : (old?.price ?? 0) };
+  const next: Product =
+    def.kind === 'mini'
+      ? { ...base, kind: 'mini', n: def.n, rar: def.rar, color: def.color }
+      : def.kind === 'craft'
+        ? { ...base, kind: 'craft', spec: def.spec, note: def.note }
+        : { ...base, kind: 'acc', note: def.note };
+  if (old) PRODUCTS[PRODUCTS.indexOf(old)] = next;
+  else PRODUCTS.push(next);
+  productById[id] = next;
+  MINIS.length = 0;
+  MINIS.push(...PRODUCTS.filter((p): p is Mini => p.kind === 'mini').sort((a, b) => a.n - b.n));
+  return next;
+};
 
 /** Linha de detalhe do produto no carrinho. */
 export const productSubtitle = (p: Product): string => {
