@@ -8,7 +8,7 @@ on:
         description: "Gravar no Notion (desmarcado = só simular)"
         type: boolean
         default: false
-permissions: {}
+permissions: { contents: read }
 jobs:
   colunas:
     runs-on: ubuntu-latest
