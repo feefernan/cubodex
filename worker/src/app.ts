@@ -25,7 +25,7 @@ import {
   shippingLabel,
 } from '../../src/domain/shipping';
 import { applyStock, type StockRow } from '../../src/domain/stock';
-import { cepDigits, formatCpf, formatPhone, isEmail } from '../../src/domain/validation';
+import { cepDigits, formatCpf, formatPhone, isCpf, isEmail, isPhone } from '../../src/domain/validation';
 import { accountRoutes, currentUser } from './account-routes';
 import {
   applyVaultEffects,
@@ -360,6 +360,11 @@ const shipVault = async (request: Request, env: Env, f: typeof fetch) => {
       : [];
     const address = parseAddress(input.address);
     if (!address) throw new OrderError(400, 'Endereço de entrega incompleto.');
+    const contact = (input.contact ?? {}) as Record<string, unknown>;
+    const cpf = String(contact.cpf ?? '').replace(/\D/g, '');
+    const phone = String(contact.phone ?? '').replace(/\D/g, '');
+    if (!isCpf(cpf)) throw new OrderError(400, 'Digite um CPF válido.');
+    if (!isPhone(phone)) throw new OrderError(400, 'Digite um telefone com DDD.');
     await loadStock(env, f);
     const items = await reserveForShipment(db, user.id, ids, serial);
     if (!items?.length)
@@ -395,7 +400,7 @@ const shipVault = async (request: Request, env: Env, f: typeof fetch) => {
     await createOrderPage(f, env.NOTION_TOKEN, env.NOTION_ORDERS_DB, {
       serial,
       status: 'Aguardando pagamento',
-      customer: user.name,
+      customer: `${user.name} · CPF ${formatCpf(cpf)} · ${formatPhone(phone)}`,
       email: user.email,
       items: `ENVIO DO COFRE\n${summary.replaceAll('; ', '\n')}`,
       shipping: `${label} · R$ ${chosen.price.toFixed(2)}`,

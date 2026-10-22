@@ -182,6 +182,9 @@ describe('conta', () => {
   });
 });
 
+/** CPF e telefone do envio do cofre (a etiqueta e a nota precisam). */
+const CONTACT = { cpf: '529.982.247-25', phone: '(11) 99999-8888' };
+
 const hook = async (e: Env, f: typeof fetch = api.f) =>
   handle(
     req(
@@ -249,7 +252,7 @@ describe('cofre', () => {
     api.state.payment.external_reference = created.serial;
     await hook(E);
     const [item] = rows('SELECT id FROM vault_items');
-    const ship = { items: [item.id], address: ORDER.address, shipping: { serviceId: 1 } };
+    const ship = { items: [item.id], address: ORDER.address, contact: CONTACT, shipping: { serviceId: 1 } };
 
     expect((await handle(req('/api/vault/ship', ship), E, ctx, api.f)).status).toBe(401);
     expect(
@@ -263,6 +266,24 @@ describe('cofre', () => {
         .status,
     ).toBe(409);
 
+    // Sem CPF ou telefone válidos não há etiqueta nem nota: recusa antes de reservar os itens.
+    const noCpf = await handle(
+      withCookie('/api/vault/ship', cookie, { ...ship, contact: { ...CONTACT, cpf: '111.111.111-11' } }),
+      E,
+      ctx,
+      api.f,
+    );
+    expect(noCpf.status).toBe(400);
+    expect((await noCpf.json()).error).toContain('CPF');
+    const noPhone = await handle(
+      withCookie('/api/vault/ship', cookie, { ...ship, contact: { ...CONTACT, phone: '123' } }),
+      E,
+      ctx,
+      api.f,
+    );
+    expect((await noPhone.json()).error).toContain('telefone');
+    expect(rows('SELECT status FROM vault_items')).toEqual([{ status: 'cofre' }]);
+
     const res = await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f);
     expect(res.status).toBe(201);
     const envio = await res.json();
@@ -273,6 +294,7 @@ describe('cofre', () => {
       shipments: { cost: 0 },
     });
     expect(api.state.orders.map((o) => o.serial)).toContain(envio.serial);
+    expect(api.calls.some((c) => JSON.stringify(c.body).includes('CPF 529.982.247-25 · (11) 99999-8888'))).toBe(true);
 
     api.state.payment.external_reference = envio.serial;
     await hook(E);
@@ -429,7 +451,7 @@ describe('pagamento sem baixa dupla (#39)', () => {
     await create({ ...ORDER, items: [{ id: 'i2', qty: 1, dest: 'vault' }] }, cookie);
     await hook(E);
     const [item] = rows('SELECT id FROM vault_items');
-    const ship = { items: [item.id, item.id], address: ORDER.address, shipping: { serviceId: 1 } };
+    const ship = { items: [item.id, item.id], address: ORDER.address, contact: CONTACT, shipping: { serviceId: 1 } };
     expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(201);
     expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(409);
   });
@@ -439,7 +461,7 @@ describe('pagamento sem baixa dupla (#39)', () => {
     await create({ ...ORDER, items: [{ id: 'i2', qty: 1, dest: 'vault' }] }, cookie);
     await hook(E);
     const [item] = rows('SELECT id FROM vault_items');
-    const ship = { items: [item.id], address: ORDER.address, shipping: { serviceId: 1 } };
+    const ship = { items: [item.id], address: ORDER.address, contact: CONTACT, shipping: { serviceId: 1 } };
     api.state.mpFails = true;
     expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(502);
     expect(rows('SELECT status, shipment_serial FROM vault_items')).toEqual([

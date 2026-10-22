@@ -13,6 +13,11 @@ interface BaseProduct {
   id: string;
   name: string;
   price: number;
+  /**
+   * O Notion manda: só vende o que está lá com "Ativo no site". Falso = fora de venda (some das vitrines e o
+   * servidor recusa). Indefinido = ainda não consultamos o Notion (desenvolvimento sem API): o catálogo de exemplo vale.
+   */
+  listed?: boolean;
 }
 interface Accessory extends BaseProduct {
   kind: 'acc';
@@ -38,6 +43,8 @@ interface SaleItem extends BaseProduct {
   grade: Grade | null;
 }
 export type Product = Accessory | Craft | Mini | SaleItem;
+
+export const isListed = (p: Product | undefined): p is Product => !!p && p.listed !== false;
 
 export interface TcgSet {
   id: string;
@@ -226,7 +233,7 @@ export const itemName = (it: Item): string => {
 };
 
 // Stryker disable all
-const PRODUCTS: Product[] = [
+export const PRODUCTS: Product[] = [
   { id: 'a1', kind: 'acc', name: 'porta-card rígido', price: 18, note: 'impresso em 3D' },
   { id: 'a2', kind: 'acc', name: 'deck box 60 cards', price: 54, note: 'impresso em 3D' },
   { id: 'a3', kind: 'acc', name: 'suporte de exibição', price: 16, note: 'impresso em 3D' },

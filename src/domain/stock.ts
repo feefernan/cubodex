@@ -1,4 +1,4 @@
-import { ITEMS, productById, type StockStatus } from './catalog';
+import { ITEMS, PRODUCTS, productById, type StockStatus } from './catalog';
 
 /** Uma linha do banco Produtos do Notion: o que a loja controla sem mudar código. */
 export interface StockRow {
@@ -17,10 +17,20 @@ const statusOf = (row: StockRow): StockStatus => {
 
 /**
  * Aplica preço e estoque do Notion ao catálogo em memória (site e Worker usam o mesmo).
- * Ids desconhecidos são ignorados e devolvidos, para o log.
+ * Ids desconhecidos são ignorados e devolvidos, para o log. Produto que não está no Notion, ou está sem
+ * "Ativo no site", sai de venda (`listed = false`): vale para cartas, miniaturas, peças e acessórios.
  */
 export const applyStock = (rows: StockRow[]): string[] => {
   const unknown: string[] = [];
+  const active = new Set(rows.filter((r) => r.active).map((r) => r.id));
+  for (const p of PRODUCTS) {
+    p.listed = active.has(p.id);
+    if (p.kind === 'item' && !p.listed) {
+      p.status = 'esgotado';
+      const item = ITEMS.find((it) => it.id === p.id);
+      if (item) item.status = 'esgotado';
+    }
+  }
   for (const row of rows) {
     const p = productById[row.id];
     if (!p) {

@@ -3,6 +3,7 @@ import {
   cardById,
   cardImage,
   type Item,
+  isListed,
   itemName,
   type Product,
   productById,
@@ -54,7 +55,11 @@ export const productTile = (p: Product): string => {
 };
 
 export const fillProducts = (container: HTMLElement, ids: string[]) => {
-  container.innerHTML = ids.map((id) => productTile(productById[id])).join('');
+  container.innerHTML = ids
+    .map((id) => productById[id])
+    .filter(isListed)
+    .map(productTile)
+    .join('');
 };
 
 const cardLink = (c: Card, inner: string, cls: string, label: string) =>

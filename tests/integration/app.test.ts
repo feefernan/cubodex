@@ -597,16 +597,24 @@ describe('conta e formulários', () => {
     await vi.waitFor(() => expect(document.querySelectorAll('#cofreBody .ship-opt')).toHaveLength(2));
     expect(lastSent('/api/shipping/quote')).toEqual({ cep: '20040020', items: [{ id: 'i2', qty: 1 }] });
     click('[data-action="vault-ship"][data-i="0"]');
-    expect($<HTMLInputElement>('#ck-street').value).toBe('Avenida Paulista');
-    type('#ck-number', '');
+    expect($<HTMLInputElement>('#vk-street').value).toBe('Avenida Paulista');
+    // O envio do cofre também pede CPF e telefone (nota fiscal e etiqueta), nos campos com id próprio (vk-).
+    expect(document.querySelector('#ck-street')).toBeNull();
+    type('#vk-cpf', '');
     click('[data-action="vault-pay"]');
-    expect($('#ck-msg').textContent).toContain('número');
-    type('#ck-number', '7');
+    expect($('#vk-msg').textContent).toContain('CPF válido');
+    type('#vk-cpf', '52998224725');
+    type('#vk-phone', '11999998888');
+    type('#vk-number', '');
+    click('[data-action="vault-pay"]');
+    expect($('#vk-msg').textContent).toContain('número');
+    type('#vk-number', '7');
     click('[data-action="vault-pay"]');
     await vi.waitFor(() => expect(to).toHaveBeenCalledWith('https://mp.test/envio'));
     expect(lastSent('/api/vault/ship')).toMatchObject({
       items: ['u1'],
       shipping: { serviceId: 1 },
+      contact: { cpf: '529.982.247-25', phone: '(11) 99999-8888' },
       address: { number: '7', cep: '20040020' },
     });
   });

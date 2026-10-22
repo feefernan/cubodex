@@ -1,4 +1,4 @@
-import { PACK_PRICE, PACK_SIZE, type Product, productById, productSubtitle } from './catalog';
+import { isListed, PACK_PRICE, PACK_SIZE, type Product, productById, productSubtitle } from './catalog';
 
 export type Destination = 'send' | 'vault';
 
@@ -26,6 +26,7 @@ const MAX_QTY = 99;
 export type CartResult = { ok: true; name: string } | { ok: false; error: string };
 
 const isMini = (id: string) => productById[id]?.kind === 'mini';
+const isMiniOnSale = (id: string) => isMini(id) && isListed(productById[id]);
 
 /** Quantas unidades existem de uma carta (estoque ou pré-venda); null = sem limite (peça impressa sob demanda). */
 const stockLimit = (id: string): number | null => {
@@ -37,7 +38,7 @@ const stockLimit = (id: string): number | null => {
 /** Monta a linha a partir do catálogo; null quando o item não existe mais ou esgotou. */
 export const describeEntry = (e: CartEntry): CartLine | null => {
   if (e.pack) {
-    if (e.pack.length !== PACK_SIZE || !e.pack.every(isMini)) return null;
+    if (e.pack.length !== PACK_SIZE || !e.pack.every(isMiniOnSale)) return null;
     const names = e.pack.map((id) => productById[id].name.replace('fiozinho ', '')).join(', ');
     return {
       id: e.id,
@@ -52,7 +53,7 @@ export const describeEntry = (e: CartEntry): CartLine | null => {
   }
   const p = productById[e.id];
   const limit = stockLimit(e.id);
-  if (!p || limit === 0) return null;
+  if (!isListed(p) || limit === 0) return null;
   return {
     id: e.id,
     qty: limit === null ? e.qty : Math.min(e.qty, limit),
@@ -83,7 +84,7 @@ export const toEntry = ({ id, qty, dest, pack }: CartLine): CartEntry => ({
 export const addToCart = (cart: CartEntry[], id: string): CartResult => {
   const p = productById[id];
   const limit = stockLimit(id);
-  if (!p || limit === 0) return { ok: false, error: 'item indisponível' };
+  if (!isListed(p) || limit === 0) return { ok: false, error: 'item indisponível' };
   const line = cart.find((l) => l.id === id);
   const qty = line?.qty ?? 0;
   if (limit !== null && qty >= limit) return { ok: false, error: `só ${limit} un. em estoque` };
@@ -104,7 +105,7 @@ export const changeQty = (entry: CartEntry, delta: number): CartResult => {
 
 /** Pacote montado com as miniaturas escolhidas; null enquanto faltam miniaturas. */
 export const packEntry = (pack: string[], now: number): CartEntry | null =>
-  pack.length === PACK_SIZE && pack.every(isMini) ? { id: `pack-${now}`, qty: 1, pack: [...pack] } : null;
+  pack.length === PACK_SIZE && pack.every(isMiniOnSale) ? { id: `pack-${now}`, qty: 1, pack: [...pack] } : null;
 
 export const cartCount = (cart: CartEntry[]): number => cart.reduce((a, l) => a + l.qty, 0);
 
