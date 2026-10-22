@@ -366,8 +366,15 @@ button{font:inherit;color:inherit}
 .grid-sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .setcard{display:flex;gap:14px;align-items:center;padding:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);text-decoration:none;min-width:0}
 .setcard:hover{border-color:var(--line-strong);background:var(--surface-2)}
-.setlogo{width:76px;height:76px;border-radius:calc(var(--radius) * .7);flex:none;display:grid;place-items:center;padding:6px;text-align:center}
-.setlogo b{font-size:17px;line-height:1;color:var(--ink)}
+.setlogo{width:76px;height:76px;border-radius:calc(var(--radius) * .7);flex:none;display:grid;place-items:center;padding:6px;text-align:center;object-fit:contain;background:var(--surface-2)}
+.setname{text-transform:lowercase}
+.sets-group>summary{display:flex;align-items:baseline;gap:12px;cursor:pointer;list-style:none;margin-bottom:14px}
+.sets-group>summary::-webkit-details-marker{display:none}
+.sets-group>summary h2{margin:0}
+.setpage-logo{display:block;margin-top:14px;max-width:100%;height:64px;object-fit:contain}
+.card-results{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px;padding:0;list-style:none}
+.card-results li{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.card-results a{font-weight:700;color:var(--fg)}
 .cardpage{display:grid;grid-template-columns:minmax(200px,320px) minmax(0,1fr);gap:32px;margin-top:20px;align-items:start}
 @media (max-width:700px){.cardpage{grid-template-columns:minmax(0,1fr)}.cardpage .media--card{max-width:280px}}
 .cardpage .spec{font-size:13px;margin:16px 0 24px;max-width:420px}

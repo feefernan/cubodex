@@ -1,11 +1,35 @@
-import { CARDS, cardById, cardImage, ITEMS, listedOf, photoUrl, SETS, setById, type TcgSet } from '../domain/catalog';
-import { escapeHtml as esc, uniq } from '../domain/format';
-import { cardsOfSet, cardsOnSale, emptyFilters, type Filters, filterItems, filterSets } from '../domain/tcg';
+import { CARDS, listedOf, photoUrl, SETS } from '../domain/catalog';
+import {
+  cardImageUrl,
+  filterCardList,
+  filterSetList,
+  groupBySerie,
+  type IndexEntry,
+  logoUrl,
+  numberLabel,
+  parseCardInfo,
+  parseIndex,
+  parseSet,
+  parseSets,
+  searchIndex,
+  setTitle,
+  setYear,
+  setYears,
+  type TcgCardInfo,
+  type TcgSetInfo,
+} from '../domain/enciclopedia';
+import { brl, escapeHtml as esc, uniq } from '../domain/format';
+import { emptyFilters, type Filters, filterItems, itemsOfTcgdexCard, onSaleBySet } from '../domain/tcg';
+import { api } from '../infra/api';
 import { emptyState } from './art';
-import { $, onAction, onInput } from './dom';
-import { registerView } from './router';
+import { alertMsg } from './cart';
+import { $, $$, onAction, onInput } from './dom';
+import { currentView, registerView } from './router';
 import { S } from './store';
-import { cardTile, fillProducts, itemTile, saleRow } from './tiles';
+import { fillProducts, itemTile, saleRow } from './tiles';
+
+/** Cartas mostradas de cada vez na página do set: as imagens vêm do CDN, e um set grande tem mais de 200. */
+const PAGE = 60;
 
 let F: Filters = emptyFilters();
 
@@ -62,79 +86,206 @@ const renderGrid = () => {
       );
 };
 
-const setCard = (x: TcgSet) => {
-  const n = cardsOnSale(x.id);
+// ───────── enciclopédia (dados da API; o TCGdex é a fonte) ─────────
+
+const wait = (text: string) => `<p class="soft" role="status" style="padding:28px 0">${esc(text)}</p>`;
+const failure = (e: unknown) =>
+  `${alertMsg((e as Error).message)}<p style="margin-top:12px"><button class="btn btn--ghost btn--sm" data-action="tcg-retry">tentar de novo</button></p>`;
+
+let sets: TcgSetInfo[] | null = null;
+let setNames = new Map<string, TcgSetInfo>();
+let index: IndexEntry[] | null = null;
+let cardQ = '';
+let setCardQ = '';
+let shown = PAGE;
+
+const loadSets = async () => {
+  sets ??= parseSets(await api.tcgSets());
+  setNames = new Map(sets.map((x) => [x.id, x]));
+  return sets;
+};
+
+const setCard = (x: TcgSetInfo, onSale: Map<string, number>) => {
+  const n = onSale.get(x.id) ?? 0;
   const sale = n
     ? `<span class="mono tag">${n} à venda na cubodex</span>`
     : '<span class="mono muted">nenhuma à venda</span>';
-  return `<a class="setcard" href="#/set/${x.id}" data-action="go" data-view="set" data-id="${x.id}"><span class="setlogo" style="background:${x.tone}"><b class="display">${esc(x.name)}</b></span><span style="min-width:0"><span class="mono muted">${x.year} · ${x.total} cartas</span><br>${sale}</span></a>`;
+  const logo = x.logo
+    ? `<img class="setlogo" src="${logoUrl(x.logo)}" alt="" width="76" height="76" loading="lazy" decoding="async">`
+    : '<span class="setlogo"></span>';
+  return `<a class="setcard" href="#/set/${esc(x.id)}" data-action="go" data-view="set" data-id="${esc(x.id)}">${logo}<span style="min-width:0"><b class="setname">${esc(setTitle(x))}</b><br><span class="mono muted">${setYear(x)} · ${x.official || x.total} cartas</span><br>${sale}</span></a>`;
 };
 
-const renderSetsBody = () => {
-  const list = filterSets(S.setQ, S.setAno);
-  const groups = uniq(list.map((x) => x.serie));
-  $('#setsBody').innerHTML = groups.length
-    ? groups
+const renderSetsBody = (list: TcgSetInfo[]) => {
+  const onSale = onSaleBySet();
+  const filtered = filterSetList(list, S.setQ, S.setAno);
+  const open = !!(S.setQ || S.setAno);
+  // Só a série mais nova abre: cada logo é uma imagem, e fechadas elas nem são baixadas.
+  $('#setsBody').innerHTML = filtered.length
+    ? groupBySerie(filtered)
         .map(
-          (g) =>
-            `<div class="sets-group"><h2 class="display">${esc(g)}</h2><div class="grid-sets">${list
-              .filter((x) => x.serie === g)
-              .map(setCard)
-              .join('')}</div></div>`,
+          (g, i) =>
+            `<details class="sets-group"${open || i === 0 ? ' open' : ''}><summary><h2 class="display">${esc(g.serie)}</h2><span class="mono muted">${g.sets.length} sets</span></summary><div class="grid-sets">${g.sets.map((x) => setCard(x, onSale)).join('')}</div></details>`,
         )
         .join('')
     : emptyState('nenhum set encontrado.', 'Tente outro nome ou outro ano.');
 };
 
-const renderSets = () => {
-  const ys = $<HTMLSelectElement>('#s-ano');
-  if (ys.options.length < 2)
-    ys.innerHTML = `<option value="">todos os anos</option>${uniq(SETS.map((x) => x.year))
-      .sort()
+const renderSets = async () => {
+  $<HTMLInputElement>('#s-q').value = S.setQ;
+  $<HTMLInputElement>('#s-card').value = cardQ;
+  $('#setsBody').innerHTML = wait('carregando os sets…');
+  try {
+    const list = await loadSets();
+    if (currentView() !== 'sets') return;
+    const ys = $<HTMLSelectElement>('#s-ano');
+    ys.innerHTML = `<option value="">todos os anos</option>${setYears(list)
       .map((y) => `<option value="${y}">${y}</option>`)
       .join('')}`;
-  $<HTMLInputElement>('#s-q').value = S.setQ;
-  ys.value = S.setAno;
-  renderSetsBody();
+    ys.value = S.setAno;
+    renderSetsBody(list);
+    void renderCardResults();
+  } catch (e) {
+    if (currentView() === 'sets') $('#setsBody').innerHTML = failure(e);
+  }
 };
 
-const renderSet = () => {
-  const x = setById[S.setId] ?? SETS[0];
-  S.setId = x.id;
-  const { all, shown } = cardsOfSet(x.id, S.setRar, S.setOnly);
-  const chips = `<button class="chip" data-action="set-rar" data-v="" aria-pressed="${!S.setRar}">todas</button>${uniq(
-    all.map((c) => c.rar),
-  )
-    .map(
-      (r) =>
-        `<button class="chip" data-action="set-rar" data-v="${esc(r)}" aria-pressed="${S.setRar === r}">${esc(r)}</button>`,
-    )
-    .join('')}`;
-  const grid = shown.length
-    ? shown.map(cardTile).join('')
+/** Busca por nome em todas as cartas: o índice (só nomes) é baixado uma vez e a busca roda no navegador. */
+const renderCardResults = async () => {
+  const box = $('#cardResults');
+  if (cardQ.trim().length < 2) {
+    box.innerHTML = '';
+    return;
+  }
+  try {
+    index ??= parseIndex(await api.tcgIndex());
+    const found = searchIndex(index, cardQ);
+    if (cardQ.trim().length < 2) return;
+    box.innerHTML = found.length
+      ? `<ul class="card-results">${found
+          .map(
+            ([id, name, pt, set]) =>
+              `<li><a href="#/carta/${esc(id)}" data-action="go" data-view="carta" data-id="${esc(id)}">${esc(pt && pt !== name ? `${name} · ${pt}` : name)}</a> <span class="mono muted">${esc(setNames.get(set)?.name ?? set)}</span></li>`,
+          )
+          .join('')}</ul>`
+      : '<p class="soft">Nenhuma carta com esse nome.</p>';
+  } catch (e) {
+    box.innerHTML = failure(e);
+  }
+};
+
+const tcgTile = (c: TcgCardInfo, x: TcgSetInfo) => {
+  const items = itemsOfTcgdexCard(c.id);
+  const sale = items.length
+    ? `<span class="mono tag">à venda · a partir de ${brl(Math.min(...items.map((i) => i.price)))}</span>`
+    : '';
+  const img = c.image
+    ? `<img src="${cardImageUrl(c.image)}" alt="" width="245" height="337" loading="lazy" decoding="async">`
+    : '';
+  const name = esc(setTitleOf(c));
+  return `<article class="tile${items.length ? ' hit' : ''}"><a class="media media--card" href="#/carta/${esc(c.id)}" data-action="go" data-view="carta" data-id="${esc(c.id)}" aria-label="Ver ${name}">${img}</a><div class="body"><span class="mono muted num">${esc(numberLabel(c, x))}</span><h3><a href="#/carta/${esc(c.id)}" data-action="go" data-view="carta" data-id="${esc(c.id)}" style="text-decoration:none">${esc(c.name)}</a></h3>${c.name_pt && c.name_pt !== c.name ? `<p class="mono muted">${esc(c.name_pt)}</p>` : ''}<p class="mono muted">${esc(c.rarity ?? '')}</p>${sale}</div></article>`;
+};
+
+const setTitleOf = (c: TcgCardInfo) => (c.name_pt && c.name_pt !== c.name ? `${c.name} · ${c.name_pt}` : c.name);
+
+const renderSetCards = (cards: TcgCardInfo[], x: TcgSetInfo) => {
+  const list = filterCardList(cards, setCardQ, S.setRar).filter((c) => !S.setOnly || itemsOfTcgdexCard(c.id).length);
+  const part = list.slice(0, shown);
+  $('#setCount').textContent = `mostrando ${part.length} de ${list.length} cartas do set`;
+  $('#setGrid').innerHTML = part.length
+    ? part.map((c) => tcgTile(c, x)).join('')
     : emptyState('nenhuma carta aqui.', 'Nenhuma carta com esse filtro neste set.', '', 'grid-column:1/-1');
-  $('#setBody').innerHTML =
-    `<p style="padding-top:20px"><a class="link-more" href="#/sets" data-action="go" data-view="sets">← todos os sets</a></p>` +
-    `<div class="page-title" style="padding-inline:0"><span class="eyebrow mono">${esc(x.serie)} · ${x.year}</span><h1 class="display">${esc(x.name)}</h1><p>${x.total} cartas no set. Idiomas: ${x.langs.join(', ')}.</p></div>` +
-    `<p class="mono muted" style="margin-top:14px">mostrando ${shown.length} de ${x.total} cartas do set</p>` +
-    `<div class="toolbar"><div class="chips" role="group" aria-label="Raridade">${chips}</div><button class="chip" data-action="set-only" aria-pressed="${S.setOnly}">só as que a cubodex tem</button></div>` +
-    `<div class="grid" id="setGrid">${grid}</div>`;
+  $('#setMore').hidden = part.length >= list.length;
 };
 
-const renderCarta = () => {
-  const c = cardById[S.cardId] ?? CARDS[0];
-  S.cardId = c.id;
-  const x = setById[c.set];
-  const its = ITEMS.filter((it) => it.card === c.id);
-  const rows = its.length
-    ? its.map(saleRow).join('')
-    : '<p class="soft">A Cubodex não tem item à venda desta carta agora.</p>';
-  $('#cartaBody').innerHTML =
-    `<p style="padding-top:20px"><a class="link-more" href="#/set/${x.id}" data-action="go" data-view="set" data-id="${x.id}">← ${esc(x.name)}</a></p>` +
-    `<div class="cardpage"><div class="media media--card" style="margin:0;width:100%"><img src="${its[0]?.photos?.[0] ? photoUrl(its[0].photos[0]) : cardImage(c, its[0]?.lang, 'high')}" alt="Carta ${esc(c.name)}, ${esc(x.name)} ${c.n}/${x.total}" width="600" height="825" decoding="async"></div>` +
-    `<div><span class="eyebrow mono">${esc(x.name)} · ${c.n}/${x.total}</span><h1 class="display" style="font-size:clamp(44px,7vw,84px)">${esc(c.name)}</h1>` +
-    `<dl class="spec"><dt>set</dt><dd>${esc(x.name)}</dd><dt>número</dt><dd>${c.n}/${x.total}</dd><dt>raridade</dt><dd>${esc(c.rar)}</dd><dt>tipo</dt><dd>${esc(c.tipo)}</dd><dt>idiomas</dt><dd>${x.langs.join(', ')}</dd></dl>` +
-    `<div class="section-head" style="margin-bottom:0"><h2 class="display" style="font-size:28px">à venda</h2></div>${rows}</div></div>`;
+let current: { set: TcgSetInfo; cards: TcgCardInfo[] } | null = null;
+
+const renderSet = async () => {
+  const id = S.setId;
+  $('#setBody').innerHTML = wait('carregando o set…');
+  try {
+    const data = (await api.tcgSet(id)) as { set?: unknown; cards?: unknown };
+    if (currentView() !== 'set' || S.setId !== id) return;
+    const x = parseSet(data.set);
+    if (!x) throw new Error('Set não encontrado.');
+    const cards = (Array.isArray(data.cards) ? data.cards : []).flatMap((c) => parseCardInfo(c) ?? []);
+    current = { set: x, cards };
+    shown = PAGE;
+    setCardQ = '';
+    const rarities = uniq(cards.map((c) => c.rarity ?? '').filter(Boolean));
+    const chips = `<button class="chip" data-action="set-rar" data-v="" aria-pressed="${!S.setRar}">todas</button>${rarities
+      .map(
+        (r) =>
+          `<button class="chip" data-action="set-rar" data-v="${esc(r)}" aria-pressed="${S.setRar === r}">${esc(r)}</button>`,
+      )
+      .join('')}`;
+    const logo = x.logo
+      ? `<img class="setpage-logo" src="${logoUrl(x.logo)}" alt="" height="64" decoding="async">`
+      : '';
+    $('#setBody').innerHTML =
+      `<p style="padding-top:20px"><a class="link-more" href="#/sets" data-action="go" data-view="sets">← todos os sets</a></p>` +
+      `<div class="page-title" style="padding-inline:0"><span class="eyebrow mono">${esc(x.serie)} · ${setYear(x)}</span><h1 class="display">${esc(setTitle(x))}</h1><p>${x.official || x.total} cartas no set${x.total > x.official && x.official ? `, mais ${x.total - x.official} secretas` : ''}.</p>${logo}</div>` +
+      `<p class="mono muted" style="margin-top:14px" id="setCount"></p>` +
+      `<div class="toolbar"><div class="search"><input class="input" id="set-q" data-input="set-q" type="search" placeholder="buscar nesta lista" aria-label="Buscar carta neste set"></div><div class="chips" role="group" aria-label="Raridade">${chips}</div><button class="chip" data-action="set-only" aria-pressed="${S.setOnly}">só as que a cubodex tem</button></div>` +
+      `<div class="grid" id="setGrid"></div><p style="margin-top:20px"><button class="btn btn--ghost" id="setMore" data-action="set-more">mostrar mais</button></p>`;
+    renderSetCards(cards, x);
+  } catch (e) {
+    if (currentView() === 'set') $('#setBody').innerHTML = failure(e);
+  }
+};
+
+const TYPE_PT: Record<string, string> = {
+  Fire: 'fogo',
+  Water: 'água',
+  Grass: 'planta',
+  Lightning: 'elétrico',
+  Psychic: 'psíquico',
+  Fighting: 'lutador',
+  Darkness: 'sombrio',
+  Metal: 'metal',
+  Dragon: 'dragão',
+  Colorless: 'incolor',
+  Fairy: 'fada',
+};
+const VARIANT_PT: Record<string, string> = {
+  normal: 'normal',
+  reverse: 'reverse holo',
+  holo: 'holo',
+  firstEdition: '1ª edição',
+};
+
+const renderCarta = async () => {
+  const id = S.cardId;
+  $('#cartaBody').innerHTML = wait('carregando a carta…');
+  try {
+    const data = (await api.tcgCard(id)) as { card?: unknown; set?: unknown };
+    if (currentView() !== 'carta' || S.cardId !== id) return;
+    const c = parseCardInfo(data.card);
+    const x = parseSet(data.set);
+    if (!c || !x) throw new Error('Carta não encontrada.');
+    const items = itemsOfTcgdexCard(c.id);
+    const own = items[0]?.photos?.[0];
+    const src = own ? photoUrl(own) : c.image ? cardImageUrl(c.image, 'high') : '';
+    const rows = items.length
+      ? items.map(saleRow).join('')
+      : '<p class="soft">A Cubodex não tem item à venda desta carta agora.</p>';
+    const list = (csv: string | null, map: Record<string, string>) =>
+      esc(
+        (csv ?? '')
+          .split(',')
+          .filter(Boolean)
+          .map((v) => map[v] ?? v)
+          .join(', '),
+      );
+    $('#cartaBody').innerHTML =
+      `<p style="padding-top:20px"><a class="link-more" href="#/set/${esc(x.id)}" data-action="go" data-view="set" data-id="${esc(x.id)}">← ${esc(x.name)}</a></p>` +
+      `<div class="cardpage"><div class="media media--card" style="margin:0;width:100%">${src ? `<img src="${esc(src)}" alt="Carta ${esc(c.name)}, ${esc(x.name)} ${esc(numberLabel(c, x))}" width="600" height="825" decoding="async">` : ''}</div>` +
+      `<div><span class="eyebrow mono">${esc(x.name)} · ${esc(numberLabel(c, x))}</span><h1 class="display" style="font-size:clamp(44px,7vw,84px)">${esc(c.name)}</h1>${c.name_pt && c.name_pt !== c.name ? `<p class="soft">${esc(c.name_pt)}</p>` : ''}` +
+      `<dl class="spec"><dt>set</dt><dd>${esc(setTitle(x))}</dd><dt>número</dt><dd>${esc(numberLabel(c, x))}</dd><dt>raridade</dt><dd>${esc(c.rarity ?? '—')}</dd><dt>tipo</dt><dd>${list(c.types, TYPE_PT) || '—'}</dd><dt>variantes</dt><dd>${list(c.variants, VARIANT_PT) || '—'}</dd></dl>` +
+      `<div class="section-head" style="margin-bottom:0"><h2 class="display" style="font-size:28px">à venda</h2></div>${rows}</div></div>`;
+  } catch (e) {
+    if (currentView() === 'carta') $('#cartaBody').innerHTML = failure(e);
+  }
 };
 
 export const initTcg = () => {
@@ -161,18 +312,45 @@ export const initTcg = () => {
   });
   onInput('sets-q', (el) => {
     S.setQ = (el as HTMLInputElement).value;
-    renderSetsBody();
+    if (sets) renderSetsBody(sets);
   });
   onInput('sets-year', (el) => {
     S.setAno = (el as HTMLSelectElement).value;
-    renderSetsBody();
+    if (sets) renderSetsBody(sets);
   });
+  onInput('card-search', (el) => {
+    cardQ = (el as HTMLInputElement).value;
+    void renderCardResults();
+  });
+  onInput('set-q', (el) => {
+    setCardQ = (el as HTMLInputElement).value;
+    shown = PAGE;
+    if (current) renderSetCards(current.cards, current.set);
+  });
+  const again = () => {
+    shown = PAGE;
+    if (current) renderSetCards(current.cards, current.set);
+  };
   onAction('set-rar', (el) => {
     S.setRar = el.dataset.v ?? '';
-    renderSet();
+    for (const b of $$('#setBody [data-action="set-rar"]'))
+      b.setAttribute('aria-pressed', String(b.dataset.v === S.setRar));
+    again();
   });
-  onAction('set-only', () => {
+  onAction('set-only', (el) => {
     S.setOnly = !S.setOnly;
-    renderSet();
+    el.setAttribute('aria-pressed', String(S.setOnly));
+    again();
+  });
+  onAction('set-more', () => {
+    shown += PAGE;
+    if (current) renderSetCards(current.cards, current.set);
+  });
+  // Falhou a carga de uma tela da enciclopédia: pede de novo e desenha a tela atual.
+  onAction('tcg-retry', () => {
+    const view = currentView();
+    if (view === 'sets') void renderSets();
+    else if (view === 'set') void renderSet();
+    else if (view === 'carta') void renderCarta();
   });
 };

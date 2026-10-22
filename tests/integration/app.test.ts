@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { tcgApi } from '../fixtures/tcg';
 
 const html = readFileSync(resolve(__dirname, '../../index.html'), 'utf-8');
 const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<script type="module"'));
@@ -89,6 +90,8 @@ const apiFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   if (url.startsWith('https://viacep.com.br/'))
     return Response.json({ logradouro: 'Avenida Paulista', bairro: 'Bela Vista', localidade: 'São Paulo', uf: 'SP' });
   if (api.fail && url !== '/api/catalog') return Response.json({ error: api.fail.error }, { status: api.fail.status });
+  const tcg = tcgApi(url);
+  if (tcg) return Response.json(tcg.body, { status: tcg.status });
   if (url === '/api/catalog') return Response.json({ products: api.products });
   if (url === '/api/shipping/quote') return Response.json({ options: SHIPPING });
   if (url === '/api/orders')
@@ -180,20 +183,21 @@ describe('navegação', () => {
 
   it('links com id vão para a URL e o voltar do navegador volta de tela (#8)', async () => {
     goTo('sets');
-    click('.setcard[data-id="jungle"]');
-    expect(location.hash).toBe('#/set/jungle');
-    expect($('#setBody h1').textContent).toBe('Jungle');
+    await vi.waitFor(() => expect(document.querySelectorAll('.setcard').length).toBeGreaterThan(0));
+    click('.setcard[data-id="base2"]');
+    expect(location.hash).toBe('#/set/base2');
+    await vi.waitFor(() => expect($('#setBody h1').textContent).toBe('Jungle · Selva'));
     click('#setGrid a.media[data-view="carta"]');
-    expect(location.hash).toMatch(/^#\/carta\/jungle-/);
+    expect(location.hash).toMatch(/^#\/carta\/base2-/);
     history.back();
     await vi.waitFor(() => expect(visible()).toEqual(['v-set']));
-    expect($('#setBody h1').textContent).toBe('Jungle');
+    await vi.waitFor(() => expect($('#setBody h1').textContent).toBe('Jungle · Selva'));
   });
 
   it('URL editada à mão abre a tela certa; tela desconhecida cai na home (#8)', async () => {
-    location.hash = '#/carta/sv151-151';
+    location.hash = '#/carta/sv03.5-151';
     await vi.waitFor(() => expect(visible()).toEqual(['v-carta']));
-    expect($('#cartaBody h1').textContent).toBe('mew ex');
+    await vi.waitFor(() => expect($('#cartaBody h1').textContent).toBe('Mew ex'));
     location.hash = '#/nao-existe';
     await vi.waitFor(() => expect(visible()).toEqual(['v-home']));
   });
@@ -221,27 +225,86 @@ describe('tcg', () => {
     click('[data-action="filters-clear"]');
   });
 
-  it('enciclopédia: busca de set, set, só à venda e página da carta', () => {
+  it('enciclopédia: sets por série, busca de set e de carta, só à venda e página da carta', async () => {
     goTo('sets');
-    expect(document.querySelectorAll('.setcard')).toHaveLength(4);
+    await vi.waitFor(() => expect(document.querySelectorAll('.setcard')).toHaveLength(4));
+    // A série mais nova abre; as outras ficam fechadas (as imagens delas nem são baixadas).
+    expect([...document.querySelectorAll<HTMLDetailsElement>('.sets-group')].map((d) => d.open)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect($('.setcard[data-id="sv03.5"]').textContent).toContain('151');
+    expect($('.setcard[data-id="sv03.5"]').textContent).toContain('à venda na cubodex');
     type('#s-q', 'xyz');
     expect($('#setsBody .empty')).not.toBeNull();
+    type('#s-q', 'selva'); // o nome em português também acha
+    expect(document.querySelectorAll('.setcard')).toHaveLength(1);
     type('#s-q', '');
     type('#s-ano', '2023');
     expect(document.querySelectorAll('.setcard')).toHaveLength(1);
+    type('#s-card', 'char');
+    await vi.waitFor(() => expect(document.querySelectorAll('#cardResults li')).toHaveLength(2));
+    expect($('#cardResults').textContent).toContain('Charizard · Charizard PT');
+    type('#s-card', 'zzzz');
+    await vi.waitFor(() => expect($('#cardResults').textContent).toContain('Nenhuma carta'));
+    type('#s-card', '');
+    expect($('#cardResults').innerHTML).toBe('');
     click('.setcard');
-    expect($('#setBody h1').textContent).toBe('151');
-    click('[data-action="set-rar"][data-v="comum"]');
+    await vi.waitFor(() => expect($('#setBody h1').textContent).toBe('151'));
+    expect(document.querySelectorAll('#setGrid .tile')).toHaveLength(3);
+    click('[data-action="set-rar"][data-v="Common"]');
     expect(document.querySelectorAll('#setGrid .tile')).toHaveLength(1);
     click('[data-action="set-rar"][data-v=""]');
+    type('#set-q', 'mew');
+    expect(document.querySelectorAll('#setGrid .tile')).toHaveLength(1);
+    type('#set-q', '');
     click('[data-action="set-only"]');
-    expect(document.querySelectorAll('#setGrid .tile.hit')).toHaveLength(
+    expect(document.querySelectorAll('#setGrid .tile.hit').length).toBe(
       document.querySelectorAll('#setGrid .tile').length,
     );
-    click('#setGrid a.btn[data-view="carta"]');
-    expect(visible()).toEqual(['v-carta']);
-    expect(document.querySelectorAll('#cartaBody .sale-row').length).toBeGreaterThan(0);
+    expect($('#setGrid .tile.hit').textContent).toContain('à venda · a partir de');
+    click('#setGrid a.media[data-view="carta"]');
+    await vi.waitFor(() => expect(visible()).toEqual(['v-carta']));
+    await vi.waitFor(() => expect(document.querySelectorAll('#cartaBody .sale-row').length).toBeGreaterThan(0));
+    click('[data-action="set-only"]');
     type('#s-ano', '');
+  });
+
+  it('enciclopédia: set grande mostra 60 de cada vez; carta sem imagem, raridade e tipos', async () => {
+    location.hash = '#/set/pop1';
+    await vi.waitFor(() => expect($('#setBody h1').textContent).toBe('POP Series 1'));
+    expect($('#setBody').textContent).not.toContain('secretas');
+    expect(document.querySelectorAll('#setGrid .tile')).toHaveLength(60);
+    expect($('#setCount').textContent).toBe('mostrando 60 de 70 cartas do set');
+    expect($<HTMLButtonElement>('#setMore').hidden).toBe(false);
+    click('[data-action="set-more"]');
+    expect(document.querySelectorAll('#setGrid .tile')).toHaveLength(70);
+    expect($<HTMLButtonElement>('#setMore').hidden).toBe(true);
+    expect(document.querySelector('#setGrid img')).toBeNull(); // nenhuma tem imagem
+    type('#set-q', 'treinador 7');
+    expect(document.querySelectorAll('#setGrid .tile')).toHaveLength(2); // "Treinador 7" e "Treinador 70"
+    type('#set-q', 'nada');
+    expect($('#setGrid .empty')).not.toBeNull();
+    type('#set-q', '');
+    location.hash = '#/carta/pop1-5';
+    await vi.waitFor(() => expect($('#cartaBody h1').textContent).toBe('Treinador 5'));
+    expect($('#cartaBody img')).toBeNull();
+    expect($('#cartaBody .spec').textContent).toContain('raridade—');
+    expect($('#cartaBody').textContent).toContain('A Cubodex não tem item à venda');
+  });
+
+  it('enciclopédia: erro de carga mostra o aviso e tentar de novo recarrega; carta e set que não existem', async () => {
+    api.fail = { status: 503, error: 'A enciclopédia ainda não está disponível. Tente mais tarde.' };
+    location.hash = '#/carta/base1-999';
+    await vi.waitFor(() => expect($('#cartaBody [role="alert"]').textContent).toContain('ainda não está disponível'));
+    api.fail = null;
+    click('#cartaBody [data-action="tcg-retry"]');
+    await vi.waitFor(() => expect($('#cartaBody [role="alert"]').textContent).toContain('Carta não encontrada'));
+    location.hash = '#/set/nao-existe';
+    await vi.waitFor(() => expect($('#setBody [role="alert"]').textContent).toContain('Set não encontrado'));
+    click('#setBody [data-action="tcg-retry"]');
+    await vi.waitFor(() => expect($('#setBody [role="alert"]')).not.toBeNull());
   });
 
   it('acessórios', () => {

@@ -23,7 +23,14 @@ import {
 import { brl, escapeHtml, normalize, pad3, uniq } from '../../src/domain/format';
 import { areaOf, isView, navGroup, parseRoute, routeHref, subnavKey } from '../../src/domain/routes';
 import { demoAccount, initialState, mergePersisted } from '../../src/domain/state';
-import { cardsOfSet, cardsOnSale, emptyFilters, filterItems, filterSets, itemsOfCard } from '../../src/domain/tcg';
+import {
+  emptyFilters,
+  filterItems,
+  itemsOfCard,
+  itemsOfTcgdexCard,
+  onSaleBySet,
+  tcgdexCardId,
+} from '../../src/domain/tcg';
 import {
   cepDigits,
   countdown,
@@ -94,17 +101,22 @@ describe('filtros do TCG', () => {
     expect(ids({ sort: 'maior' })[0]).toBe('i1');
     expect(ids({ sort: 'az' })[0]).toBe('i2');
   });
-  it('enciclopédia: cartas à venda, sets por busca/ano e cartas do set', () => {
+  it('enciclopédia: a ponte para os ids do TCGdex e o que a loja tem à venda', () => {
     expect(itemsOfCard('jungle-11')).toEqual([]);
     expect(itemsOfCard('sv151-6').map((i) => i.id)).toEqual(['i8', 'i12']);
-    expect(cardsOnSale('jungle')).toBe(0);
-    expect(cardsOnSale('base1')).toBe(5);
-    expect(filterSets('escarlate', '').map((s) => s.id)).toEqual(['sv151']);
-    expect(filterSets('', '1999')).toHaveLength(3);
-    const base = cardsOfSet('base1', '', false);
-    expect(base.all.map((c) => c.n)).toEqual([1, 2, 4, 10, 15, 58]);
-    expect(cardsOfSet('base1', 'comum', false).shown.map((c) => c.n)).toEqual([58]);
-    expect(cardsOfSet('base1', '', true).shown.map((c) => c.n)).toEqual([2, 4, 10, 15, 58]);
+    // Ids do catálogo de exemplo viram ids do TCGdex (set base2 = Jungle; sv03.5 = 151, com número de 3 dígitos).
+    expect(tcgdexCardId(cardById['jungle-11'])).toBe('base2-11');
+    expect(tcgdexCardId(cardById['sv151-6'])).toBe('sv03.5-006');
+    expect(tcgdexCardId(cardById['base1-4'])).toBe('base1-4');
+    expect(itemsOfTcgdexCard('sv03.5-006').map((i) => i.id)).toEqual(['i8', 'i12']);
+    expect(itemsOfTcgdexCard('base2-11')).toEqual([]); // esgotada
+    expect(onSaleBySet()).toEqual(
+      new Map([
+        ['base1', 5],
+        ['base3', 1],
+        ['sv03.5', 4],
+      ]),
+    );
   });
 });
 

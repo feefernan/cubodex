@@ -1,5 +1,5 @@
-import { CARDS, type Card, cardById, ITEMS, type Item, itemName, SETS, setById } from './catalog';
-import { normalize, uniq } from './format';
+import { type Card, cardById, ITEMS, type Item, itemName, setById } from './catalog';
+import { normalize } from './format';
 
 export interface Filters {
   q: string;
@@ -61,20 +61,25 @@ export const filterItems = (f: Filters, items: Item[] = ITEMS): Item[] =>
 export const itemsOfCard = (cardId: string): Item[] =>
   ITEMS.filter((it) => it.card === cardId && it.status !== 'esgotado');
 
-/** Quantas cartas diferentes do set a Cubodex tem à venda. */
-export const cardsOnSale = (setId: string): number =>
-  uniq(ITEMS.filter((it) => cardById[it.card].set === setId && it.status !== 'esgotado').map((it) => it.card)).length;
+/**
+ * A enciclopédia fala em ids do TCGdex; o catálogo de exemplo ainda usa ids próprios (`jungle-11`). Esta ponte dá o id
+ * do TCGdex de cada carta à venda, para mostrar "à venda na Cubodex" nas páginas da enciclopédia. Some na 3.3, quando
+ * as cartas à venda passam a vir do Notion já com o id do TCGdex.
+ */
+const tcgdexSetId = (c: Card): string => setById[c.set].tcgdex.split('/')[1];
+export const tcgdexCardId = (c: Card): string => `${tcgdexSetId(c)}-${String(c.n).padStart(setById[c.set].pad, '0')}`;
 
-export const filterSets = (q: string, year: string) => {
-  const nq = normalize(q.trim());
-  return SETS.filter(
-    (s) => (!nq || normalize(`${s.name} ${s.serie}`).includes(nq)) && (!year || String(s.year) === year),
-  );
-};
+/** Itens à venda (não esgotados) de uma carta do TCGdex. */
+export const itemsOfTcgdexCard = (id: string): Item[] =>
+  ITEMS.filter((it) => it.status !== 'esgotado' && tcgdexCardId(cardById[it.card]) === id);
 
-/** Cartas do set em ordem de número, com filtros de raridade e "só as que a Cubodex tem". */
-export const cardsOfSet = (setId: string, rar: string, onlyOnSale: boolean): { all: Card[]; shown: Card[] } => {
-  const all = CARDS.filter((c) => c.set === setId).sort((a, b) => a.n - b.n);
-  const shown = all.filter((c) => (!rar || c.rar === rar) && (!onlyOnSale || itemsOfCard(c.id).length > 0));
-  return { all, shown };
+/** Quantas cartas diferentes de cada set do TCGdex a Cubodex tem à venda. */
+export const onSaleBySet = (): Map<string, number> => {
+  const cards = new Map<string, Set<string>>();
+  for (const it of ITEMS) {
+    if (it.status === 'esgotado') continue;
+    const c = cardById[it.card];
+    cards.set(tcgdexSetId(c), (cards.get(tcgdexSetId(c)) ?? new Set()).add(c.id));
+  }
+  return new Map([...cards].map(([set, ids]) => [set, ids.size]));
 };

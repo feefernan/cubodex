@@ -206,9 +206,16 @@
   <div class="wrap page-title">
     <span class="eyebrow mono">colecionar · tcg</span>
     <h1 class="display">enciclopédia de sets.</h1>
-    <p>Todos os sets, agrupados por série. As cartas que a Cubodex tem em estoque ficam destacadas.</p>
+    <p>Todos os sets e cartas do jogo, agrupados por série. As cartas que a Cubodex tem em estoque ficam destacadas.</p>
   </div>
   <div class="wrap">
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input class="input" id="s-card" data-input="card-search" type="search" placeholder="buscar carta pelo nome" aria-label="Buscar carta pelo nome" autocomplete="off">
+      </div>
+    </div>
+    <section id="cardResults" aria-live="polite" aria-label="Resultado da busca de cartas"></section>
     <div class="toolbar">
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>

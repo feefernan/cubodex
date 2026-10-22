@@ -29,6 +29,19 @@ const send = <T>(method: string, path: string, body: unknown) =>
   call<T>(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const post = <T>(path: string, body: unknown) => send<T>('POST', path, body);
 
+/** Respostas da enciclopédia: mudam uma vez por semana, então cada uma é pedida uma vez por visita. */
+const memo = new Map<string, Promise<unknown>>();
+const once = <T>(key: string, load: () => Promise<T>): Promise<T> => {
+  let p = memo.get(key) as Promise<T> | undefined;
+  if (!p) {
+    p = load();
+    memo.set(key, p);
+    // Falhou: o próximo pedido tenta de novo em vez de guardar o erro.
+    p.catch(() => memo.delete(key));
+  }
+  return p;
+};
+
 interface AccountOrder {
   serial: string;
   kind: 'compra' | 'envio';
@@ -66,6 +79,10 @@ export const api = {
   me: () => call<Account>('/api/me'),
   saveDex: (dex: Dex) => send<{ dex: Dex }>('PUT', '/api/dex', { dex }),
   deleteMe: () => send<{ ok: true }>('DELETE', '/api/me', {}),
+  tcgSets: () => once('sets', () => call<unknown>('/api/tcg/sets')),
+  tcgSet: (id: string) => once(`set:${id}`, () => call<unknown>(`/api/tcg/sets/${encodeURIComponent(id)}`)),
+  tcgCard: (id: string) => once(`card:${id}`, () => call<unknown>(`/api/tcg/cards/${encodeURIComponent(id)}`)),
+  tcgIndex: () => once('index', () => call<unknown>('/api/tcg/index')),
   shipVault: (body: {
     items: string[];
     address: Address;

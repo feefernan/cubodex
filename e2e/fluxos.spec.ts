@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { tcgApi } from '../tests/fixtures/tcg';
 
 // API da loja e ViaCEP simulados: respondem como os reais (o Worker local não tem tokens).
 test.beforeEach(async ({ page }) => {
@@ -72,15 +73,19 @@ test.describe('fluxos principais', () => {
   });
 
   test('link compartilhado abre a carta e o voltar do navegador volta de tela', async ({ page }) => {
+    await page.route('**/api/tcg/**', (route) => {
+      const r = tcgApi(new URL(route.request().url()).pathname);
+      return route.fulfill({ status: r?.status ?? 404, json: r?.body ?? {} });
+    });
     await page.goto('/#/carta/base1-4');
-    await expect(page.locator('#cartaBody h1')).toHaveText('charizard');
+    await expect(page.locator('#cartaBody h1')).toHaveText('Charizard');
     await page.locator('#cartaBody a.link-more').click();
     await expect(page).toHaveURL(/#\/set\/base1$/);
-    await expect(page.locator('#setBody h1')).toHaveText('Base Set');
+    await expect(page.locator('#setBody h1')).toContainText('Base Set');
     await page.goBack();
-    await expect(page.locator('#cartaBody h1')).toHaveText('charizard');
+    await expect(page.locator('#cartaBody h1')).toHaveText('Charizard');
     await page.goForward();
-    await expect(page.locator('#setBody h1')).toHaveText('Base Set');
+    await expect(page.locator('#setBody h1')).toContainText('Base Set');
   });
 
   test('entrar: o botão leva ao login do Google', async ({ page }) => {
