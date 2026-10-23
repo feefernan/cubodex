@@ -52,6 +52,7 @@ import {
   removeSubscriber,
   updatePaymentStatus,
 } from './notion';
+import { tcgRoutes } from './tcg';
 
 export { refreshCatalog } from './catalog-db';
 
@@ -516,6 +517,8 @@ export const handle = async (request: Request, env: Env, ctx: Ctx, f: typeof fet
   const { method } = request;
   const path = url.pathname;
   if (path === '/api/health') return json({ ok: true });
+  const tcg = await tcgRoutes(request, env, path, ctx);
+  if (tcg) return tcg;
   if (path.startsWith('/api/img/') && method === 'GET') return photo(request, env, path.slice('/api/img/'.length), ctx);
   if (path === '/api/catalog' && method === 'GET') return catalog(env, f);
   if (path === '/api/shipping/quote' && method === 'POST') return shippingQuote(request, env, f);

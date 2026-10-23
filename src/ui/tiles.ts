@@ -10,7 +10,6 @@ import {
   setById,
 } from '../domain/catalog';
 import { brl, escapeHtml as esc, pad3 } from '../domain/format';
-import { itemsOfCard } from '../domain/tcg';
 import { cube, flag, plan } from './art';
 import { disabledAttr } from './dom';
 
@@ -93,16 +92,4 @@ export const saleRow = (it: Item): string => {
       ? '<span class="mono status ok">pré-venda</span>'
       : '';
   return `<div class="sale-row"><div class="badges">${flag(it.lang)}<span class="mono pill">${esc(it.variant)}</span>${gradeChip(it)}${status}</div><span class="mono qty-un num">${soldOut ? 0 : it.qty} un.</span><span class="price num">${brl(it.price)}</span>${soldOut ? soldOutButton : addButton(it.id)}</div>`;
-};
-
-/** Card de uma carta da enciclopédia (com ou sem item à venda). */
-export const cardTile = (c: Card): string => {
-  const its = itemsOfCard(c.id);
-  const hit = its.length > 0;
-  const min = hit ? Math.min(...its.map((i) => i.price)) : 0;
-  const name = esc(c.name);
-  const row = hit
-    ? `<span class="mono tag">a partir de ${brl(min)}</span><a class="btn btn--sm" href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}">comprar</a>`
-    : '<span class="mono muted">sem item à venda</span>';
-  return `<article class="tile${hit ? ' hit' : ''}">${cardLink(c, cardImg(c), 'media media--card', `Ver ${name}`)}<div class="body"><span class="mono muted num">${c.n}/${setById[c.set].total}</span><h3><a href="#/carta/${c.id}" data-action="go" data-view="carta" data-id="${c.id}" style="text-decoration:none">${name}</a></h3><p class="mono muted">${esc(c.rar)} · ${esc(c.tipo)}</p><div class="row">${row}</div></div></article>`;
 };
