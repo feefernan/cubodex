@@ -60,14 +60,14 @@ const ACCOUNT = {
     {
       id: 'u1',
       productId: 'i2',
-      name: 'blastoise 2/102',
+      name: 'Blastoise 2/102',
       meta: 'EN · normal',
       date: '16/10',
       qty: 1,
       st: 'cofre' as const,
     },
   ],
-  hist: [{ d: '16/10', t: 'guardado no cofre · blastoise 2/102' }],
+  hist: [{ d: '16/10', t: 'guardado no cofre · Blastoise 2/102' }],
   orders: [
     {
       serial: 'CBX-20261016-AAAAAA',
@@ -653,7 +653,7 @@ describe('conta e formulários', () => {
     await vi.waitFor(() => expect(lastSent('/api/dex')).toEqual({ dex: { m2: 'have', m5: 'want' } }));
 
     goTo('cofre');
-    expect($('#cofreBody').textContent).toContain('blastoise 2/102');
+    expect($('#cofreBody').textContent).toContain('Blastoise 2/102');
     check('[data-input="vault-select"][data-id="u1"]', true);
     type('#vcep', '20040020');
     submit('#formVFrete');

@@ -100,7 +100,14 @@ hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na
 `k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e o `Tipo`, e os campos do tipo: miniatura = `Cor` (#RRGGBB), `Raridade`
 (comum, rara, especial) e `Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota`; pacote = uma linha
 `pack` com `Desconto do pacote` (%). Em até 10 min o cron leva a linha ao D1 (`def`, validado por `parseDef`) e o site a mostra.
-Sem preço, o produto novo fica fora de venda. Cartas ainda vêm do código (Fase 3: TCGdex).
+Sem preço, o produto novo fica fora de venda.
+
+**Carta à venda só pelo Notion:** `Tipo` = carta, `Carta TCGdex` (o id do TCGdex, ex.: `base1-4` ou `sv03.5-006`; está na
+URL da carta na enciclopédia do site), `Idioma` (EN/PT), `Variante` (normal, holo, reverse holo, 1ª edição), `Gradação`
+(ex.: `PSA 8`), mais `Preço`, `Disponíveis` e `Ativo no site`. O nome, o set, o número, a raridade e a imagem vêm da
+enciclopédia (D1): o Worker junta a linha do Notion com `tcg_cards` e `tcg_sets` ao ler (`readProducts`). Item em PT mostra o
+nome em português quando o TCGdex tem. A data de criação da linha ordena "mais recentes". Id que não existe na
+enciclopédia deixa a linha sem descrição (o log avisa). O catálogo de exemplo do código só vale sem a API (desenvolvimento).
 
 - `domain/` **não importa** `infra/` nem `ui/` e não toca no DOM. Toda regra de negócio nova nasce aqui, com teste.
 - `infra/` **não importa** `ui/`.

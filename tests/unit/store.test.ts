@@ -180,7 +180,7 @@ describe('pedido', () => {
     expect(o.address).toMatchObject({ cep: '01310100', uf: 'SP', complement: '' });
     expect(o.serviceId).toBe(2);
     expect(o.shipLines).toHaveLength(2);
-    expect(describeLine(o.lines[0])).toBe('2× blastoise 2/102 (EN · normal)');
+    expect(describeLine(o.lines[0])).toBe('2× Blastoise 2/102 (EN · normal)');
   });
   it('tudo no cofre dispensa endereço e frete, mas exige conta', () => {
     const items = [{ id: 'i2', qty: 1, dest: 'vault' }];

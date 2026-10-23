@@ -1,6 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { addToCart, describeEntry, packEntry } from '../../src/domain/cart';
-import { isListed, listedOf, MINIS, PACK, PRODUCTS, packPrice, parseDef, productById } from '../../src/domain/catalog';
+import { addToCart, describeEntry, packEntry, resolveCart } from '../../src/domain/cart';
+import {
+  ITEMS,
+  isListed,
+  itemName,
+  listedOf,
+  MINIS,
+  PACK,
+  PRODUCTS,
+  packPrice,
+  parseCardRef,
+  parseDef,
+  parseItemSpec,
+  productById,
+} from '../../src/domain/catalog';
 import { applyStock, parseStockRows } from '../../src/domain/stock';
 import { everything, packRow, resetCatalog } from '../catalog';
 
@@ -143,5 +156,145 @@ describe('pacote com desconto do Notion', () => {
     expect(PACK.listed).toBe(false);
     applyStock([...everything, packRow(10)]);
     expect(PACK.listed).toBe(true);
+  });
+});
+
+const CARD = {
+  id: 'sv03.5-100',
+  setId: 'sv03.5',
+  setName: '151',
+  number: '100',
+  total: 165,
+  name: 'Kangaskhan ex',
+  rarity: 'Double rare',
+  types: 'Colorless',
+  image: 'sv/sv03.5/100',
+  pt: true,
+};
+
+describe('carta à venda só pelo Notion (3.3)', () => {
+  it('a linha do Notion vira especificação: id do TCGdex, idioma, variante, gradação e data', () => {
+    expect(
+      parseItemSpec({
+        kind: 'item',
+        tcgdex: 'sv03.5-100',
+        lang: 'PT',
+        variant: 'holo',
+        grade: 'psa 9,5',
+        created: '2026-10-20T10:00:00.000Z',
+      }),
+    ).toEqual({
+      kind: 'item',
+      tcgdex: 'sv03.5-100',
+      lang: 'PT',
+      variant: 'holo',
+      grade: { co: 'PSA', n: 9.5 },
+      created: '2026-10-20T10:00:00.000Z',
+    });
+    // idioma desconhecido vira EN, variante vazia vira "normal", gradação ou data inválidas somem
+    expect(
+      parseItemSpec({ kind: 'item', tcgdex: 'base1-4', lang: 'xx', variant: '', grade: 'sem nota', created: 'ontem' }),
+    ).toEqual({
+      kind: 'item',
+      tcgdex: 'base1-4',
+      lang: 'EN',
+      variant: 'normal',
+      grade: null,
+      created: null,
+    });
+    expect(parseItemSpec({ kind: 'item', tcgdex: '', lang: 'EN' })).toBeNull();
+    expect(parseItemSpec({ kind: 'item', tcgdex: "a'; drop" })).toBeNull();
+    expect(parseItemSpec({ kind: 'mini', tcgdex: 'base1-4' })).toBeNull();
+    expect(parseItemSpec({ kind: 'item', tcgdex: 'a', grade: { co: 'CGC', n: 11 } })?.grade).toBeNull(); // nota fora de 1 a 10
+    expect(parseItemSpec({ kind: 'item', tcgdex: 'a', grade: { co: 'CGC', n: 8 } })?.grade).toEqual({
+      co: 'CGC',
+      n: 8,
+    });
+  });
+
+  it('a carta do TCGdex só entra com id, set, nome, número e total válidos; imagem fora do formato some', () => {
+    expect(parseCardRef(CARD)).toEqual(CARD);
+    expect(parseCardRef({ ...CARD, image: '../../x' })?.image).toBeNull();
+    expect(parseCardRef({ ...CARD, rarity: undefined, types: undefined, setName: '' })).toMatchObject({
+      rarity: '',
+      types: '',
+      setName: 'sv03.5',
+    });
+    expect(parseCardRef({ ...CARD, id: 'a b' })).toBeNull();
+    expect(parseCardRef({ ...CARD, total: -1 })).toBeNull();
+    expect(parseCardRef({ ...CARD, name: '' })).toBeNull();
+    expect(parseCardRef(null)).toBeNull();
+    expect(parseDef({ kind: 'item', card: CARD })).toMatchObject({ kind: 'item', lang: 'EN', variant: 'normal' });
+    expect(parseDef({ kind: 'item', card: null })).toBeNull();
+  });
+
+  const row = (id: string, def: unknown, over: object = {}) => ({
+    id,
+    price: 99 as number | null,
+    available: 3 as number | null,
+    active: true,
+    presale: false,
+    def: parseDef(def) ?? undefined,
+    ...over,
+  });
+
+  it('carta nova no Notion aparece na loja, no carrinho e nos filtros, sem mudar o código', () => {
+    applyStock([
+      ...everything,
+      packRow(10),
+      row('i13', {
+        kind: 'item',
+        card: CARD,
+        lang: 'PT',
+        variant: 'holo',
+        grade: { co: 'PSA', n: 9 },
+        created: '2099-01-01T00:00:00Z',
+      }),
+    ]);
+    const item = ITEMS.find((i) => i.id === 'i13');
+    expect(item).toMatchObject({ price: 99, qty: 3, status: 'estoque', variant: 'holo', grade: { co: 'PSA', n: 9 } });
+    expect(itemName(item as never)).toBe('Kangaskhan ex 100/165');
+    expect(productById.i13).toMatchObject({
+      kind: 'item',
+      name: 'Kangaskhan ex 100/165',
+      qty: 3,
+      grade: { co: 'PSA', n: 9 },
+    });
+    expect(addToCart([], 'i13').ok).toBe(true);
+    expect(resolveCart([{ id: 'i13', qty: 9, dest: 'send' }]).lines[0]).toMatchObject({ qty: 3, price: 99 }); // nunca passa do estoque
+    // a mais nova (data de criação no futuro) vem primeiro em "mais recentes"
+    expect(ITEMS.filter((i) => i.status !== 'esgotado').sort((a, b) => a.added - b.added)[0].id).toBe('i13');
+  });
+
+  it('o que o Notion muda de uma carta existente vale (preço, variante, gradação) e a foto própria fica', () => {
+    applyStock([
+      ...everything.map((r) => (r.id === 'i1' ? { ...r, photos: ['fotos/i1/0123456789abcdef.jpg'] } : r)),
+      packRow(10),
+      row(
+        'i1',
+        {
+          kind: 'item',
+          card: {
+            ...CARD,
+            id: 'base1-4',
+            setId: 'base1',
+            setName: 'Base Set',
+            number: '4',
+            total: 102,
+            name: 'Charizard',
+          },
+          lang: 'EN',
+          variant: 'holo',
+          grade: null,
+          created: null,
+        },
+        { price: 1000, photos: ['fotos/i1/0123456789abcdef.jpg'] },
+      ),
+    ]);
+    const item = ITEMS.find((i) => i.id === 'i1');
+    expect(item).toMatchObject({ price: 1000, variant: 'holo', photos: ['fotos/i1/0123456789abcdef.jpg'] });
+    expect(item?.grade).toBeUndefined();
+    expect(ITEMS.filter((i) => i.id === 'i1')).toHaveLength(1);
+    expect(PRODUCTS.filter((p) => p.id === 'i1')).toHaveLength(1);
   });
 });

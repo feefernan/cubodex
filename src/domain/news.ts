@@ -1,4 +1,4 @@
-import { cardById, ITEMS, type Item, isListed, itemName, PRODUCTS, setById } from './catalog';
+import { ITEMS, type Item, isListed, itemName, PRODUCTS } from './catalog';
 
 /** Uma novidade da home: o que é, o título e a linha de apoio, com o destino do clique. */
 export interface NewsCard {
@@ -21,13 +21,12 @@ export const homeNews = (): NewsCard[] => {
   const cards: NewsCard[] = [];
   const item = ITEMS.filter((it) => it.status !== 'esgotado').sort((a, b) => a.added - b.added)[0];
   if (item) {
-    const c = cardById[item.card];
     cards.push({
-      tag: `novidade · ${setById[c.set].name}`,
+      tag: `novidade · ${item.card.setName}`,
       title: `${itemName(item)} · ${item.variant}`,
       sub: `${gradeText(item)}${stockText(item)}`,
       view: 'carta',
-      id: c.id,
+      id: item.card.id,
     });
   }
   const craft = PRODUCTS.filter((p) => p.kind === 'craft' && isListed(p)).at(-1);

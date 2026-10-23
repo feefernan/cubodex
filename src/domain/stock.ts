@@ -1,4 +1,5 @@
 import {
+  defineItem,
   defineProduct,
   ITEMS,
   PACK,
@@ -40,6 +41,7 @@ export const applyStock = (rows: StockRow[]): string[] => {
   const unknown: string[] = [];
   for (const row of rows) {
     if (row.def?.kind === 'pack') PACK.discount = row.def.discount;
+    else if (row.def?.kind === 'item') defineItem(row.id, row.def, row.price);
     else if (row.def) defineProduct(row.id, row.def, row.price);
   }
   const active = new Set(rows.filter((r) => r.active).map((r) => r.id));

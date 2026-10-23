@@ -84,6 +84,7 @@ export const fake = () => {
         .filter((k) => !id || k === id)
         .map((k) => ({
           id: `page-${k}`,
+          created_time: '2026-10-20T10:00:00.000Z',
           properties: {
             ID: { rich_text: [{ plain_text: k }] },
             Disponíveis: { number: state.stock[k] ?? null },

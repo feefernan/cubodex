@@ -236,7 +236,7 @@ describe('cofre', () => {
     const [order] = rows('SELECT kind, status, vault_json FROM orders');
     expect(order).toMatchObject({ kind: 'compra', status: 'Aguardando pagamento' });
     expect(JSON.parse(String(order.vault_json))).toEqual([
-      { id: 'i2', qty: 2, name: 'blastoise 2/102', meta: 'EN · normal' },
+      { id: 'i2', qty: 2, name: 'Blastoise 2/102', meta: 'EN · normal' },
     ]);
 
     api.state.payment.external_reference = created.serial;
@@ -246,7 +246,7 @@ describe('cofre', () => {
       { product_id: 'i2', qty: 2, status: 'cofre' },
     ]);
     const me = await (await handle(withCookie('/api/me', cookie), E, ctx, api.f)).json();
-    expect(me.hist).toEqual([{ d: expect.any(String), t: 'guardado no cofre · blastoise 2/102 (2 un.)' }]);
+    expect(me.hist).toEqual([{ d: expect.any(String), t: 'guardado no cofre · Blastoise 2/102 (2 un.)' }]);
     expect(me.orders[0]).toMatchObject({ serial: created.serial, status: 'Pago' });
   });
 
@@ -428,7 +428,7 @@ describe('pagamento sem baixa dupla (#39)', () => {
     expect(api.state.orders[0].status).toBe('Estornado');
     const me = await (await handle(withCookie('/api/me', cookie), E, ctx, api.f)).json();
     expect(me.hist.map((h: { t: string }) => h.t)).toContain(
-      'removido do cofre · pagamento estornado · blastoise 2/102',
+      'removido do cofre · pagamento estornado · Blastoise 2/102',
     );
   });
 
