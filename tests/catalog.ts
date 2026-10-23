@@ -1,5 +1,5 @@
 /** Catálogo de exemplo como o Notion o teria, e o jeito de voltar a ele: o catálogo é do módulo, então os testes o restauram. */
-import { DEFAULT_PACK_DISCOUNT, MINIS, type Mini, PRODUCTS, productById } from '../src/domain/catalog';
+import { DEFAULT_PACK_DISCOUNT, ITEMS, MINIS, type Mini, PRODUCTS, productById } from '../src/domain/catalog';
 import { applyStock } from '../src/domain/stock';
 
 export const everything = PRODUCTS.map((p) => ({
@@ -20,7 +20,7 @@ export const packRow = (discount: number) => ({
 });
 
 /** Ids que os testes criam só pelo Notion; saem do catálogo na restauração. */
-const ADDED = ['m13', 'k7', 'a5'];
+const ADDED = ['m13', 'k7', 'a5', 'i13'];
 
 export const resetCatalog = () => {
   applyStock([...everything, packRow(DEFAULT_PACK_DISCOUNT)]);
@@ -29,6 +29,8 @@ export const resetCatalog = () => {
     if (!p) continue;
     PRODUCTS.splice(PRODUCTS.indexOf(p), 1);
     delete productById[id];
+    const item = ITEMS.find((it) => it.id === id);
+    if (item) ITEMS.splice(ITEMS.indexOf(item), 1);
   }
   MINIS.length = 0;
   MINIS.push(...PRODUCTS.filter((p): p is Mini => p.kind === 'mini'));

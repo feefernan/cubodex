@@ -58,6 +58,7 @@ describe('imagens e rótulos', () => {
   it('endereços no CDN do TCGdex', () => {
     expect(cardImageUrl('base/base1/4')).toBe('https://assets.tcgdex.net/en/base/base1/4/low.webp');
     expect(cardImageUrl('base/base1/4', 'high')).toBe('https://assets.tcgdex.net/en/base/base1/4/high.webp');
+    expect(cardImageUrl('sv/sv03.5/006', 'low', 'pt')).toBe('https://assets.tcgdex.net/pt/sv/sv03.5/006/low.webp');
     expect(logoUrl('base/base1')).toBe('https://assets.tcgdex.net/en/base/base1/logo.webp');
   });
   it('nome do set com o português ao lado quando difere; número sobre o total oficial', () => {

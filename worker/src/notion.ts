@@ -6,7 +6,7 @@
  *   E-mail (e-mail), Total (número), Data (data).
  * - Avisos: E-mail (título), Inscrito em (data), Consentimento (texto), Token (texto), Saiu (caixa).
  */
-import { parseDef } from '../../src/domain/catalog';
+import { type ItemSpec, type ProductDef, parseDef, parseItemSpec } from '../../src/domain/catalog';
 import type { PaymentStatus } from '../../src/domain/shipping';
 import type { StockRow } from '../../src/domain/stock';
 
@@ -24,9 +24,18 @@ type Prop = {
 };
 
 /** O que a linha descreve (Tipo, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
-const rowDef = (p: Record<string, Prop>, name: string) => {
+const rowDef = (p: Record<string, Prop>, name: string, created: string | undefined) => {
   const note = plain(p.Nota);
   switch (p.Tipo?.select?.name) {
+    case 'carta':
+      return {
+        kind: 'item',
+        tcgdex: plain(p['Carta TCGdex']),
+        lang: p.Idioma?.select?.name,
+        variant: p.Variante?.select?.name ?? plain(p.Variante),
+        grade: plain(p.Gradação),
+        created,
+      };
     case 'miniatura':
       return { kind: 'mini', name, n: p.Número?.number, rar: p.Raridade?.select?.name, color: plain(p.Cor) };
     case 'peça':
@@ -48,7 +57,7 @@ const rowDef = (p: Record<string, Prop>, name: string) => {
       return null;
   }
 };
-type Page = { id: string; properties: Record<string, Prop> };
+type Page = { id: string; created_time?: string; properties: Record<string, Prop> };
 
 /** Erros só com status e código: o corpo do Notion pode repetir dados do cliente (e-mail, endereço). */
 const failure = async (res: Response, what: string) => {
@@ -96,6 +105,12 @@ const plain = (p?: Prop) =>
     .join('')
     .trim();
 
+/** O que fica no D1: a descrição pronta, ou (carta) só o que o Notion diz, sem a carta do TCGdex. */
+export type StoredDef = Exclude<ProductDef, { kind: 'item' }> | ItemSpec;
+
+export const parseStoredDef = (v: unknown): StoredDef | null =>
+  (v as { kind?: string } | null)?.kind === 'item' ? parseItemSpec(v) : (parseDef(v) as StoredDef | null);
+
 /** Um arquivo da coluna Fotos: `internal` = enviado ao Notion (o link expira e tem assinatura na query). */
 export interface PhotoFile {
   name: string;
@@ -108,12 +123,12 @@ export const fetchProducts = async (
   f: Fetch,
   token: string,
   db: string,
-): Promise<(StockRow & { pageId: string; files: PhotoFile[] })[]> =>
+): Promise<(Omit<StockRow, 'def'> & { def?: StoredDef; pageId: string; files: PhotoFile[] })[]> =>
   (await query(f, token, db, null, 'ler produtos'))
-    .map(({ id: pageId, properties: p }) => ({
+    .map(({ id: pageId, created_time, properties: p }) => ({
       id: plain(p.ID),
       pageId,
-      def: parseDef(rowDef(p, plain(p.Nome))) ?? undefined,
+      def: parseStoredDef(rowDef(p, plain(p.Nome), created_time)) ?? undefined,
       files: (p.Fotos?.files ?? []).flatMap((x) => {
         const url = x.file?.url ?? x.external?.url;
         return url ? [{ name: x.name, url, internal: !!x.file }] : [];
@@ -127,7 +142,11 @@ export const fetchProducts = async (
 
 /** Preço e estoque de cada produto do banco Produtos (sem o id da página). */
 export const fetchStock = async (f: Fetch, token: string, db: string): Promise<StockRow[]> =>
-  (await fetchProducts(f, token, db)).map(({ pageId: _page, files: _files, ...row }) => row);
+  (await fetchProducts(f, token, db)).map(({ pageId: _page, files: _files, def, ...row }) => ({
+    ...row,
+    // Sem o banco não há enciclopédia para completar a carta: só as descrições que já vêm inteiras.
+    ...(def && def.kind !== 'item' ? { def } : {}),
+  }));
 
 /** Grava o estoque que o D1 já baixou na coluna Disponíveis da página do produto. */
 export const setAvailable = (f: Fetch, token: string, pageId: string, qty: number) =>

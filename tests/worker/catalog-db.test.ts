@@ -7,7 +7,7 @@ import { ctx, env, fake, req } from './fakes';
 
 let d1: ReturnType<typeof testDb>;
 let api: ReturnType<typeof fake>;
-const row = (id: string, over: Partial<StockRow & { pageId: string }> = {}) => ({
+const row = (id: string, over: Partial<Omit<StockRow, 'def'> & { pageId: string }> = {}) => ({
   id,
   pageId: `page-${id}`,
   price: null,

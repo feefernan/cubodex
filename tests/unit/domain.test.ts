@@ -11,7 +11,7 @@ import {
   resolveCart,
   toEntry,
 } from '../../src/domain/cart';
-import { cardById, cardImage, ITEMS, itemName, productById, productSubtitle } from '../../src/domain/catalog';
+import { ITEMS, itemName, productById, productSubtitle } from '../../src/domain/catalog';
 import {
   dexTotals,
   filterDex,
@@ -23,14 +23,7 @@ import {
 import { brl, escapeHtml, normalize, pad3, uniq } from '../../src/domain/format';
 import { areaOf, isView, navGroup, parseRoute, routeHref, subnavKey } from '../../src/domain/routes';
 import { demoAccount, initialState, mergePersisted } from '../../src/domain/state';
-import {
-  emptyFilters,
-  filterItems,
-  itemsOfCard,
-  itemsOfTcgdexCard,
-  onSaleBySet,
-  tcgdexCardId,
-} from '../../src/domain/tcg';
+import { emptyFilters, filterItems, filterOptions, itemsOfTcgdexCard, onSaleBySet } from '../../src/domain/tcg';
 import {
   cepDigits,
   countdown,
@@ -57,7 +50,8 @@ describe('formatação', () => {
 
 describe('catálogo', () => {
   it('nomeia o item pela carta e o total do set', () => {
-    expect(itemName(ITEMS[0])).toBe('charizard 4/102');
+    expect(itemName(ITEMS[0])).toBe('Charizard 4/102');
+    expect(itemName(ITEMS.find((i) => i.id === 'i8') ?? ITEMS[0])).toBe('Charizard ex 006/165'); // número como impresso
   });
   it('descreve cada tipo de produto no carrinho', () => {
     expect(productSubtitle(productById.i1)).toBe('EN · 1ª edição · PSA 8');
@@ -65,13 +59,6 @@ describe('catálogo', () => {
     expect(productSubtitle(productById.m3)).toBe('colecionável #003');
     expect(productSubtitle(productById.k1)).toBe('criar');
     expect(productSubtitle(productById.a1)).toBe('acessório');
-  });
-  it('imagem da carta no TCGdex: número com os dígitos do set e português só onde o set existe em PT', () => {
-    expect(cardImage(cardById['base1-4'])).toBe('https://assets.tcgdex.net/en/base/base1/4/low.webp');
-    expect(cardImage(cardById['base1-4'], 'PT', 'high')).toBe('https://assets.tcgdex.net/en/base/base1/4/high.webp');
-    expect(cardImage(cardById['jungle-11'])).toBe('https://assets.tcgdex.net/en/base/base2/11/low.webp');
-    expect(cardImage(cardById['sv151-6'], 'PT')).toBe('https://assets.tcgdex.net/pt/sv/sv03.5/006/low.webp');
-    expect(cardImage(cardById['sv151-151'], 'EN', 'high')).toBe('https://assets.tcgdex.net/en/sv/sv03.5/151/high.webp');
   });
 });
 
@@ -88,8 +75,8 @@ describe('filtros do TCG', () => {
     expect(ids({ q: 'fossil' })).toEqual(['i6']);
   });
   it('combina set, raridade, tipo, idioma, variante, gradação e estoque', () => {
-    expect(ids({ set: 'sv151', lang: 'PT' })).toEqual(['i9', 'i8', 'i10']);
-    expect(ids({ rar: 'comum', tipo: 'elétrico' })).toEqual(['i10', 'i4']);
+    expect(ids({ set: 'sv03.5', lang: 'PT' })).toEqual(['i9', 'i8', 'i10']);
+    expect(ids({ rar: 'Common', tipo: 'Lightning' })).toEqual(['i10', 'i4']);
     expect(ids({ variant: 'holo' })).toEqual(['i9', 'i12', 'i11']);
     expect(ids({ graded: true })).toEqual(['i1', 'i5']);
     expect(ids({ stock: true })).not.toContain('i7');
@@ -101,15 +88,24 @@ describe('filtros do TCG', () => {
     expect(ids({ sort: 'maior' })[0]).toBe('i1');
     expect(ids({ sort: 'az' })[0]).toBe('i2');
   });
-  it('enciclopédia: a ponte para os ids do TCGdex e o que a loja tem à venda', () => {
-    expect(itemsOfCard('jungle-11')).toEqual([]);
-    expect(itemsOfCard('sv151-6').map((i) => i.id)).toEqual(['i8', 'i12']);
-    // Ids do catálogo de exemplo viram ids do TCGdex (set base2 = Jungle; sv03.5 = 151, com número de 3 dígitos).
-    expect(tcgdexCardId(cardById['jungle-11'])).toBe('base2-11');
-    expect(tcgdexCardId(cardById['sv151-6'])).toBe('sv03.5-006');
-    expect(tcgdexCardId(cardById['base1-4'])).toBe('base1-4');
+  it('opções dos filtros saem das cartas à venda', () => {
+    const o = filterOptions();
+    expect(o.sets).toEqual([
+      ['sv03.5', '151'],
+      ['base1', 'Base Set'],
+      ['base3', 'Fossil'],
+      ['base2', 'Jungle'],
+    ]);
+    expect(o.rarities).toEqual(['Common', 'Double rare', 'Rare', 'Uncommon']);
+    expect(o.types).toEqual(['Colorless', 'Fire', 'Grass', 'Lightning', 'Psychic', 'Water']);
+    expect(o.langs).toEqual(['EN', 'PT']);
+    expect(o.variants).toEqual(['1ª edição', 'holo', 'normal', 'reverse holo']);
+    expect(filterOptions([]).sets).toEqual([]);
+  });
+  it('enciclopédia: o que a loja tem à venda de cada carta e de cada set do TCGdex', () => {
     expect(itemsOfTcgdexCard('sv03.5-006').map((i) => i.id)).toEqual(['i8', 'i12']);
     expect(itemsOfTcgdexCard('base2-11')).toEqual([]); // esgotada
+    expect(itemsOfTcgdexCard('nao-existe')).toEqual([]);
     expect(onSaleBySet()).toEqual(
       new Map([
         ['base1', 5],
@@ -123,7 +119,7 @@ describe('filtros do TCG', () => {
 describe('carrinho', () => {
   it('soma unidades e respeita o estoque das cartas', () => {
     const cart: CartEntry[] = [];
-    expect(addToCart(cart, 'i1')).toEqual({ ok: true, name: 'charizard 4/102' });
+    expect(addToCart(cart, 'i1')).toEqual({ ok: true, name: 'Charizard 4/102' });
     expect(addToCart(cart, 'i1')).toEqual({ ok: false, error: 'só 1 un. em estoque' });
     expect(addToCart(cart, 'm1').ok).toBe(true);
     expect(addToCart(cart, 'm1').ok).toBe(true);
@@ -155,7 +151,7 @@ describe('carrinho', () => {
   it('preço, nome e cor vêm do catálogo, nunca do que foi salvo (#7)', () => {
     const saved = [{ id: 'i2', qty: 1, price: 1, name: 'falso', color: 'red;}' }] as unknown as CartEntry[];
     const { lines } = resolveCart(saved);
-    expect(lines[0]).toMatchObject({ name: 'blastoise 2/102', price: 420, color: null, dest: 'send', kind: 'item' });
+    expect(lines[0]).toMatchObject({ name: 'Blastoise 2/102', price: 420, color: null, dest: 'send', kind: 'item' });
     expect(toEntry(lines[0])).toEqual({ id: 'i2', qty: 1, dest: 'send' });
   });
   it('item que sumiu ou esgotou sai do carrinho; quantidade acima do estoque é cortada', () => {

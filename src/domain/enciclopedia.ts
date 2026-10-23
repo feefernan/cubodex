@@ -27,8 +27,12 @@ export interface TcgCardInfo {
   image: string | null;
 }
 
-/** Carta no CDN: `low` (245×337) nas grades, `high` (600×825) na página da carta. */
-export const cardImageUrl = (path: string, size: 'low' | 'high' = 'low'): string => `${CDN}/en/${path}/${size}.webp`;
+/**
+ * Carta no CDN: `low` (245×337) nas grades, `high` (600×825) na página da carta. A imagem em português só existe
+ * nos sets que existem em português; fora deles, vale a em inglês.
+ */
+export const cardImageUrl = (path: string, size: 'low' | 'high' = 'low', lang: 'en' | 'pt' = 'en'): string =>
+  `${CDN}/${lang}/${path}/${size}.webp`;
 export const logoUrl = (path: string): string => `${CDN}/en/${path}/logo.webp`;
 
 const text = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);

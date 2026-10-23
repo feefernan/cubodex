@@ -1,4 +1,4 @@
-import { CARDS, listedOf, photoUrl, SETS } from '../domain/catalog';
+import { listedOf, photoUrl } from '../domain/catalog';
 import {
   cardImageUrl,
   filterCardList,
@@ -19,7 +19,16 @@ import {
   type TcgSetInfo,
 } from '../domain/enciclopedia';
 import { brl, escapeHtml as esc, uniq } from '../domain/format';
-import { emptyFilters, type Filters, filterItems, itemsOfTcgdexCard, onSaleBySet } from '../domain/tcg';
+import {
+  emptyFilters,
+  type Filters,
+  filterItems,
+  filterOptions,
+  itemsOfTcgdexCard,
+  onSaleBySet,
+  TYPE_PT,
+  VARIANT_PT,
+} from '../domain/tcg';
 import { api } from '../infra/api';
 import { emptyState } from './art';
 import { alertMsg } from './cart';
@@ -45,18 +54,24 @@ const FIELDS: Record<Exclude<keyof Filters, 'graded' | 'stock'>, string> = {
   sort: '#f-sort',
 };
 
-const options = (values: string[], label: string) =>
-  `<option value="">${label}</option>${values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join('')}`;
+const options = (pairs: [string, string][], label: string) =>
+  `<option value="">${label}</option>${pairs.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}`;
 
+/** As opções saem das cartas à venda de agora (o catálogo chega do Notion depois da página): refaz a cada vez. */
 const fillFilters = () => {
-  const sel = $<HTMLSelectElement>('#f-set');
-  if (sel.options.length > 1) return;
-  sel.innerHTML = `<option value="">todos os sets</option>${SETS.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}`;
-  $('#f-rar').innerHTML = options(uniq(CARDS.map((c) => c.rar)), 'todas as raridades');
-  $('#f-tipo').innerHTML = options(uniq(CARDS.map((c) => c.tipo)), 'todos os tipos');
-  $('#f-lang').innerHTML = options(['PT', 'EN'], 'todos os idiomas');
-  $('#f-var').innerHTML = options(['normal', 'holo', 'reverse holo', '1ª edição'], 'todas as variantes');
-  $('#f-sort').innerHTML = [
+  const o = filterOptions();
+  const same = (list: string[]): [string, string][] => list.map((v) => [v, v]);
+  $('#f-set').innerHTML = options(o.sets, 'todos os sets');
+  $('#f-rar').innerHTML = options(same(o.rarities), 'todas as raridades');
+  $('#f-tipo').innerHTML = options(
+    o.types.map((t) => [t, TYPE_PT[t] ?? t]),
+    'todos os tipos',
+  );
+  $('#f-lang').innerHTML = options(same(o.langs), 'todos os idiomas');
+  $('#f-var').innerHTML = options(same(o.variants), 'todas as variantes');
+  const sort = $<HTMLSelectElement>('#f-sort');
+  if (sort.options.length) return;
+  sort.innerHTML = [
     ['recentes', 'mais recentes'],
     ['menor', 'menor preço'],
     ['maior', 'maior preço'],
@@ -232,26 +247,6 @@ const renderSet = async () => {
   } catch (e) {
     if (currentView() === 'set') $('#setBody').innerHTML = failure(e);
   }
-};
-
-const TYPE_PT: Record<string, string> = {
-  Fire: 'fogo',
-  Water: 'água',
-  Grass: 'planta',
-  Lightning: 'elétrico',
-  Psychic: 'psíquico',
-  Fighting: 'lutador',
-  Darkness: 'sombrio',
-  Metal: 'metal',
-  Dragon: 'dragão',
-  Colorless: 'incolor',
-  Fairy: 'fada',
-};
-const VARIANT_PT: Record<string, string> = {
-  normal: 'normal',
-  reverse: 'reverse holo',
-  holo: 'holo',
-  firstEdition: '1ª edição',
 };
 
 const renderCarta = async () => {

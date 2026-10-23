@@ -11,10 +11,10 @@ describe('novidades da home', () => {
     // i9 (mew ex, pré-venda) é a mais recente; k6 é a última peça da lista.
     expect(carta).toEqual({
       tag: 'novidade · 151',
-      title: 'mew ex 151/165 · holo',
+      title: 'Mew ex 151/165 · holo',
       sub: 'pré-venda',
       view: 'carta',
-      id: 'sv151-151',
+      id: 'sv03.5-151',
     });
     expect(peca).toEqual({
       tag: 'novo em criar',
@@ -27,7 +27,7 @@ describe('novidades da home', () => {
   it('mostra a quantidade e a gradação, e some quando o item sai de venda', () => {
     applyStock(everything.map((r) => (r.id === 'i9' ? { ...r, active: false } : r)));
     // sem i9, a mais recente passa a ser i8 (4 un., sem gradação)
-    expect(homeNews()[0]).toMatchObject({ title: 'charizard ex 6/165 · normal', sub: '4 un.', id: 'sv151-6' });
+    expect(homeNews()[0]).toMatchObject({ title: 'Charizard ex 006/165 · normal', sub: '4 un.', id: 'sv03.5-006' });
     applyStock(everything.map((r) => (['i9', 'i8'].includes(r.id) ? { ...r, active: false } : r)));
     // sem i8 também: i1 (1 un., PSA 8) → "última unidade"
     expect(homeNews()[0]).toMatchObject({ sub: 'PSA 8 · última unidade' });

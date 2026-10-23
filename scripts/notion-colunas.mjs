@@ -26,6 +26,11 @@ const COLUMNS = {
   Impressão: { rich_text: {} },
   Nota: { rich_text: {} },
   'Desconto do pacote': { number: { format: 'number' } },
+  // Cartas à venda (Fase 3.3): a carta é o id do TCGdex; nome, set, número, raridade e imagem vêm de lá.
+  'Carta TCGdex': { rich_text: {} },
+  Idioma: { select: { options: ['EN', 'PT'].map((name) => ({ name })) } },
+  Variante: { select: { options: ['normal', 'holo', 'reverse holo', '1ª edição'].map((name) => ({ name })) } },
+  Gradação: { rich_text: {} },
 };
 
 const MINIS = [
@@ -59,6 +64,21 @@ const PECAS = [
   ['k6', 'PLA', '120 × 120 × 60 mm', '~8 h', 'empilhável'],
 ].map(([id, material, medidas, impressao, nota]) => ({ id, tipo: 'peça', material, medidas, impressao, nota }));
 
+const CARTAS = [
+  ['i1', 'base1-4', 'EN', '1ª edição', 'PSA 8'],
+  ['i2', 'base1-2', 'EN', 'normal', ''],
+  ['i3', 'base1-10', 'EN', 'normal', ''],
+  ['i4', 'base1-58', 'EN', 'normal', ''],
+  ['i5', 'base1-15', 'EN', 'normal', 'CGC 8'],
+  ['i6', 'base3-5', 'EN', 'normal', ''],
+  ['i7', 'base2-11', 'EN', 'normal', ''],
+  ['i8', 'sv03.5-006', 'PT', 'normal', ''],
+  ['i9', 'sv03.5-151', 'PT', 'holo', ''],
+  ['i10', 'sv03.5-025', 'PT', 'reverse holo', ''],
+  ['i11', 'sv03.5-094', 'EN', 'holo', ''],
+  ['i12', 'sv03.5-006', 'EN', 'holo', ''],
+].map(([id, tcgdex, idioma, variante, gradacao]) => ({ id, tipo: 'carta', tcgdex, idioma, variante, gradacao }));
+
 const rich = (v) => ({ rich_text: [{ text: { content: v } }] });
 const sel = (v) => ({ select: { name: v } });
 const toProps = (d) => ({
@@ -71,6 +91,10 @@ const toProps = (d) => ({
   ...(d.medidas && { Medidas: rich(d.medidas) }),
   ...(d.impressao && { Impressão: rich(d.impressao) }),
   ...(d.nota && { Nota: rich(d.nota) }),
+  ...(d.tcgdex && { 'Carta TCGdex': rich(d.tcgdex) }),
+  ...(d.idioma && { Idioma: sel(d.idioma) }),
+  ...(d.variante && { Variante: sel(d.variante) }),
+  ...(d.gradacao && { Gradação: rich(d.gradacao) }),
 });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -110,7 +134,7 @@ const byId = new Map(pages.map((p) => [plain(p.properties.ID), p]));
 
 let filled = 0;
 let skipped = 0;
-for (const d of [...MINIS, ...ACESSORIOS, ...PECAS]) {
+for (const d of [...MINIS, ...ACESSORIOS, ...PECAS, ...CARTAS]) {
   const page = byId.get(d.id);
   if (!page) {
     console.log(`- ${d.id}: não está no Notion, ignorado`);

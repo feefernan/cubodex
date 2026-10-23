@@ -4,16 +4,16 @@
  * - A baixa é um UPDATE atômico: duas vendas da mesma carta ao mesmo tempo nunca passam do estoque.
  * - `dirty` protege a baixa: enquanto o Notion não recebeu o valor novo, o sync não o sobrescreve.
  */
-import { type ProductDef, parseDef } from '../../src/domain/catalog';
+import type { CardRef, ProductDef } from '../../src/domain/catalog';
 import type { StockRow } from '../../src/domain/stock';
 import type { Db } from './accounts';
 import type { Bucket } from './bucket';
 import { log } from './http';
-import { fetchProducts, type PhotoFile, setAvailable } from './notion';
+import { fetchProducts, type PhotoFile, parseStoredDef, type StoredDef, setAvailable } from './notion';
 import { readPhotos, syncPhotos } from './photos';
 
 type Fetch = typeof fetch;
-type Row = StockRow & { pageId: string; files?: PhotoFile[] };
+type Row = Omit<StockRow, 'def'> & { def?: StoredDef; pageId: string; files?: PhotoFile[] };
 
 interface ProductRow {
   def: string | null;
@@ -24,26 +24,101 @@ interface ProductRow {
   presale: number;
 }
 
-/** Produtos no formato que o domínio já usa (`applyStock`) e que `/api/catalog` devolve. */
+/** Linha da carta do TCGdex com o set dela, como a leitura junta. */
+interface CardJoin {
+  id: string;
+  local_id: string;
+  name: string;
+  name_pt: string | null;
+  rarity: string | null;
+  types: string | null;
+  image: string | null;
+  set_id: string;
+  set_name: string;
+  set_pt: string | null;
+  total: number;
+  official: number;
+}
+
+/** As cartas do TCGdex (com o set) que as linhas do Notion citam; poucas por vez, por causa do limite de parâmetros. */
+const loadCards = async (db: Db, ids: string[]) => {
+  const out = new Map<string, CardJoin>();
+  for (let i = 0; i < ids.length; i += 50) {
+    const part = ids.slice(i, i + 50);
+    const rows = (
+      await db
+        .prepare(
+          `SELECT c.id, c.local_id, c.name, c.name_pt, c.rarity, c.types, c.image, s.id AS set_id, s.name AS set_name,
+            s.name_pt AS set_pt, s.total, s.official
+           FROM tcg_cards c JOIN tcg_sets s ON s.id = c.set_id WHERE c.id IN (${part.map(() => '?').join(', ')})`,
+        )
+        .bind(...part)
+        .all<CardJoin>()
+    ).results;
+    for (const r of rows) out.set(r.id, r);
+  }
+  return out;
+};
+
+/** A carta de uma linha do Notion: o que a loja mostra dela (nome no idioma do item, set, número, raridade, imagem). */
+const cardRef = (c: CardJoin, lang: string): CardRef => ({
+  id: c.id,
+  setId: c.set_id,
+  setName: c.set_name,
+  number: c.local_id,
+  total: c.official || c.total,
+  name: lang === 'PT' && c.name_pt ? c.name_pt : c.name,
+  rarity: c.rarity ?? '',
+  types: c.types ?? '',
+  image: c.image,
+  pt: c.set_pt !== null,
+});
+
+/**
+ * Produtos no formato que o domínio já usa (`applyStock`) e que `/api/catalog` devolve. A carta à venda sai com a
+ * carta do TCGdex junta: se o id do Notion não existe na enciclopédia, a linha fica sem descrição (e o log avisa).
+ */
 export const readProducts = async (db: Db): Promise<StockRow[]> => {
   const photos = await readPhotos(db);
-  return (await db.prepare('SELECT id, price, qty, active, presale, def FROM products').all<ProductRow>()).results.map(
-    (r) => ({
+  const rows = (await db.prepare('SELECT id, price, qty, active, presale, def FROM products').all<ProductRow>())
+    .results;
+  const defs = new Map(rows.map((r) => [r.id, parseStored(r.def)]));
+  const specs = [...defs.values()].flatMap((d) => (d?.kind === 'item' ? [d] : []));
+  const cards = specs.length
+    ? await loadCards(db, [...new Set(specs.map((s) => s.tcgdex))])
+    : new Map<string, CardJoin>();
+  return rows.map((r): StockRow => {
+    const d = defs.get(r.id);
+    let def: ProductDef | undefined;
+    if (d?.kind === 'item') {
+      const c = cards.get(d.tcgdex);
+      if (c)
+        def = {
+          kind: 'item',
+          card: cardRef(c, d.lang),
+          lang: d.lang,
+          variant: d.variant,
+          grade: d.grade,
+          created: d.created,
+        };
+      else log('warn', 'carta do Notion que não está na enciclopédia', { id: r.id, tcgdex: d.tcgdex });
+    } else if (d) def = d;
+    return {
       id: r.id,
       price: r.price,
       available: r.qty,
       active: r.active === 1,
       presale: r.presale === 1,
       photos: photos.get(r.id) ?? [],
-      ...(parseStoredDef(r.def) && { def: parseStoredDef(r.def) as ProductDef }),
-    }),
-  );
+      ...(def && { def }),
+    };
+  });
 };
 
 /** O JSON guardado no D1 passa de novo pela validação do domínio (um valor estragado vira "sem descrição"). */
-const parseStoredDef = (json: string | null) => {
+const parseStored = (json: string | null): StoredDef | null => {
   try {
-    return json ? parseDef(JSON.parse(json)) : null;
+    return json ? parseStoredDef(JSON.parse(json)) : null;
   } catch {
     return null;
   }
