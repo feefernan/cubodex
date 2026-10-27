@@ -20,6 +20,7 @@ import { $, check, disabledAttr, onAction, onInput, onSubmit } from './dom';
 import { currentView, registerView } from './router';
 import { isRealUser } from './session';
 import { persist, S } from './store';
+import { itemImg } from './tiles';
 import { toast } from './toast';
 
 // Demonstração: frete simulado e sem cobrança (conta real cota no Melhor Envio e paga no Mercado Pago).
@@ -80,7 +81,7 @@ const renderCofre = () => {
       .map((v) => {
         const on = v.st === 'cofre';
         const [label, cls] = STATUS[v.st];
-        return `<label class="vrow${on ? '' : ' off'}"><input type="checkbox" data-input="vault-select" data-id="${esc(v.id)}"${S.vSel[v.id] ? ' checked' : ''}${on ? '' : ' disabled'} aria-label="Selecionar ${esc(v.name)}"><span class="vph ph"></span><span style="min-width:0"><b style="text-transform:lowercase">${esc(v.name)}</b><br><span class="mono muted">${esc(v.meta)} · ${esc(v.date)} · ${v.qty} un.</span></span><span class="mono ${cls}">${label}</span></label>`;
+        return `<label class="vrow${on ? '' : ' off'}"><input type="checkbox" data-input="vault-select" data-id="${esc(v.id)}"${S.vSel[v.id] ? ' checked' : ''}${on ? '' : ' disabled'} aria-label="Selecionar ${esc(v.name)}"><span class="vph ph">${itemImg(v.productId)}</span><span style="min-width:0"><b style="text-transform:lowercase">${esc(v.name)}</b><br><span class="mono muted">${esc(v.meta)} · ${esc(v.date)} · ${v.qty} un.</span></span><span class="mono ${cls}">${label}</span></label>`;
       })
       .join('') ||
     '<p class="soft" style="padding:14px 0">Nada guardado ainda. No carrinho, escolha “guardar no cofre” nas cartas.</p>';
@@ -91,7 +92,7 @@ const renderCofre = () => {
   b.innerHTML =
     `<div class="vault-grid"><div><div class="section-head" style="margin-bottom:6px"><h2 class="display" style="font-size:28px">seus itens</h2><span class="mono muted">${inVault} no cofre${S.user.demo ? ' · exemplo' : ''}</span></div>${rows}` +
     `<div class="section-head" style="margin:36px 0 10px"><h2 class="display" style="font-size:28px">histórico</h2></div><ol class="timeline">${hist}</ol></div>` +
-    `<aside class="summary"><h3 class="display" style="font-size:26px">pedir envio</h3><p class="soft">${units ? `${units} un. selecionadas` : 'Marque os itens que quer receber.'}</p>` +
+    `<aside class="summary"><h3 class="display" style="font-size:26px">pedir envio</h3><p class="soft">${units ? `${units} un. selecionada${units > 1 ? 's' : ''}` : 'Marque os itens que quer receber.'}</p>` +
     shipPanel(units) +
     '</aside></div>';
 };
@@ -114,6 +115,7 @@ const quoteVault = async () => {
       api.quote(
         S.vCep,
         chosen.map((v) => ({ id: v.productId ?? '', qty: v.qty })),
+        true,
       ),
       S.buyer.street ? null : lookupCep(S.vCep),
     ]);

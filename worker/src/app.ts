@@ -30,6 +30,7 @@ import { accountRoutes, currentUser } from './account-routes';
 import {
   applyVaultEffects,
   claimPaid,
+  expireOrders,
   getOrder,
   markOrderStatus,
   markRefunded,
@@ -57,8 +58,29 @@ import { tcgRoutes } from './tcg';
 export { refreshCatalog } from './catalog-db';
 
 /** Cron (a cada 10 minutos): grava no Notion as baixas de estoque pendentes e traz de lá o que o dono editou. */
+/** Pedido sem pagamento por mais que isso é cancelado. */
+const UNPAID_HOURS = 24;
+/** Poucos por rodada: cada um custa 2 chamadas ao Notion e o plano grátis limita as chamadas por execução. */
+const EXPIRE_PER_RUN = 3;
+
+const expireUnpaid = async (db: NonNullable<Env['DB']>, env: Env, f: typeof fetch) => {
+  const before = new Date(Date.now() - UNPAID_HOURS * 3_600_000).toISOString();
+  for (const serial of await expireOrders(db, before, EXPIRE_PER_RUN)) {
+    log('info', 'pedido sem pagamento cancelado', { serial });
+    if (!env.NOTION_TOKEN) continue;
+    const page = await findOrderPage(f, env.NOTION_TOKEN, env.NOTION_ORDERS_DB, serial);
+    if (page && page.status === 'Aguardando pagamento')
+      await updatePaymentStatus(f, env.NOTION_TOKEN, page.id, 'Cancelado', `sem pagamento em ${UNPAID_HOURS} h`);
+  }
+};
+
 export const scheduled = (env: Env, ctx: Ctx, f: typeof fetch = fetch) => {
-  if (env.DB) ctx.waitUntil(refreshCatalog(env.DB, env, f));
+  const { DB } = env;
+  if (!DB) return;
+  ctx.waitUntil(refreshCatalog(DB, env, f));
+  ctx.waitUntil(
+    expireUnpaid(DB, env, f).catch((e) => log('error', 'cancelamento de pedidos parados falhou', { error: String(e) })),
+  );
 };
 export type { Env } from './env';
 
@@ -135,7 +157,16 @@ const quoteFor = async (env: Env, f: typeof fetch, cep: string, lines: CartLine[
   return options;
 };
 
-/** POST /api/shipping/quote — { cep, items } → opções de frete para o que vai ser enviado agora. */
+const ownedLines = (entries: { id?: unknown; qty?: unknown }[]) =>
+  entries.slice(0, MAX_LINES).flatMap((e) => {
+    const p = typeof e.id === 'string' ? productById[e.id] : undefined;
+    const qty = Number(e.qty);
+    return p && Number.isInteger(qty) && qty >= 1 && qty <= 99
+      ? [{ id: p.id, kind: p.kind, qty, price: p.price } as CartLine]
+      : [];
+  });
+
+/** POST /api/shipping/quote — { cep, items, owned? } → opções de frete para o que vai ser enviado agora (owned: itens do cofre). */
 const shippingQuote = async (request: Request, env: Env, f: typeof fetch) => {
   const blocked = await limited(request, env.QUOTES_LIMITER);
   if (blocked) return blocked;
@@ -144,8 +175,12 @@ const shippingQuote = async (request: Request, env: Env, f: typeof fetch) => {
     const cep = cepDigits(String(input.cep ?? ''));
     if (cep.length !== 8) throw new OrderError(400, 'CEP inválido');
     await loadStock(env, f);
-    const { lines } = resolveCart(Array.isArray(input.items) ? (input.items as never) : []);
-    const shipLines = lines.filter((l) => l.dest !== 'vault');
+    const entries = Array.isArray(input.items) ? (input.items as { id?: unknown; qty?: unknown }[]) : [];
+    // Itens do cofre já são do cliente: o estoque da loja (que pode ter zerado com essa mesma venda) não entra.
+    const shipLines =
+      input.owned === true
+        ? ownedLines(entries)
+        : resolveCart(entries as never).lines.filter((l) => l.dest !== 'vault');
     if (!shipLines.length) throw new OrderError(400, 'Nada para enviar');
     const options = await quoteFor(env, f, cep, shipLines);
     return json({ options: pickShippingOptions(options) });

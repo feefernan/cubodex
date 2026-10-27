@@ -164,6 +164,23 @@ export const releaseShipment = (db: Db, serial: string) =>
     .bind(serial)
     .run();
 
+/**
+ * Pedidos que ninguém pagou até `before` viram "Cancelado" (os itens separados para um envio voltam ao cofre).
+ * Um pagamento aprovado que chegue depois ainda leva o pedido a "Pago" (claimPaid aceita "Cancelado").
+ */
+export const expireOrders = async (db: Db, before: string, limit: number) => {
+  const { results } = await db
+    .prepare(
+      `UPDATE orders SET status = 'Cancelado' WHERE serial IN (
+         SELECT serial FROM orders WHERE status = 'Aguardando pagamento' AND created_at < ? ORDER BY created_at LIMIT ?
+       ) RETURNING serial`,
+    )
+    .bind(before, limit)
+    .all<{ serial: string }>();
+  for (const r of results) await releaseShipment(db, r.serial);
+  return results.map((r) => r.serial);
+};
+
 export interface OrderMirror {
   serial: string;
   userId: string | null;

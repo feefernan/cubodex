@@ -52,6 +52,27 @@ describe('rotas básicas', () => {
 });
 
 describe('frete', () => {
+  it('itens do cofre são cotados mesmo sem estoque na loja', async () => {
+    const quote = (items: unknown[]) =>
+      handle(req('/api/shipping/quote', { cep: '01310100', items, owned: true }), env(), ctx, api.f);
+    expect((await quote([{ id: 'i2', qty: 1 }])).status).toBe(200);
+    expect(
+      (
+        ((api.calls.filter((c) => c.url.startsWith('https://me.test')).at(-1)?.body ?? {}).products as {
+          id: string;
+        }[]) ?? []
+      ).map((p) => p.id),
+    ).toEqual(['i2']);
+    expect(
+      (
+        await quote([
+          { id: 'nao-existe', qty: 1 },
+          { id: 'i2', qty: 0 },
+        ])
+      ).status,
+    ).toBe(400);
+  });
+
   it('cota no Melhor Envio só o que vai ser enviado', async () => {
     const res = await handle(
       req('/api/shipping/quote', {

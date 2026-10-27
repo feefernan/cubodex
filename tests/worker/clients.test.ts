@@ -20,7 +20,10 @@ describe('Mercado Pago', () => {
     expect(await createCheckout(f, 'TEST-123', charge)).toBe('https://sandbox');
     expect(await createCheckout(f, 'APP_USR-1', charge)).toBe('https://prod');
     const init = f.mock.calls[0][1] as RequestInit;
-    expect(JSON.parse(String(init.body)).back_urls.success).toBe('https://cubodex.test/#/pedido/CBX-20261016-ABCDEF');
+    const body = JSON.parse(String(init.body));
+    expect(body.back_urls.success).toBe('https://cubodex.test/#/pedido/CBX-20261016-ABCDEF');
+    expect(body.expires).toBe(true);
+    expect(Date.parse(body.expiration_date_to) - Date.now()).toBeGreaterThan(60 * 60_000);
   });
   it('erro ou resposta sem link viram exceção', async () => {
     await expect(createCheckout(async () => Response.json({}), 'APP_USR-1', charge)).rejects.toThrow('sem link');

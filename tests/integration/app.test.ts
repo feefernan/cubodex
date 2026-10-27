@@ -658,7 +658,7 @@ describe('conta e formulários', () => {
     type('#vcep', '20040020');
     submit('#formVFrete');
     await vi.waitFor(() => expect(document.querySelectorAll('#cofreBody .ship-opt')).toHaveLength(2));
-    expect(lastSent('/api/shipping/quote')).toEqual({ cep: '20040020', items: [{ id: 'i2', qty: 1 }] });
+    expect(lastSent('/api/shipping/quote')).toEqual({ cep: '20040020', items: [{ id: 'i2', qty: 1 }], owned: true });
     click('[data-action="vault-ship"][data-i="0"]');
     expect($<HTMLInputElement>('#vk-street').value).toBe('Avenida Paulista');
     // O envio do cofre também pede CPF e telefone (nota fiscal e etiqueta), nos campos com id próprio (vk-).
