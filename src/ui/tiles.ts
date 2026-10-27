@@ -1,4 +1,4 @@
-import { type CardRef, type Item, itemName, PACK, type Product, photoUrl } from '../domain/catalog';
+import { type CardRef, ITEMS, type Item, itemName, PACK, type Product, photoUrl } from '../domain/catalog';
 import { cardImageUrl } from '../domain/enciclopedia';
 import { brl, escapeHtml as esc, pad3 } from '../domain/format';
 import { cube, flag, plan } from './art';
@@ -11,6 +11,12 @@ import { disabledAttr } from './dom';
 const cardImg = (c: CardRef, lang: string, own?: string) => {
   const src = own ? photoUrl(own) : c.image ? cardImageUrl(c.image, 'low', lang === 'PT' && c.pt ? 'pt' : 'en') : '';
   return src ? `<img src="${esc(src)}" alt="" width="245" height="337" loading="lazy" decoding="async">` : '';
+};
+
+/** Miniatura da carta de um item (para o cofre); vazia se o item saiu do catálogo. */
+export const itemImg = (id?: string) => {
+  const it = ITEMS.find((i) => i.id === id);
+  return it ? cardImg(it.card, it.lang, it.photos?.[0]) : '';
 };
 
 /** Foto própria do produto, preenchendo o espaço da mídia. */

@@ -68,8 +68,10 @@ export interface OrderRequest {
 
 export const api = {
   catalog: () => call<unknown>('/api/catalog'),
-  quote: (cep: string, items: CartEntry[]) =>
-    post<{ options: ShippingOption[] }>('/api/shipping/quote', { cep, items }).then((d) => d.options),
+  quote: (cep: string, items: CartEntry[], owned = false) =>
+    post<{ options: ShippingOption[] }>('/api/shipping/quote', { cep, items, ...(owned ? { owned } : {}) }).then(
+      (d) => d.options,
+    ),
   order: (body: OrderRequest) =>
     post<{ serial: string; total: number; checkoutUrl: string | null }>('/api/orders', body),
   status: (serial: string) =>

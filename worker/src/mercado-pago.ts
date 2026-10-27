@@ -33,6 +33,9 @@ export const createCheckout = async (f: typeof fetch, token: string, c: Charge):
       auto_return: 'approved',
       // Sem notification_url aqui: ela teria prioridade sobre o webhook cadastrado no painel do Mercado Pago,
       // e só os avisos do painel vêm assinados com a chave secreta (x-signature) que o Worker confere.
+      // O link deixa de valer em 2 h; o pedido não pago é cancelado em 24 h pelo cron.
+      expires: true,
+      expiration_date_to: new Date(Date.now() + 2 * 3_600_000).toISOString().replace('Z', '+00:00'),
       statement_descriptor: 'CUBODEX',
     }),
   });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { startSession } from '../../worker/src/accounts';
-import { clearStockCache, handle, refreshCatalog } from '../../worker/src/app';
+import { clearStockCache, handle, refreshCatalog, scheduled } from '../../worker/src/app';
 import type { Env } from '../../worker/src/env';
 import { testDb } from './d1';
 import { ctx, env, fake, ORDER, req, sign } from './fakes';
@@ -438,6 +438,21 @@ describe('pagamento sem baixa dupla (#39)', () => {
     await hook(E);
     const patch = api.calls.filter((c) => c.method === 'PATCH' && c.url.endsWith('/pages/p0')).at(-1);
     expect(JSON.stringify(patch?.body)).toContain('VALOR DIVERGENTE');
+  });
+
+  it('pedido sem pagamento há mais de 24 h é cancelado pelo cron, no D1 e no Notion', async () => {
+    const old = await create();
+    const fresh = await create();
+    d1.sqlite
+      .prepare('UPDATE orders SET created_at = ? WHERE serial = ?')
+      .run(new Date(Date.now() - 25 * 3_600_000).toISOString(), old);
+    const waits: Promise<unknown>[] = [];
+    scheduled(E, { waitUntil: (p: Promise<unknown>) => void waits.push(p) }, api.f);
+    await Promise.all(waits);
+    const status = (s: string) => rows(`SELECT status FROM orders WHERE serial = '${s}'`)[0].status;
+    expect(status(old)).toBe('Cancelado');
+    expect(status(fresh)).toBe('Aguardando pagamento');
+    expect(api.calls.some((c) => c.method === 'PATCH' && JSON.stringify(c.body).includes('Cancelado'))).toBe(true);
   });
 
   it('frete pago à parte do valor das cartas não conta como divergência', async () => {
