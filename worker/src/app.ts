@@ -306,7 +306,8 @@ const paymentWebhook = async (request: Request, env: Env, f: typeof fetch) => {
         claimed &&
         mirror &&
         payment.transaction_amount != null &&
-        Math.abs(payment.transaction_amount - mirror.total) > 0.01
+        Math.abs(payment.transaction_amount - mirror.total) > 0.01 &&
+        Math.abs(payment.transaction_amount + (payment.shipping_amount ?? 0) - mirror.total) > 0.01
       ) {
         log('warn', 'valor pago diferente do pedido', {
           serial,

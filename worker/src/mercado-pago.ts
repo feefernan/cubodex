@@ -55,6 +55,8 @@ export const getPayment = async (f: typeof fetch, token: string, id: string) => 
     id: number;
     status: string;
     transaction_amount?: number;
+    /** O frete do Checkout Pro vem à parte do transaction_amount. */
+    shipping_amount?: number;
     external_reference?: string;
     metadata?: { items?: { id?: unknown; qty?: unknown }[] };
   };
