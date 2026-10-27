@@ -440,6 +440,19 @@ describe('pagamento sem baixa dupla (#39)', () => {
     expect(JSON.stringify(patch?.body)).toContain('VALOR DIVERGENTE');
   });
 
+  it('frete pago à parte do valor das cartas não conta como divergência', async () => {
+    await create();
+    const total = rows('SELECT total FROM orders')[0].total as number;
+    api.state.payment = {
+      ...api.state.payment,
+      transaction_amount: total - 10,
+      shipping_amount: 10,
+    } as typeof api.state.payment;
+    await hook(E);
+    const patch = api.calls.filter((c) => c.method === 'PATCH' && c.url.endsWith('/pages/p0')).at(-1);
+    expect(JSON.stringify(patch?.body)).not.toContain('VALOR DIVERGENTE');
+  });
+
   it('Notion fora do ar ao gravar o pedido deixa o espelho como "Falhou"', async () => {
     const f = failOnce((u, m) => m === 'POST' && u === 'https://api.notion.com/v1/pages');
     expect((await handle(req('/api/orders', cardOrder), E, ctx, f)).status).toBe(502);
