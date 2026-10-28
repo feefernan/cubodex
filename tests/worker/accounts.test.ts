@@ -418,11 +418,16 @@ describe('pagamento sem baixa dupla (#39)', () => {
 
   it('estorno depois de pago vira "Estornado" e tira o item do cofre', async () => {
     const cookie = await login();
+    const qty = () => rows("SELECT qty FROM products WHERE id = 'i2'")[0].qty;
     await create({ ...ORDER, items: [{ id: 'i2', qty: 1, dest: 'vault' }] }, cookie);
+    const before = qty();
     await hook(E);
     expect(rows('SELECT status FROM vault_items')).toEqual([{ status: 'cofre' }]);
+    expect(qty()).toBe((before as number) - 1);
     api.state.payment = { ...api.state.payment, status: 'refunded' };
     await hook(E);
+    expect(qty()).toBe(before);
+    expect(rows("SELECT dirty FROM products WHERE id = 'i2'")).toEqual([{ dirty: 1 }]);
     expect(rows('SELECT status FROM orders')).toEqual([{ status: 'Estornado' }]);
     expect(rows('SELECT * FROM vault_items')).toEqual([]);
     expect(api.state.orders[0].status).toBe('Estornado');
@@ -482,6 +487,28 @@ describe('pagamento sem baixa dupla (#39)', () => {
     const ship = { items: [item.id, item.id], address: ORDER.address, contact: CONTACT, shipping: { serviceId: 1 } };
     expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(201);
     expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(409);
+  });
+
+  it('estorno do envio devolve ao cofre os itens que ainda não saíram, sem mexer no estoque', async () => {
+    const cookie = await login();
+    await create({ ...ORDER, items: [{ id: 'i2', qty: 1, dest: 'vault' }] }, cookie);
+    await hook(E);
+    const [item] = rows('SELECT id FROM vault_items');
+    const ship = { items: [item.id], address: ORDER.address, contact: CONTACT, shipping: { serviceId: 1 } };
+    expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(201);
+    const [{ serial }] = rows("SELECT serial FROM orders WHERE kind = 'envio'") as { serial: string }[];
+    api.state.payment = { ...api.state.payment, external_reference: serial, status: 'approved' };
+    await hook(E);
+    expect(rows('SELECT status FROM vault_items')).toEqual([{ status: 'envio' }]);
+    const stock = rows("SELECT qty FROM products WHERE id = 'i2'");
+    api.state.payment = { ...api.state.payment, status: 'refunded' };
+    await hook(E);
+    expect(rows('SELECT status, shipment_serial FROM vault_items')).toEqual([
+      { status: 'cofre', shipment_serial: null },
+    ]);
+    expect(rows("SELECT qty FROM products WHERE id = 'i2'")).toEqual(stock);
+    const me = await (await handle(withCookie('/api/me', cookie), E, ctx, api.f)).json();
+    expect(me.hist.map((h: { t: string }) => h.t)).toContain('envio estornado · volta ao cofre · Blastoise 2/102');
   });
 
   it('cobrança do envio que falha devolve os itens ao cofre', async () => {
