@@ -286,27 +286,41 @@ export const applyVaultEffects = async (db: Db, serial: string, order: OrderRow,
 };
 
 /**
- * Estorno ou chargeback de pedido pago: o pedido vira Estornado e as cartas dessa compra saem do cofre
- * (não podem ser enviadas de graça depois). Itens já enviados ficam como estão — a loja resolve à parte.
+ * Estorno ou chargeback de pedido pago: o pedido vira Estornado.
+ * - compra: as cartas dessa compra que ainda estão no cofre saem dele (não podem ser enviadas de graça) e voltam ao
+ *   estoque da loja, pois continuam com a loja;
+ * - envio: os itens que ainda não saíram ("envio") voltam ao cofre.
+ * Itens já enviados ficam como estão — a loja resolve à parte.
  */
 export const markRefunded = async (db: Db, serial: string, now = Date.now()) => {
   const order = await db
     .prepare("UPDATE orders SET status = 'Estornado' WHERE serial = ? AND status = 'Pago' RETURNING user_id, kind")
     .bind(serial)
     .first<{ user_id: string | null; kind: string }>();
-  if (!order?.user_id || order.kind !== 'compra') return;
+  if (!order?.user_id) return;
+  const compra = order.kind === 'compra';
   const { results } = await db
-    .prepare("DELETE FROM vault_items WHERE order_serial = ? AND status = 'cofre' RETURNING name")
+    .prepare(
+      compra
+        ? "DELETE FROM vault_items WHERE order_serial = ? AND status = 'cofre' RETURNING name, product_id, qty"
+        : "UPDATE vault_items SET status = 'cofre', shipment_serial = NULL WHERE shipment_serial = ? AND status = 'envio' RETURNING name, product_id, qty",
+    )
     .bind(serial)
-    .all<{ name: string }>();
-  if (results.length)
-    await db.batch(
-      results.map((it) =>
+    .all<{ name: string; product_id: string | null; qty: number }>();
+  const text = compra ? 'removido do cofre · pagamento estornado' : 'envio estornado · volta ao cofre';
+  const writes = results.map((it) =>
+    db
+      .prepare('INSERT INTO vault_history (user_id, at, text) VALUES (?, ?, ?)')
+      .bind(order.user_id, day(now), `${text} · ${it.name}`),
+  );
+  if (compra)
+    for (const it of results)
+      writes.push(
         db
-          .prepare('INSERT INTO vault_history (user_id, at, text) VALUES (?, ?, ?)')
-          .bind(order.user_id, day(now), `removido do cofre · pagamento estornado · ${it.name}`),
-      ),
-    );
+          .prepare('UPDATE products SET qty = qty + ?, dirty = 1 WHERE id = ? AND qty IS NOT NULL')
+          .bind(it.qty, it.product_id),
+      );
+  if (writes.length) await db.batch(writes);
 };
 
 /** Pedido que não vai ser pago: Cancelado (recusado) ou Falhou (não chegou ao painel). Pago e Estornado ficam. */
