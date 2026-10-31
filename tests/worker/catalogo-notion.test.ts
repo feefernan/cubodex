@@ -41,7 +41,9 @@ describe('catálogo vindo só do Notion (2.3)', () => {
     };
     api.state.rows.a6 = {
       Nome: { title: [{ plain_text: 'triple pack' }] },
-      Tipo: choice('pack'),
+      Tipo: choice('lacrado'),
+      Idioma: choice('PT'),
+      Série: choice('Equilíbrio Perfeito'),
       Nota: text('3 boosters'),
       Preço: { number: 25 },
     };
@@ -74,7 +76,9 @@ describe('catálogo vindo só do Notion (2.3)', () => {
       kind: 'acc',
       name: 'triple pack',
       note: '3 boosters',
-      group: 'pack',
+      group: 'lacrado',
+      lang: 'PT',
+      set: 'Equilíbrio Perfeito',
     });
     expect(stored.find((p) => p.id === 'a5')?.def).toEqual({ kind: 'acc', name: 'luva', note: 'macia' });
     expect(stored.find((p) => p.id === 'pack')?.def).toEqual({ kind: 'pack', discount: 10 });

@@ -51,8 +51,15 @@ const rowDef = (p: Record<string, Prop>, name: string, created: string | undefin
       };
     case 'acessório':
       return { kind: 'acc', name, note };
-    case 'pack':
-      return { kind: 'acc', name, note, group: 'pack' };
+    case 'lacrado':
+      return {
+        kind: 'acc',
+        name,
+        note,
+        group: 'lacrado',
+        lang: p.Idioma?.select?.name,
+        set: p.Série?.select?.name ?? plain(p.Série),
+      };
     case 'pacote':
       return { kind: 'pack', discount: p['Desconto do pacote']?.number };
     default:

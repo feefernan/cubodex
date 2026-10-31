@@ -31,8 +31,8 @@ const isMiniOnSale = (id: string) => isMini(id) && isListed(productById[id]);
 /** Quantas unidades existem de uma carta (estoque ou pré-venda); null = sem limite (peça impressa sob demanda). */
 const stockLimit = (id: string): number | null => {
   const p = productById[id];
-  if (p?.kind !== 'item') return null;
-  return p.status === 'esgotado' ? 0 : p.qty;
+  if (p?.kind === 'item') return p.status === 'esgotado' ? 0 : p.qty;
+  return p?.kind === 'acc' ? (p.qty ?? null) : null;
 };
 
 /** Monta a linha a partir do catálogo; null quando o item não existe mais ou esgotou. */

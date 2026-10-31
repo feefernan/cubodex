@@ -283,12 +283,12 @@ const renderCarta = async () => {
   }
 };
 
-let accGroup: 'all' | 'pack' | 'acc' = 'all';
+let accGroup: 'all' | 'lacrado' | 'acc' = 'all';
 
-/** Packs e acessórios: o filtro separa o lacrado do TCG (group "pack") do resto. */
+/** Packs e acessórios: o filtro separa o lacrado do TCG (group "lacrado") do resto. */
 const renderAcc = () => {
   const list = listedOf('acc').filter(
-    (p) => accGroup === 'all' || (p.kind === 'acc' && !!p.group) === (accGroup === 'pack'),
+    (p) => accGroup === 'all' || (p.kind === 'acc' && !!p.group) === (accGroup === 'lacrado'),
   );
   $('#accGrid').innerHTML = list.length
     ? ''
@@ -305,7 +305,7 @@ export const initTcg = () => {
   });
   registerView('acessorios', renderAcc);
   onAction('acc-group', (el) => {
-    accGroup = el.dataset.g === 'pack' || el.dataset.g === 'acc' ? el.dataset.g : 'all';
+    accGroup = el.dataset.g === 'lacrado' || el.dataset.g === 'acc' ? el.dataset.g : 'all';
     renderAcc();
   });
   registerView('sets', renderSets);

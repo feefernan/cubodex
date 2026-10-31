@@ -45,8 +45,16 @@ const media = (p: Product): string => {
   }
 };
 
+const accDetails = (p: Extract<Product, { kind: 'acc' }>): string => {
+  const qty = p.qty === undefined ? '' : `<p class="mono qty-un num">${p.qty} un.</p>`;
+  if (p.group !== 'lacrado') return `<p class="mono meta">${esc(p.note)}</p>${qty}`;
+  const set = p.set ? `<p class="mono muted">${esc(p.set)}</p>` : '';
+  const lang = p.lang ? `<div class="badges">${flag(p.lang)}</div>` : '';
+  return `${set}${lang}<p class="mono meta">${esc(p.note)}</p>${qty}`;
+};
+
 const details = (p: Product): string => {
-  if (p.kind === 'acc') return `<p class="mono meta">${esc(p.note)}</p>`;
+  if (p.kind === 'acc') return accDetails(p);
   if (p.kind === 'mini') return `<p class="mono muted">${esc(p.rar)} · série 01</p>`;
   if (p.kind === 'craft')
     return `<dl class="spec">${p.spec.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;
@@ -59,7 +67,8 @@ export const productTile = (p: Product): string => {
     p.kind === 'mini' && PACK.listed
       ? `<button class="btn btn--ghost btn--sm" data-action="pack-add" data-id="${p.id}">+ pacote</button>`
       : '';
-  return `<article class="tile">${media(p)}<div class="body"><h3>${esc(p.name)}</h3>${details(p)}<div class="row"><span class="price num">${brl(p.price)}</span><div class="actions">${pack}${addButton(p.id)}</div></div></div></article>`;
+  const soldOut = p.kind === 'acc' && p.qty === 0;
+  return `<article class="tile${soldOut ? ' soldout' : ''}">${media(p)}<div class="body"><h3>${esc(p.name)}</h3>${details(p)}<div class="row"><span class="price num">${brl(p.price)}</span><div class="actions">${pack}${soldOut ? soldOutButton : addButton(p.id)}</div></div></div></article>`;
 };
 
 export const fillProducts = (container: HTMLElement, products: Product[]) => {
