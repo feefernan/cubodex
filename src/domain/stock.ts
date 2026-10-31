@@ -25,7 +25,7 @@ export interface StockRow {
 }
 
 /** Chave de foto no R2: `fotos/<id do produto>/<16 hex>.<extensão de imagem>`. */
-export const PHOTO_KEY = /^fotos\/[a-z0-9-]+\/[0-9a-f]{16}\.(?:jpe?g|png|webp|gif)$/;
+export const PHOTO_KEY = /^fotos\/[A-Za-z0-9-]+\/[0-9a-f]{16}\.(?:jpe?g|png|webp|gif)$/;
 
 const statusOf = (row: StockRow): StockStatus => {
   if (!row.active || row.available === 0) return 'esgotado';

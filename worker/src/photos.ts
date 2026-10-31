@@ -30,7 +30,7 @@ const sha16 = async (text: string) =>
 /** Chave da foto no R2, ou null se o arquivo não é uma imagem que aceitamos (a extensão vem do nome dado no Notion). */
 export const photoKey = async (productId: string, file: PhotoFile): Promise<string | null> => {
   const ext = file.name.match(EXT)?.[1]?.toLowerCase();
-  if (!ext || !/^[a-z0-9-]+$/.test(productId)) return null;
+  if (!ext || !/^[A-Za-z0-9-]+$/.test(productId)) return null;
   const u = new URL(file.url);
   const identity = file.internal ? `${u.origin}${u.pathname}` : file.url;
   const key = `fotos/${productId}/${await sha16(identity)}.${ext}`;
