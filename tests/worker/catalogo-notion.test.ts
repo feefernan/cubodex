@@ -41,7 +41,7 @@ describe('catálogo vindo só do Notion (2.3)', () => {
     };
     api.state.rows.a6 = {
       Nome: { title: [{ plain_text: 'triple pack' }] },
-      Tipo: choice('lacrado'),
+      Tipo: choice(' Lacrado '),
       Idioma: choice('PT'),
       Série: choice('Equilíbrio Perfeito'),
       Nota: text('3 boosters'),

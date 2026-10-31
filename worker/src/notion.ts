@@ -26,7 +26,8 @@ type Prop = {
 /** O que a linha descreve (Tipo, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
 const rowDef = (p: Record<string, Prop>, name: string, created: string | undefined) => {
   const note = plain(p.Nota);
-  switch (p.Tipo?.select?.name) {
+  // Maiúscula e espaço sobrando no nome da opção não mudam o tipo ("Lacrado", "acessório ").
+  switch (p.Tipo?.select?.name?.trim().toLowerCase()) {
     case 'carta':
       return {
         kind: 'item',
