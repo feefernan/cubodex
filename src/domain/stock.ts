@@ -64,6 +64,7 @@ export const applyStock = (rows: StockRow[]): string[] => {
     }
     if (row.price !== null && row.price >= 0) p.price = row.price;
     p.photos = row.photos ?? [];
+    if (p.kind === 'acc') p.qty = row.available === null ? undefined : Math.max(0, Math.floor(row.available));
     if (p.kind !== 'item') continue;
     const item = ITEMS.find((it) => it.id === row.id);
     p.status = statusOf(row);

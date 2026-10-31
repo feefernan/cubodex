@@ -298,3 +298,40 @@ describe('carta à venda só pelo Notion (3.3)', () => {
     expect(PRODUCTS.filter((p) => p.id === 'i1')).toHaveLength(1);
   });
 });
+
+describe('estoque de acessórios e lacrados', () => {
+  const acc = (id: string, available: number | null) => ({
+    id,
+    price: 25,
+    available,
+    active: true,
+    presale: false,
+    def: parseDef({ kind: 'acc', name: 'triple pack', note: '', group: 'lacrado', lang: 'PT', set: 'Caos Ascendente' }),
+  });
+
+  it('com quantidade no Notion, o carrinho respeita o estoque; zerado, o item some da compra', () => {
+    applyStock([...everything, acc('a9', 2)]);
+    expect(productById.a9).toMatchObject({ group: 'lacrado', lang: 'PT', set: 'Caos Ascendente', qty: 2 });
+    const cart: { id: string; qty: number }[] = [];
+    expect(addToCart(cart, 'a9').ok).toBe(true);
+    expect(addToCart(cart, 'a9').ok).toBe(true);
+    expect(addToCart(cart, 'a9')).toEqual({ ok: false, error: 'só 2 un. em estoque' });
+    applyStock([...everything, acc('a9', 0)]);
+    expect(addToCart([], 'a9')).toEqual({ ok: false, error: 'item indisponível' });
+  });
+
+  it('sem quantidade no Notion, não há limite nem contagem', () => {
+    applyStock([...everything, acc('a9', null)]);
+    expect((productById.a9 as { qty?: number }).qty).toBeUndefined();
+    expect(addToCart([], 'a9').ok).toBe(true);
+  });
+
+  it('idioma fora de PT/EN é ignorado e a coleção é cortada em 60 caracteres', () => {
+    expect(parseDef({ kind: 'acc', name: 'x', note: '', lang: 'FR', set: 'a'.repeat(80) })).toEqual({
+      kind: 'acc',
+      name: 'x',
+      note: '',
+      set: 'a'.repeat(60),
+    });
+  });
+});

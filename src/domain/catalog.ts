@@ -24,6 +24,13 @@ interface BaseProduct {
 interface Accessory extends BaseProduct {
   kind: 'acc';
   note: string;
+  /** "lacrado": produto lacrado do TCG (booster, caixa). Sem isso é acessório. */
+  group?: 'lacrado';
+  /** Idioma e coleção, só nos lacrados (como nas cartas avulsas). */
+  lang?: 'PT' | 'EN';
+  set?: string;
+  /** Unidades em estoque (do Notion); sem valor = sem controle. */
+  qty?: number;
 }
 interface Craft extends BaseProduct {
   kind: 'craft';
@@ -340,7 +347,7 @@ export interface ItemDef {
 export type ProductDef =
   | { kind: 'mini'; name: string; n: number; rar: Rarity; color: string }
   | { kind: 'craft'; name: string; spec: [string, string][]; note: string }
-  | { kind: 'acc'; name: string; note: string }
+  | { kind: 'acc'; name: string; note: string; group?: 'lacrado'; lang?: 'PT' | 'EN'; set?: string }
   | { kind: 'pack'; discount: number }
   | ItemDef;
 
@@ -430,7 +437,16 @@ export const parseDef = (v: unknown): ProductDef | null => {
       return name ? { kind: 'craft', name, spec, note: str(o.note, 120) } : null;
     }
     case 'acc':
-      return name ? { kind: 'acc', name, note: str(o.note, 120) } : null;
+      return name
+        ? {
+            kind: 'acc',
+            name,
+            note: str(o.note, 120),
+            ...(o.group === 'lacrado' ? { group: 'lacrado' } : {}),
+            ...(o.lang === 'PT' || o.lang === 'EN' ? { lang: o.lang } : {}),
+            ...(str(o.set, 60) ? { set: str(o.set, 60) } : {}),
+          }
+        : null;
     case 'item': {
       const card = parseCardRef(o.card);
       return card ? { kind: 'item', card, ...itemFields(o) } : null;
@@ -460,7 +476,14 @@ export const defineProduct = (
       ? { ...base, kind: 'mini', n: def.n, rar: def.rar, color: def.color }
       : def.kind === 'craft'
         ? { ...base, kind: 'craft', spec: def.spec, note: def.note }
-        : { ...base, kind: 'acc', note: def.note };
+        : {
+            ...base,
+            kind: 'acc',
+            note: def.note,
+            ...(def.group ? { group: def.group } : {}),
+            ...(def.lang ? { lang: def.lang } : {}),
+            ...(def.set ? { set: def.set } : {}),
+          };
   if (old) PRODUCTS[PRODUCTS.indexOf(old)] = next;
   else PRODUCTS.push(next);
   productById[id] = next;

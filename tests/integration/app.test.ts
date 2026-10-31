@@ -307,9 +307,45 @@ describe('tcg', () => {
     await vi.waitFor(() => expect($('#setBody [role="alert"]')).not.toBeNull());
   });
 
-  it('acessórios', () => {
+  it('lacrados e acessórios: filtro, idioma, coleção e estoque', async () => {
+    const { defineProduct, PRODUCTS, productById } = await import('../../src/domain/catalog');
     goTo('acessorios');
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
+    click('#accFilter [data-g="lacrado"]');
+    expect($('#accGrid').textContent).toContain('Nada nessa seleção');
+    const pack = defineProduct(
+      'a9',
+      {
+        kind: 'acc',
+        name: 'triple pack',
+        note: '3 boosters',
+        group: 'lacrado',
+        lang: 'PT',
+        set: 'Equilíbrio Perfeito',
+      },
+      25,
+    );
+    const acc = pack as Extract<typeof pack, { kind: 'acc' }>;
+    acc.listed = true;
+    acc.qty = 6;
+    click('#accFilter [data-g="lacrado"]');
+    const tile = $('#accGrid .tile');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
+    expect(tile.textContent).toContain('Equilíbrio Perfeito');
+    expect(tile.textContent).toContain('PT');
+    expect(tile.textContent).toContain('6 un.');
+    expect($('#accFilter [data-g="lacrado"]').getAttribute('aria-pressed')).toBe('true');
+    acc.qty = 0;
+    click('#accFilter [data-g="lacrado"]');
+    expect($('#accGrid .tile').classList.contains('soldout')).toBe(true);
+    expect($('#accGrid .tile button').hasAttribute('disabled')).toBe(true);
+    click('#accFilter [data-g="acc"]');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
+    expect($('#accGrid').textContent).not.toContain('un.');
+    click('#accFilter [data-g="all"]');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(5);
+    PRODUCTS.splice(PRODUCTS.indexOf(pack), 1);
+    delete productById.a9;
   });
 });
 
