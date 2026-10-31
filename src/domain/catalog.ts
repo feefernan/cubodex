@@ -24,6 +24,8 @@ interface BaseProduct {
 interface Accessory extends BaseProduct {
   kind: 'acc';
   note: string;
+  /** "pack": produto lacrado do TCG (booster, caixa). Sem isso é acessório. */
+  group?: 'pack';
 }
 interface Craft extends BaseProduct {
   kind: 'craft';
@@ -340,7 +342,7 @@ export interface ItemDef {
 export type ProductDef =
   | { kind: 'mini'; name: string; n: number; rar: Rarity; color: string }
   | { kind: 'craft'; name: string; spec: [string, string][]; note: string }
-  | { kind: 'acc'; name: string; note: string }
+  | { kind: 'acc'; name: string; note: string; group?: 'pack' }
   | { kind: 'pack'; discount: number }
   | ItemDef;
 
@@ -430,7 +432,9 @@ export const parseDef = (v: unknown): ProductDef | null => {
       return name ? { kind: 'craft', name, spec, note: str(o.note, 120) } : null;
     }
     case 'acc':
-      return name ? { kind: 'acc', name, note: str(o.note, 120) } : null;
+      return name
+        ? { kind: 'acc', name, note: str(o.note, 120), ...(o.group === 'pack' ? { group: 'pack' } : {}) }
+        : null;
     case 'item': {
       const card = parseCardRef(o.card);
       return card ? { kind: 'item', card, ...itemFields(o) } : null;
@@ -460,7 +464,7 @@ export const defineProduct = (
       ? { ...base, kind: 'mini', n: def.n, rar: def.rar, color: def.color }
       : def.kind === 'craft'
         ? { ...base, kind: 'craft', spec: def.spec, note: def.note }
-        : { ...base, kind: 'acc', note: def.note };
+        : { ...base, kind: 'acc', note: def.note, ...(def.group ? { group: def.group } : {}) };
   if (old) PRODUCTS[PRODUCTS.indexOf(old)] = next;
   else PRODUCTS.push(next);
   productById[id] = next;

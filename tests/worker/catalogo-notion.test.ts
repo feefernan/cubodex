@@ -39,6 +39,12 @@ describe('catálogo vindo só do Notion (2.3)', () => {
       Nota: text('com tampa'),
       Preço: { number: 52 },
     };
+    api.state.rows.a6 = {
+      Nome: { title: [{ plain_text: 'triple pack' }] },
+      Tipo: choice('pack'),
+      Nota: text('3 boosters'),
+      Preço: { number: 25 },
+    };
     api.state.rows.a5 = {
       Nome: { title: [{ plain_text: 'luva' }] },
       Tipo: choice('acessório'),
@@ -64,6 +70,13 @@ describe('catálogo vindo só do Notion (2.3)', () => {
         ['medidas', '100 × 80 × 40 mm'],
       ],
     });
+    expect(stored.find((p) => p.id === 'a6')?.def).toEqual({
+      kind: 'acc',
+      name: 'triple pack',
+      note: '3 boosters',
+      group: 'pack',
+    });
+    expect(stored.find((p) => p.id === 'a5')?.def).toEqual({ kind: 'acc', name: 'luva', note: 'macia' });
     expect(stored.find((p) => p.id === 'pack')?.def).toEqual({ kind: 'pack', discount: 10 });
     expect(stored.find((p) => p.id === 'i1')?.def).toBeUndefined(); // carta: ainda vem do código
 

@@ -307,9 +307,23 @@ describe('tcg', () => {
     await vi.waitFor(() => expect($('#setBody [role="alert"]')).not.toBeNull());
   });
 
-  it('acessórios', () => {
+  it('packs e acessórios: o filtro separa o lacrado do resto', async () => {
+    const { defineProduct, PRODUCTS, productById } = await import('../../src/domain/catalog');
     goTo('acessorios');
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
+    click('#accFilter [data-g="pack"]');
+    expect($('#accGrid').textContent).toContain('Nada nessa seleção');
+    const pack = defineProduct('a9', { kind: 'acc', name: 'triple pack', note: '3 boosters', group: 'pack' }, 25);
+    pack.listed = true;
+    click('#accFilter [data-g="pack"]');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
+    expect($('#accFilter [data-g="pack"]').getAttribute('aria-pressed')).toBe('true');
+    click('#accFilter [data-g="acc"]');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
+    click('#accFilter [data-g="all"]');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(5);
+    PRODUCTS.splice(PRODUCTS.indexOf(pack), 1);
+    delete productById.a9;
   });
 });
 

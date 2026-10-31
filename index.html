@@ -194,10 +194,15 @@
   <div class="wrap tcgwrap"><nav class="tcgnav" aria-label="TCG"></nav></div>
   <div class="wrap page-title">
     <span class="eyebrow mono">colecionar · tcg</span>
-    <h1 class="display">acessórios.</h1>
-    <p>Porta-cards, deck boxes e suportes impressos em 3D. Nenhum reproduz personagens.</p>
+    <h1 class="display">packs e acessórios.</h1>
+    <p>Packs lacrados de pokémon TCG e acessórios para guardar suas cartas, como porta-cards e deck boxes impressos em 3D.</p>
   </div>
-  <div class="wrap section" style="padding-top:28px"><div class="grid grid--hl" id="accGrid"></div></div>
+  <div class="wrap" style="padding-top:20px"><fieldset style="display:flex;gap:8px;flex-wrap:wrap;border:0;padding:0;margin:0;min-width:0" aria-label="Filtrar por tipo" id="accFilter">
+    <button class="chip" type="button" data-action="acc-group" data-g="all" aria-pressed="true">todos</button>
+    <button class="chip" type="button" data-action="acc-group" data-g="pack" aria-pressed="false">packs</button>
+    <button class="chip" type="button" data-action="acc-group" data-g="acc" aria-pressed="false">acessórios</button>
+  </fieldset></div>
+  <div class="wrap section" style="padding-top:20px"><div class="grid grid--hl" id="accGrid"></div></div>
 </section>
 
 <!-- TCG · enciclopédia de sets -->

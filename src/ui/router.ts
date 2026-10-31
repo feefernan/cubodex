@@ -26,7 +26,7 @@ export const currentView = () => current;
 
 const TCG_NAV: [View, string][] = [
   ['tcg', 'cartas à venda'],
-  ['acessorios', 'acessórios'],
+  ['acessorios', 'packs e acessórios'],
   ['cofre', 'cofre virtual'],
   ['sets', 'enciclopédia de sets'],
 ];

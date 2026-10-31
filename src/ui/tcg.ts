@@ -283,13 +283,31 @@ const renderCarta = async () => {
   }
 };
 
+let accGroup: 'all' | 'pack' | 'acc' = 'all';
+
+/** Packs e acessórios: o filtro separa o lacrado do TCG (group "pack") do resto. */
+const renderAcc = () => {
+  const list = listedOf('acc').filter(
+    (p) => accGroup === 'all' || (p.kind === 'acc' && !!p.group) === (accGroup === 'pack'),
+  );
+  $('#accGrid').innerHTML = list.length
+    ? ''
+    : '<p class="soft" style="padding:14px 0">Nada nessa seleção por enquanto.</p>';
+  if (list.length) fillProducts($('#accGrid'), list);
+  for (const b of $$('#accFilter button')) b.setAttribute('aria-pressed', String(b.dataset.g === accGroup));
+};
+
 export const initTcg = () => {
   registerView('tcg', () => {
     fillFilters();
     syncFilters();
     renderGrid();
   });
-  registerView('acessorios', () => fillProducts($('#accGrid'), listedOf('acc')));
+  registerView('acessorios', renderAcc);
+  onAction('acc-group', (el) => {
+    accGroup = el.dataset.g === 'pack' || el.dataset.g === 'acc' ? el.dataset.g : 'all';
+    renderAcc();
+  });
   registerView('sets', renderSets);
   registerView('set', renderSet);
   registerView('carta', renderCarta);
