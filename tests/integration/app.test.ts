@@ -312,7 +312,7 @@ describe('tcg', () => {
     goTo('acessorios');
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
     click('#accFilter [data-g="lacrado"]');
-    expect($('#accGrid').textContent).toContain('Nada nessa seleção');
+    expect($('#accGrid .empty')).not.toBeNull();
     const pack = defineProduct(
       'a9',
       {
@@ -328,7 +328,20 @@ describe('tcg', () => {
     const acc = pack as Extract<typeof pack, { kind: 'acc' }>;
     acc.listed = true;
     acc.qty = 6;
+    goTo('home');
+    goTo('acessorios');
+    type('#sh-set', 'Equilíbrio Perfeito');
+    type('#sh-lang', 'PT');
     click('#accFilter [data-g="lacrado"]');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
+    click('[data-action="shelf-clear"]');
+    expect($<HTMLSelectElement>('#sh-set').value).toBe('');
+    expect($('#accFilter [data-g="lacrado"]').getAttribute('aria-pressed')).toBe('true');
+    type('#sh-q', 'triple');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
+    type('#sh-q', 'inexistente');
+    expect($('#accGrid .empty')).not.toBeNull();
+    type('#sh-q', '');
     const tile = $('#accGrid .tile');
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
     expect(tile.textContent).toContain('Equilíbrio Perfeito');

@@ -198,6 +198,8 @@ button{font:inherit;color:inherit}
 .media--card img{display:block;width:100%;height:100%;object-fit:contain}
 .media--sq{aspect-ratio:1/1;border-bottom:1px solid var(--line)}
 .media .photo{display:block;width:100%;height:100%;object-fit:cover}
+/* Selados e acessórios: foto inteira, centralizada e do mesmo tamanho, qualquer que seja a proporção do arquivo. */
+.media--shelf .photo{position:absolute;inset:0;object-fit:contain;background:#fff;padding:6%;box-sizing:border-box}
 .media--craft{aspect-ratio:4/3;border-bottom:1px solid var(--line);color:var(--muted)}
 .media--craft .plan{width:82%;height:auto;display:block}
 .media--mini{aspect-ratio:1/1;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--c) 42%,var(--media-base)),var(--media-base) 78%)}

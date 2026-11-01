@@ -1,4 +1,4 @@
-import { ITEMS, type Item, itemName } from './catalog';
+import { ITEMS, type Item, itemName, type Product } from './catalog';
 import { normalize, uniq } from './format';
 
 export interface Filters {
@@ -57,8 +57,79 @@ const SORTS: Record<Filters['sort'], (a: Item, b: Item) => number> = {
 /** Carta fora de venda (inativa no Notion) não aparece; esgotada, sim. */
 const shown = (it: Item) => it.listed !== false;
 
+/** Esgotados vão para o fim da lista, sem mexer na ordem de cada grupo (o sort é estável). */
+const soldOutLast = <T>(list: T[], soldOut: (x: T) => boolean): T[] => [
+  ...list.filter((x) => !soldOut(x)),
+  ...list.filter(soldOut),
+];
+
 export const filterItems = (f: Filters, items: Item[] = ITEMS): Item[] =>
-  items.filter((it) => shown(it) && matches(it, f)).sort(SORTS[f.sort] ?? SORTS.recentes);
+  soldOutLast(
+    items.filter((it) => shown(it) && matches(it, f)).sort(SORTS[f.sort] ?? SORTS.recentes),
+    (it) => it.status === 'esgotado',
+  );
+
+// ───────── selados e acessórios ─────────
+
+type Shelf = Extract<Product, { kind: 'acc' }>;
+
+export interface ShelfFilters {
+  q: string;
+  group: 'all' | 'lacrado' | 'acc';
+  set: string;
+  lang: string;
+  stock: boolean;
+  min: string;
+  max: string;
+  sort: 'padrao' | 'menor' | 'maior' | 'az';
+}
+
+export const emptyShelf = (): ShelfFilters => ({
+  q: '',
+  group: 'all',
+  set: '',
+  lang: '',
+  stock: false,
+  min: '',
+  max: '',
+  sort: 'padrao',
+});
+
+const SHELF_SORTS: Record<ShelfFilters['sort'], (a: Shelf, b: Shelf) => number> = {
+  padrao: () => 0,
+  menor: (a, b) => a.price - b.price,
+  maior: (a, b) => b.price - a.price,
+  az: (a, b) => a.name.localeCompare(b.name, 'pt'),
+};
+
+/** Opções dos filtros: coleções e idiomas dos selados à venda. */
+export const shelfOptions = (all: Product[]) => {
+  const list = all.filter((p): p is Shelf => p.kind === 'acc');
+  return {
+    sets: uniq(list.map((p) => p.set ?? '').filter(Boolean)).sort((a, b) => a.localeCompare(b, 'pt')),
+    langs: uniq(list.map((p) => p.lang ?? '').filter(Boolean)).sort(),
+  };
+};
+
+export const filterShelf = (all: Product[], f: ShelfFilters): Shelf[] => {
+  const q = normalize(f.q.trim());
+  const min = Number.parseFloat(f.min);
+  const max = Number.parseFloat(f.max);
+  const out = all
+    .filter((p): p is Shelf => p.kind === 'acc')
+    .filter((p) => {
+      if (f.group !== 'all' && (p.group === 'lacrado') !== (f.group === 'lacrado')) return false;
+      if (q && !normalize(`${p.name} ${p.set ?? ''} ${p.note}`).includes(q)) return false;
+      if (f.set && p.set !== f.set) return false;
+      if (f.lang && p.lang !== f.lang) return false;
+      if (f.stock && p.qty === 0) return false;
+      if (!Number.isNaN(min) && p.price < min) return false;
+      if (!Number.isNaN(max) && p.price > max) return false;
+      return true;
+    })
+    .sort(SHELF_SORTS[f.sort] ?? SHELF_SORTS.padrao);
+  return soldOutLast(out, (p) => p.qty === 0);
+};
 
 /** Itens à venda (não esgotados) de uma carta do TCGdex. */
 export const itemsOfTcgdexCard = (id: string): Item[] =>
