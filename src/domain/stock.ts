@@ -60,6 +60,9 @@ export const applyStock = (rows: StockRow[]): string[] => {
       }
     }
   }
+  // Id reaproveitado no Notion para outro tipo de produto (ex.: o i1 de exemplo virou um deck box): a carta de
+  // exemplo que sobrou no código não é mais um produto à venda.
+  for (const it of ITEMS) if (productById[it.id]?.kind !== 'item') it.listed = false;
   for (const row of rows) {
     const p = productById[row.id];
     if (!p) {

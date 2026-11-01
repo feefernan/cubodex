@@ -358,3 +358,20 @@ describe('carta inativa no Notion some das vitrines; esgotada continua aparecend
     expect(onSaleBySet().size).toBeGreaterThan(0);
   });
 });
+
+describe('id de carta de exemplo reaproveitado para outro produto', () => {
+  it('a carta de exemplo que sobra no código não aparece nem entra na contagem', () => {
+    const reused = {
+      id: 'i1',
+      price: 89,
+      available: 1,
+      active: true,
+      presale: false,
+      def: parseDef({ kind: 'acc', name: 'deck box', note: '' }),
+    };
+    applyStock(everything.map((r) => (r.id === 'i1' ? reused : r)));
+    expect(productById.i1.kind).toBe('acc');
+    expect(ITEMS.find((i) => i.id === 'i1')?.listed).toBe(false);
+    expect(filterItems(emptyFilters()).map((i) => i.id)).not.toContain('i1');
+  });
+});
