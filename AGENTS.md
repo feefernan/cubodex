@@ -98,7 +98,7 @@ hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na
 
 **Produto novo só pelo Notion (miniatura, peça, acessório, pacote):** crie uma linha em Produtos com `ID` único (ex.: `m13`,
 `k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e o `Tipo`, e os campos do tipo: miniatura = `Cor` (#RRGGBB), `Raridade`
-(comum, rara, especial) e `Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota`; produto selado do TCG (booster, caixa) = `Tipo` selado (ou `lacrado`, vale igual) + `Idioma` (PT/EN) + `Série` (a coleção) + `Nota`; selado e acessório aparecem em "selados e acessórios", com busca, filtros (coleção, idioma, preço, em estoque) e esgotados no fim, e mostram `Disponíveis` como estoque; pacote = uma linha
+(comum, rara, especial) e `Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota` + `Categoria` (o tipo: fichário, caixa, deck box…, coluna de seleção) + `Cor` (o nome da cor, como `azul`); acessório filtra só por tipo, cor e preço, sem coleção nem idioma; produto selado do TCG (booster, caixa) = `Tipo` selado (ou `lacrado`, vale igual) + `Idioma` (PT/EN) + `Série` (a coleção) + `Nota`; selado e acessório aparecem em "selados e acessórios", com busca, filtros (coleção, idioma, preço, em estoque) e esgotados no fim, e mostram `Disponíveis` como estoque; pacote = uma linha
 `pack` com `Desconto do pacote` (%). Em até 10 min o cron leva a linha ao D1 (`def`, validado por `parseDef`) e o site a mostra.
 Sem preço, o produto novo fica fora de venda.
 

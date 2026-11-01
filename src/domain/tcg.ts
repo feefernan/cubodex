@@ -78,6 +78,8 @@ export interface ShelfFilters {
   group: 'all' | 'lacrado' | 'acc';
   set: string;
   lang: string;
+  category: string;
+  color: string;
   stock: boolean;
   min: string;
   max: string;
@@ -89,6 +91,8 @@ export const emptyShelf = (): ShelfFilters => ({
   group: 'all',
   set: '',
   lang: '',
+  category: '',
+  color: '',
   stock: false,
   min: '',
   max: '',
@@ -102,12 +106,23 @@ const SHELF_SORTS: Record<ShelfFilters['sort'], (a: Shelf, b: Shelf) => number> 
   az: (a, b) => a.name.localeCompare(b.name, 'pt'),
 };
 
-/** Opções dos filtros: coleções e idiomas dos selados à venda. */
+const isSealed = (p: Shelf) => p.group === 'lacrado';
+
+/**
+ * Opções dos filtros. Selados filtram por coleção e idioma; acessórios, por tipo e cor (não têm coleção nem idioma).
+ * "Todos" só tem preço e estoque, que valem para os dois.
+ */
 export const shelfOptions = (all: Product[]) => {
   const list = all.filter((p): p is Shelf => p.kind === 'acc');
+  const sealed = list.filter(isSealed);
+  const acc = list.filter((p) => !isSealed(p));
+  const sorted = (xs: (string | undefined)[]) =>
+    uniq(xs.filter((x): x is string => !!x)).sort((a, b) => a.localeCompare(b, 'pt'));
   return {
-    sets: uniq(list.map((p) => p.set ?? '').filter(Boolean)).sort((a, b) => a.localeCompare(b, 'pt')),
-    langs: uniq(list.map((p) => p.lang ?? '').filter(Boolean)).sort(),
+    sets: sorted(sealed.map((p) => p.set)),
+    langs: sorted(sealed.map((p) => p.lang)),
+    categories: sorted(acc.map((p) => p.category)),
+    colors: sorted(acc.map((p) => p.color)),
   };
 };
 
@@ -115,14 +130,20 @@ export const filterShelf = (all: Product[], f: ShelfFilters): Shelf[] => {
   const q = normalize(f.q.trim());
   const min = Number.parseFloat(f.min);
   const max = Number.parseFloat(f.max);
+  // Cada tipo de produto só usa os filtros que tem: um filtro guardado do outro lado não esconde nada.
+  const sealed = f.group === 'lacrado';
+  const acc = f.group === 'acc';
   const out = all
     .filter((p): p is Shelf => p.kind === 'acc')
     .filter((p) => {
-      if (f.group !== 'all' && (p.group === 'lacrado') !== (f.group === 'lacrado')) return false;
-      if (q && !normalize(`${p.name} ${p.set ?? ''} ${p.note}`).includes(q)) return false;
-      if (f.set && p.set !== f.set) return false;
-      if (f.lang && p.lang !== f.lang) return false;
-      if (f.stock && p.qty === 0) return false;
+      if (f.group !== 'all' && isSealed(p) !== sealed) return false;
+      if (q && !normalize(`${p.name} ${p.set ?? ''} ${p.category ?? ''} ${p.color ?? ''} ${p.note}`).includes(q))
+        return false;
+      if (sealed && f.set && p.set !== f.set) return false;
+      if (sealed && f.lang && p.lang !== f.lang) return false;
+      if (acc && f.category && p.category !== f.category) return false;
+      if (acc && f.color && p.color !== f.color) return false;
+      if (!acc && f.stock && p.qty === 0) return false;
       if (!Number.isNaN(min) && p.price < min) return false;
       if (!Number.isNaN(max) && p.price > max) return false;
       return true;

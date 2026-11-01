@@ -293,6 +293,8 @@ const SHELF_FIELDS: Record<Exclude<keyof ShelfFilters, 'group' | 'stock'>, strin
   q: '#sh-q',
   set: '#sh-set',
   lang: '#sh-lang',
+  category: '#sh-cat',
+  color: '#sh-color',
   min: '#sh-min',
   max: '#sh-max',
   sort: '#sh-sort',
@@ -323,6 +325,22 @@ const renderShelf = () => {
     ),
     shelf.lang,
   );
+  keep(
+    '#sh-cat',
+    options(
+      o.categories.map((v) => [v, v]),
+      'todos os tipos',
+    ),
+    shelf.category,
+  );
+  keep(
+    '#sh-color',
+    options(
+      o.colors.map((v) => [v, v]),
+      'todas as cores',
+    ),
+    shelf.color,
+  );
   const sort = $<HTMLSelectElement>('#sh-sort');
   if (!sort.options.length) {
     sort.innerHTML = [
@@ -338,7 +356,7 @@ const renderShelf = () => {
   sort.value = shelf.sort;
   $<HTMLInputElement>('#sh-stock').checked = shelf.stock;
   for (const [k, sel] of Object.entries(SHELF_FIELDS))
-    if (k !== 'set' && k !== 'lang' && k !== 'sort')
+    if (k !== 'set' && k !== 'lang' && k !== 'category' && k !== 'color' && k !== 'sort')
       $<HTMLInputElement>(sel).value = shelf[k as keyof typeof SHELF_FIELDS];
   drawShelf();
 };
@@ -356,6 +374,8 @@ const drawShelf = () => {
       );
   if (list.length) fillProducts($('#accGrid'), list);
   for (const b of $$('#accFilter button')) b.setAttribute('aria-pressed', String(b.dataset.g === shelf.group));
+  // Cada grupo mostra só os filtros que ele tem: selados (coleção, idioma), acessórios (tipo, cor).
+  for (const el of $$('[data-shelf]')) el.hidden = !(el.dataset.shelf ?? '').split(' ').includes(shelf.group);
 };
 
 export const initTcg = () => {

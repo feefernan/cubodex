@@ -353,6 +353,12 @@ describe('tcg', () => {
     expect($('#accGrid .tile').classList.contains('soldout')).toBe(true);
     expect($('#accGrid .tile button').hasAttribute('disabled')).toBe(true);
     click('#accFilter [data-g="acc"]');
+    // Acessórios filtram por tipo e cor; coleção, idioma e "só em estoque" são dos selados.
+    expect($('#sh-cat').closest('.field')?.hasAttribute('hidden')).toBe(false);
+    expect($('#sh-color').closest('.field')?.hasAttribute('hidden')).toBe(false);
+    expect($('#sh-set').closest('.field')?.hasAttribute('hidden')).toBe(true);
+    expect($('#sh-lang').closest('.field')?.hasAttribute('hidden')).toBe(true);
+    expect($('#sh-stock').closest('.check')?.hasAttribute('hidden')).toBe(true);
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(4);
     expect($('#accGrid').textContent).not.toContain('un.');
     click('#accFilter [data-g="all"]');
