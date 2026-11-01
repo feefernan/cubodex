@@ -200,3 +200,26 @@ export const VARIANT_PT: Record<string, string> = {
   holo: 'holo',
   firstEdition: '1ª edição',
 };
+
+// ───────── destaques da página inicial ─────────
+
+const NO_ESTOQUE = (p: Shelf) => p.qty !== 0;
+
+/**
+ * Destaques de TCG: o que está marcado "Destaque" no Notion (cartas e selados, só o que tem estoque), até 8.
+ * Sem nenhum marcado, mostra as 4 cartas mais recentes em estoque, para a home nunca ficar vazia.
+ */
+export const tcgHighlights = (cards: Item[] = ITEMS, shelf: Product[] = []): (Item | Shelf)[] => {
+  const live = cards.filter((it) => shown(it) && it.status !== 'esgotado');
+  const chosen: (Item | Shelf)[] = [
+    ...live.filter((it) => it.featured).sort((a, b) => a.added - b.added),
+    ...shelf.filter((p): p is Shelf => p.kind === 'acc' && !!p.featured && NO_ESTOQUE(p)),
+  ];
+  return chosen.length ? chosen.slice(0, 8) : [...live].sort((a, b) => a.added - b.added).slice(0, 4);
+};
+
+/** Destaques de "criar": peças marcadas no Notion (até 8); sem nenhuma, as 4 primeiras. */
+export const craftHighlights = (crafts: Product[]): Product[] => {
+  const chosen = crafts.filter((p) => p.featured);
+  return chosen.length ? chosen.slice(0, 8) : crafts.slice(0, 4);
+};

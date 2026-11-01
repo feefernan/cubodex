@@ -154,6 +154,7 @@ export const fetchProducts = async (
       available: p.Disponíveis?.number ?? null,
       active: p['Ativo no site']?.checkbox ?? true,
       presale: p['Pré-venda']?.checkbox ?? false,
+      ...(p.Destaque?.checkbox ? { featured: true } : {}),
     }))
     .filter((row) => row.id);
 

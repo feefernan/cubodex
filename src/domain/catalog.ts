@@ -20,6 +20,8 @@ interface BaseProduct {
   listed?: boolean;
   /** Chaves das fotos próprias (copiadas do Notion para o R2), na ordem do Notion. */
   photos?: string[];
+  /** Destaque da página inicial, marcado no Notion. */
+  featured?: boolean;
 }
 interface Accessory extends BaseProduct {
   kind: 'acc';
@@ -94,6 +96,8 @@ export interface Item {
   status: StockStatus;
   /** Falso = fora de venda no Notion (inativa ou sem preço): some das vitrines. Esgotada (ativa, 0 un.) continua aparecendo. */
   listed?: boolean;
+  /** Destaque da página inicial, marcado no Notion. */
+  featured?: boolean;
   /** Quanto menor, mais recente (ordena "mais recentes"). */
   added: number;
 }

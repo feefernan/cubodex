@@ -16,6 +16,7 @@ import {
 } from '../../src/domain/catalog';
 import { applyStock, parseStockRows } from '../../src/domain/stock';
 import {
+  craftHighlights,
   emptyFilters,
   emptyShelf,
   filterItems,
@@ -24,6 +25,7 @@ import {
   itemsOfTcgdexCard,
   onSaleBySet,
   shelfOptions,
+  tcgHighlights,
 } from '../../src/domain/tcg';
 import { everything, packRow, resetCatalog } from '../catalog';
 
@@ -473,5 +475,60 @@ describe('selados e acessórios: busca, filtros e esgotados no fim', () => {
     const list = filterItems(emptyFilters()).map((i) => i.id);
     expect(list.at(-1)).toBe('i2');
     expect(list.indexOf('i2')).toBeGreaterThan(list.indexOf('i3'));
+  });
+});
+
+describe('destaques da página inicial vêm do Notion', () => {
+  const feat = (id: string, extra: object = {}) => ({
+    ...everything.find((r) => r.id === id),
+    id,
+    featured: true,
+    ...extra,
+  });
+  const withRow = (rows: object[]) => {
+    const ids = new Set(rows.map((r) => (r as { id: string }).id));
+    applyStock([...everything.filter((r) => !ids.has(r.id)), ...(rows as typeof everything)]);
+  };
+
+  it('sem nenhum marcado, mostra as 4 cartas em estoque mais recentes; carta fora de venda nunca entra', () => {
+    applyStock(everything.map((r) => (r.id === 'i1' ? { ...r, active: false } : r)));
+    const list = tcgHighlights(ITEMS, listedOf('acc'));
+    expect(list).toHaveLength(4);
+    expect(list.map((x) => x.id)).not.toContain('i1');
+  });
+
+  it('marcadas "Destaque" no Notion aparecem primeiro e sozinhas; esgotada e inativa ficam de fora', () => {
+    withRow([feat('i3'), feat('i4'), feat('i5', { available: 0 }), feat('i6', { active: false })]);
+    expect(tcgHighlights(ITEMS, listedOf('acc')).map((x) => x.id)).toEqual(expect.arrayContaining(['i3', 'i4']));
+    const ids = tcgHighlights(ITEMS, listedOf('acc')).map((x) => x.id);
+    expect(ids).toHaveLength(2);
+    expect(ids).not.toContain('i5');
+    expect(ids).not.toContain('i6');
+  });
+
+  it('selados e acessórios marcados entram junto, mas só com estoque', () => {
+    const acc = (id: string, available: number | null, featured: boolean) => ({
+      id,
+      price: 25,
+      available,
+      active: true,
+      presale: false,
+      featured,
+      def: parseDef({ kind: 'acc', name: id, note: '', group: 'lacrado' }),
+    });
+    withRow([feat('i3'), acc('h1', 3, true), acc('h2', 0, true), acc('h3', 5, false)]);
+    const ids = tcgHighlights(ITEMS, listedOf('acc')).map((x) => x.id);
+    expect(ids).toContain('h1');
+    expect(ids).not.toContain('h2');
+    expect(ids).not.toContain('h3');
+    expect(ids.indexOf('i3')).toBeLessThan(ids.indexOf('h1'));
+  });
+
+  it('no máximo 8, e "criar" segue a mesma regra', () => {
+    withRow(['i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8', 'i9', 'i10', 'i11'].map((id) => feat(id)));
+    expect(tcgHighlights(ITEMS, []).length).toBeLessThanOrEqual(8);
+    expect(craftHighlights(listedOf('craft'))).toHaveLength(4);
+    withRow([feat('k2'), feat('k3')]);
+    expect(craftHighlights(listedOf('craft')).map((p) => p.id)).toEqual(['k2', 'k3']);
   });
 });

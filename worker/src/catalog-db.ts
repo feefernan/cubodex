@@ -22,6 +22,7 @@ interface ProductRow {
   qty: number | null;
   active: number;
   presale: number;
+  featured: number;
 }
 
 /** Linha da carta do TCGdex com o set dela, como a leitura junta. */
@@ -80,8 +81,9 @@ const cardRef = (c: CardJoin, lang: string): CardRef => ({
  */
 export const readProducts = async (db: Db): Promise<StockRow[]> => {
   const photos = await readPhotos(db);
-  const rows = (await db.prepare('SELECT id, price, qty, active, presale, def FROM products').all<ProductRow>())
-    .results;
+  const rows = (
+    await db.prepare('SELECT id, price, qty, active, presale, featured, def FROM products').all<ProductRow>()
+  ).results;
   const defs = new Map(rows.map((r) => [r.id, parseStored(r.def)]));
   const specs = [...defs.values()].flatMap((d) => (d?.kind === 'item' ? [d] : []));
   const cards = specs.length
@@ -109,6 +111,7 @@ export const readProducts = async (db: Db): Promise<StockRow[]> => {
       available: r.qty,
       active: r.active === 1,
       presale: r.presale === 1,
+      ...(r.featured === 1 ? { featured: true } : {}),
       photos: photos.get(r.id) ?? [],
       ...(def && { def }),
     };
@@ -124,10 +127,10 @@ const parseStored = (json: string | null): StoredDef | null => {
   }
 };
 
-const UPSERT = `INSERT INTO products (id, price, qty, active, presale, page_id, synced_at, def) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+const UPSERT = `INSERT INTO products (id, price, qty, active, presale, page_id, synced_at, def, featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET price = excluded.price, def = excluded.def,
     qty = CASE WHEN products.dirty = 1 THEN products.qty ELSE excluded.qty END,
-    active = excluded.active, presale = excluded.presale, page_id = excluded.page_id, synced_at = excluded.synced_at`;
+    active = excluded.active, presale = excluded.presale, featured = excluded.featured, page_id = excluded.page_id, synced_at = excluded.synced_at`;
 
 /**
  * Traz as linhas do Notion para o D1, sem desfazer baixa pendente. Produto que sumiu do Notion fica inativo
@@ -151,6 +154,7 @@ export const syncProducts = async (db: Db, rows: Row[], now = new Date().toISOSt
               r.pageId,
               now,
               r.def ? JSON.stringify(r.def) : null,
+              r.featured ? 1 : 0,
             ),
         ),
     );
