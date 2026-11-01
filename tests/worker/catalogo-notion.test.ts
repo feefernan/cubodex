@@ -132,6 +132,27 @@ describe('catálogo vindo só do Notion (2.3)', () => {
     expect(products.find((p: { id: string }) => p.id === 'm13').def).toMatchObject({ kind: 'mini', n: 13 });
   });
 
+  it('o id é a numeração automática do Notion (`# ID`), que manda sobre a coluna ID em texto', async () => {
+    const E = env({ DB: d1.db });
+    const auto = (number: number, prefix: string | null = null) => ({ '# ID': { unique_id: { prefix, number } } });
+    const blank = { ID: { rich_text: [] } };
+    api.state.rows.m13 = { ...MINI_AZUL, ...auto(99), Preço: { number: 45 } }; // tem ID em texto e número: vale o número
+    api.state.rows.n1 = { ...MINI_AZUL, ...blank, ...auto(72) };
+    api.state.rows.n2 = { ...MINI_AZUL, ...blank, ...auto(73, 'PRD') };
+    api.state.rows.n3 = { ...MINI_AZUL, ...blank }; // sem nenhum id: a linha é ignorada
+    await refreshCatalog(d1.db, E, api.f);
+    const stored = await readProducts(d1.db);
+    const ids = stored.map((r) => r.id);
+    expect(ids).toContain('99');
+    expect(ids).not.toContain('m13');
+    expect(ids).toContain('72');
+    expect(ids).toContain('PRD-73');
+    expect(ids).not.toContain('');
+    expect(stored.find((r) => r.id === '99')?.price).toBe(45);
+    // Sem a numeração (banco antigo), a coluna ID em texto continua valendo.
+    expect(ids).toContain('i2');
+  });
+
   it('um produto que só existe no Notion pode ser pedido: o servidor o conhece sem mudança de código', async () => {
     api.state.rows.m13 = MINI_AZUL;
     const E = env({ DB: d1.db });

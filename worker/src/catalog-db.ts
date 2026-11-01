@@ -225,6 +225,7 @@ export const refreshCatalog = async (
   await flushStock(db, f, env.NOTION_TOKEN);
   const rows = await fetchProducts(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB);
   const synced = await syncProducts(db, rows);
+  log('info', 'catálogo sincronizado', { linhas: synced });
   // Fotos não derrubam o catálogo: o que não copiou agora tenta de novo na próxima rodada.
   if (env.FOTOS)
     await syncPhotos(db, env.FOTOS, rows, f).catch((e) => log('warn', 'fotos não copiadas', { error: String(e) }));

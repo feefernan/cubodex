@@ -21,6 +21,17 @@ type Prop = {
   title?: { plain_text: string }[];
   select?: { name: string } | null;
   files?: { name: string; file?: { url: string }; external?: { url: string } }[];
+  unique_id?: { prefix?: string | null; number: number } | null;
+};
+
+/**
+ * Id do produto: a numeração automática do Notion (`# ID`: `72`, ou `PRD-72` com prefixo), que nunca se repete. Sem ela
+ * (banco antigo), vale a coluna `ID` em texto.
+ */
+const rowId = (p: Record<string, Prop>) => {
+  const auto = p['# ID']?.unique_id;
+  if (auto) return auto.prefix ? `${auto.prefix}-${auto.number}` : String(auto.number);
+  return plain(p.ID);
 };
 
 /** O que a linha descreve (Categoria, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
@@ -151,7 +162,7 @@ export const fetchProducts = async (
 ): Promise<(Omit<StockRow, 'def'> & { def?: StoredDef; pageId: string; files: PhotoFile[] })[]> =>
   (await query(f, token, db, null, 'ler produtos'))
     .map(({ id: pageId, created_time, properties: p }) => ({
-      id: plain(p.ID),
+      id: rowId(p),
       pageId,
       def: parseStoredDef(rowDef(p, plain(p.Nome), created_time)) ?? undefined,
       files: (p.Fotos?.files ?? []).flatMap((x) => {
@@ -192,9 +203,7 @@ export const decrementStock = async (
   onEach: (done: number) => Promise<unknown>,
 ) => {
   if (from >= items.length) return [];
-  const byId = new Map(
-    (await query(f, token, db, null, 'ler produtos')).map((p) => [plain(p.properties.ID), p] as const),
-  );
+  const byId = new Map((await query(f, token, db, null, 'ler produtos')).map((p) => [rowId(p.properties), p] as const));
   const short: string[] = [];
   for (let i = from; i < items.length; i++) {
     const { id, qty } = items[i];
