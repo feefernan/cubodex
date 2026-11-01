@@ -50,6 +50,7 @@ describe('catálogo vindo só do Notion (2.3)', () => {
     api.state.rows.a5 = {
       Nome: { title: [{ plain_text: 'luva' }] },
       Tipo: choice('acessório'),
+      Destaque: { checkbox: true },
       Categoria: choice('luva'),
       Cor: text('azul'),
       Nota: text('macia'),
@@ -74,6 +75,8 @@ describe('catálogo vindo só do Notion (2.3)', () => {
         ['medidas', '100 × 80 × 40 mm'],
       ],
     });
+    expect(stored.find((p) => p.id === 'a5')?.featured).toBe(true);
+    expect(stored.find((p) => p.id === 'a6')?.featured).toBeUndefined();
     expect(stored.find((p) => p.id === 'a6')?.def).toEqual({
       kind: 'acc',
       name: 'triple pack',

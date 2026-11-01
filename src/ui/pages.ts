@@ -3,6 +3,7 @@ import { quoteRequestText, whatsappUrl } from '../domain/contact';
 import { FEATURES } from '../domain/features';
 import { escapeHtml as esc } from '../domain/format';
 import { homeNews, type NewsCard } from '../domain/news';
+import { craftHighlights, tcgHighlights } from '../domain/tcg';
 import { isEmail } from '../domain/validation';
 import { api } from '../infra/api';
 import { APOIO } from './apoio';
@@ -11,7 +12,7 @@ import { tickCountdowns } from './collectibles';
 import { $, $$, check, onAction, onSubmit } from './dom';
 import { go, registerView } from './router';
 import { S } from './store';
-import { fillProducts, itemTile } from './tiles';
+import { fillProducts, itemTile, productTile } from './tiles';
 
 const LAUNCH_NEWS =
   '<a class="news news--hot" href="#/serie" data-action="go" data-view="serie"><span class="mono">lançamento · série 01</span><h3>fiozinho chega</h3><span class="cd num">em breve</span><span class="mono">entre na lista para saber primeiro</span></a>';
@@ -22,12 +23,11 @@ const newsCard = (n: NewsCard) =>
   `<a class="news" href="#/${n.view}${n.id ? `/${n.id}` : ''}" data-action="go" data-view="${n.view}"${n.id ? ` data-id="${esc(n.id)}"` : ''}><span class="mono tag">${esc(n.tag)}</span><h3>${esc(n.title)}</h3><span class="mono soft">${esc(n.sub)}</span></a>`;
 
 const renderHome = () => {
-  $('#hl-tcg').innerHTML = ['i1', 'i2', 'i8', 'i5']
-    .flatMap((id) => ITEMS.filter((it) => it.id === id && it.status !== 'esgotado'))
-    .map(itemTile)
+  $('#hl-tcg').innerHTML = tcgHighlights(ITEMS, listedOf('acc'))
+    .map((x) => ('card' in x ? itemTile(x) : productTile(x)))
     .join('');
   if (FEATURES.colecionaveis) fillProducts($('#hl-col'), listedOf('mini', 4));
-  fillProducts($('#hl-criar'), listedOf('craft', 4));
+  fillProducts($('#hl-criar'), craftHighlights(listedOf('craft')));
   $('#news').innerHTML = (FEATURES.colecionaveis ? LAUNCH_NEWS : '') + homeNews().map(newsCard).join('') + OPT_IN_NEWS;
   if (FEATURES.colecionaveis) tickCountdowns();
 };

@@ -18,6 +18,8 @@ export interface StockRow {
   available: number | null;
   active: boolean;
   presale: boolean;
+  /** Marcado como destaque da página inicial no Notion (coluna "Destaque"). */
+  featured?: boolean;
   /** Chaves das fotos próprias no R2 (vazio = sem foto própria). */
   photos?: string[];
   /** Descrição do produto (miniatura, peça, acessório) ou o desconto do pacote; cartas ainda vêm do código. */
@@ -47,13 +49,18 @@ export const applyStock = (rows: StockRow[]): string[] => {
     else if (row.def) defineProduct(row.id, row.def, row.price);
   }
   const active = new Set(rows.filter((r) => r.active).map((r) => r.id));
+  const featured = new Set(rows.filter((r) => r.featured).map((r) => r.id));
   PACK.listed = active.has('pack');
   for (const p of PRODUCTS) {
     // Sem preço não vende: produto novo sem preço no Notion fica fora de venda até alguém preencher.
     p.listed = active.has(p.id) && p.price > 0;
+    p.featured = featured.has(p.id);
     if (p.kind === 'item') {
       const item = ITEMS.find((it) => it.id === p.id);
-      if (item) item.listed = p.listed;
+      if (item) {
+        item.listed = p.listed;
+        item.featured = p.featured;
+      }
       if (!p.listed) {
         p.status = 'esgotado';
         if (item) item.status = 'esgotado';
@@ -97,6 +104,7 @@ export const parseStockRows = (data: unknown): StockRow[] => {
         available: num(o.available),
         active: o.active !== false,
         presale: o.presale === true,
+        ...(o.featured === true ? { featured: true } : {}),
         photos: Array.isArray(o.photos)
           ? o.photos.filter((k): k is string => typeof k === 'string' && PHOTO_KEY.test(k))
           : [],
