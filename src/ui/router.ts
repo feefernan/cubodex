@@ -25,8 +25,8 @@ export const refresh = () => renders.get(current)?.();
 export const currentView = () => current;
 
 const TCG_NAV: [View, string][] = [
+  ['acessorios', 'selados e acessórios'],
   ['tcg', 'cartas à venda'],
-  ['acessorios', 'lacrados e acessórios'],
   ['cofre', 'cofre virtual'],
   ['sets', 'enciclopédia de sets'],
 ];

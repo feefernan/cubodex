@@ -26,7 +26,7 @@ interface Accessory extends BaseProduct {
   note: string;
   /** "lacrado": produto lacrado do TCG (booster, caixa). Sem isso é acessório. */
   group?: 'lacrado';
-  /** Idioma e coleção, só nos lacrados (como nas cartas avulsas). */
+  /** Idioma e coleção, só nos selados (como nas cartas avulsas). */
   lang?: 'PT' | 'EN';
   set?: string;
   /** Unidades em estoque (do Notion); sem valor = sem controle. */

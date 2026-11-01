@@ -21,11 +21,15 @@ import {
 import { brl, escapeHtml as esc, uniq } from '../domain/format';
 import {
   emptyFilters,
+  emptyShelf,
   type Filters,
   filterItems,
   filterOptions,
+  filterShelf,
   itemsOfTcgdexCard,
   onSaleBySet,
+  type ShelfFilters,
+  shelfOptions,
   TYPE_PT,
   VARIANT_PT,
 } from '../domain/tcg';
@@ -283,18 +287,75 @@ const renderCarta = async () => {
   }
 };
 
-let accGroup: 'all' | 'lacrado' | 'acc' = 'all';
+let shelf: ShelfFilters = emptyShelf();
 
-/** Packs e acessórios: o filtro separa o lacrado do TCG (group "lacrado") do resto. */
-const renderAcc = () => {
-  const list = listedOf('acc').filter(
-    (p) => accGroup === 'all' || (p.kind === 'acc' && !!p.group) === (accGroup === 'lacrado'),
+const SHELF_FIELDS: Record<Exclude<keyof ShelfFilters, 'group' | 'stock'>, string> = {
+  q: '#sh-q',
+  set: '#sh-set',
+  lang: '#sh-lang',
+  min: '#sh-min',
+  max: '#sh-max',
+  sort: '#sh-sort',
+};
+
+/** Selados e acessórios: o filtro separa o selado do TCG (group "lacrado") do resto; esgotados vão para o fim. */
+const renderShelf = () => {
+  const all = listedOf('acc');
+  const o = shelfOptions(all);
+  const keep = (id: string, html: string, v: string) => {
+    const sel = $<HTMLSelectElement>(id);
+    sel.innerHTML = html;
+    sel.value = v;
+  };
+  keep(
+    '#sh-set',
+    options(
+      o.sets.map((v) => [v, v]),
+      'todas as coleções',
+    ),
+    shelf.set,
   );
+  keep(
+    '#sh-lang',
+    options(
+      o.langs.map((v) => [v, v]),
+      'todos os idiomas',
+    ),
+    shelf.lang,
+  );
+  const sort = $<HTMLSelectElement>('#sh-sort');
+  if (!sort.options.length) {
+    sort.innerHTML = [
+      ['padrao', 'padrão'],
+      ['menor', 'menor preço'],
+      ['maior', 'maior preço'],
+      ['az', 'A–Z'],
+    ]
+      .map(([v, l]) => `<option value="${v}">${l}</option>`)
+      .join('');
+    if (window.innerWidth < 860) $('#shelfFilters').removeAttribute('open');
+  }
+  sort.value = shelf.sort;
+  $<HTMLInputElement>('#sh-stock').checked = shelf.stock;
+  for (const [k, sel] of Object.entries(SHELF_FIELDS))
+    if (k !== 'set' && k !== 'lang' && k !== 'sort')
+      $<HTMLInputElement>(sel).value = shelf[k as keyof typeof SHELF_FIELDS];
+  drawShelf();
+};
+
+const drawShelf = () => {
+  const list = filterShelf(listedOf('acc'), shelf);
+  $('#shelfCount').textContent = `${list.length}${list.length === 1 ? ' item' : ' itens'}`;
   $('#accGrid').innerHTML = list.length
     ? ''
-    : '<p class="soft" style="padding:14px 0">Nada nessa seleção por enquanto.</p>';
+    : emptyState(
+        'nada encontrado.',
+        'Nenhum produto com esses filtros. Afrouxe um filtro ou limpe tudo.',
+        '<button class="btn btn--ghost btn--sm" data-action="shelf-clear">limpar filtros</button>',
+        'grid-column:1/-1',
+      );
   if (list.length) fillProducts($('#accGrid'), list);
-  for (const b of $$('#accFilter button')) b.setAttribute('aria-pressed', String(b.dataset.g === accGroup));
+  for (const b of $$('#accFilter button')) b.setAttribute('aria-pressed', String(b.dataset.g === shelf.group));
 };
 
 export const initTcg = () => {
@@ -303,10 +364,22 @@ export const initTcg = () => {
     syncFilters();
     renderGrid();
   });
-  registerView('acessorios', renderAcc);
+  registerView('acessorios', renderShelf);
   onAction('acc-group', (el) => {
-    accGroup = el.dataset.g === 'lacrado' || el.dataset.g === 'acc' ? el.dataset.g : 'all';
-    renderAcc();
+    shelf = { ...shelf, group: el.dataset.g === 'lacrado' || el.dataset.g === 'acc' ? el.dataset.g : 'all' };
+    drawShelf();
+  });
+  onInput('shelf', (el) => {
+    const input = el as HTMLInputElement;
+    shelf = {
+      ...shelf,
+      [input.dataset.f as keyof ShelfFilters]: input.type === 'checkbox' ? input.checked : input.value,
+    };
+    drawShelf();
+  });
+  onAction('shelf-clear', () => {
+    shelf = { ...emptyShelf(), group: shelf.group };
+    renderShelf();
   });
   registerView('sets', renderSets);
   registerView('set', renderSet);
