@@ -7,6 +7,7 @@ import { initAccount } from './ui/account';
 import { initCart, updateBadge } from './ui/cart';
 import { initCollectibles } from './ui/collectibles';
 import { bindEvents } from './ui/dom';
+import { initGallery } from './ui/gallery';
 import { initOrder } from './ui/order';
 import { initPages } from './ui/pages';
 import { initRouter, refresh } from './ui/router';
@@ -16,6 +17,7 @@ import { initTheme } from './ui/theme';
 import { initVault } from './ui/vault';
 
 bindEvents();
+initGallery();
 initCart();
 initTcg();
 initVault();

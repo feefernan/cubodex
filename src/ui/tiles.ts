@@ -20,8 +20,16 @@ export const itemImg = (id?: string) => {
 };
 
 /** Foto própria do produto, preenchendo o espaço da mídia. */
-const photoImg = (p: Product, key: string) =>
-  `<img class="photo" src="${photoUrl(key)}" alt="${esc(p.name)}" width="400" height="400" loading="lazy" decoding="async">`;
+const photoImg = (p: Product, key: string, alt = p.name) =>
+  `<img class="photo" src="${photoUrl(key)}" alt="${esc(alt)}" width="400" height="400" loading="lazy" decoding="async">`;
+
+/** Selados e acessórios com mais de uma foto (até 3): faixa que se desliza, com um ponto por foto. */
+const gallery = (p: Product, keys: string[]): string => {
+  const shots = keys.slice(0, 3);
+  const imgs = shots.map((k, i) => photoImg(p, k, `${p.name} (foto ${i + 1} de ${shots.length})`)).join('');
+  const dots = shots.map((_, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('');
+  return `<div class="media media--sq media--shelf gallery"><div class="gallery-track" tabindex="0" role="region" aria-label="Fotos de ${esc(p.name)}">${imgs}</div><div class="gallery-dots" aria-hidden="true">${dots}</div></div>`;
+};
 
 const gradeChip = (it: Item) => (it.grade ? `<span class="mono grade">${esc(it.grade.co)} ${it.grade.n}</span>` : '');
 
@@ -30,6 +38,7 @@ const soldOutButton = `<button class="btn btn--sm"${disabledAttr(true)}>esgotado
 
 const media = (p: Product): string => {
   const own = p.photos?.[0];
+  if (own && p.kind === 'acc' && (p.photos?.length ?? 0) > 1) return gallery(p, p.photos ?? []);
   if (own && p.kind !== 'item')
     return `<div class="media media--${p.kind === 'craft' ? 'craft' : 'sq'}${p.kind === 'acc' ? ' media--shelf' : ''}">${photoImg(p, own)}</div>`;
   switch (p.kind) {

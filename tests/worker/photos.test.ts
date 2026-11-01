@@ -59,6 +59,17 @@ describe('cópia para o R2', () => {
     expect(await keysOf('i1')).toEqual(keys);
   });
 
+  it('no máximo 3 fotos por produto: só as 3 primeiras do Notion são copiadas', async () => {
+    const five = [1, 2, 3, 4, 5].map((n) => file(`${n}.jpg`, `ws/${n}/${n}.jpg`));
+    expect(await syncPhotos(d1.db, r2.bucket, [{ id: 'i1', files: five }], api.f)).toBe(3);
+    const keys = await keysOf('i1');
+    expect(keys).toHaveLength(3);
+    expect(r2.objects.size).toBe(3);
+    // A mesma lista na rodada seguinte não copia nem apaga nada.
+    expect(await syncPhotos(d1.db, r2.bucket, [{ id: 'i1', files: five }], api.f)).toBe(0);
+    expect(await keysOf('i1')).toEqual(keys);
+  });
+
   it('foto trocada ou tirada: a lista muda e a cópia velha sai do R2', async () => {
     await syncPhotos(
       d1.db,

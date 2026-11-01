@@ -201,6 +201,15 @@ button{font:inherit;color:inherit}
 .media .photo{display:block;width:100%;height:100%;object-fit:cover}
 /* Selados e acessórios: foto inteira, centralizada e do mesmo tamanho, qualquer que seja a proporção do arquivo. */
 .media--shelf .photo{position:absolute;inset:0;object-fit:contain;background:#fff;padding:6%;box-sizing:border-box}
+/* Faixa de fotos (selados e acessórios): rolagem com encaixe, sem biblioteca; teclado com o foco na faixa. */
+.gallery-track{position:absolute;inset:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.gallery-track::-webkit-scrollbar{display:none}
+.gallery-track:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
+.media--shelf .gallery-track .photo{position:static;flex:0 0 100%;width:100%;height:100%;scroll-snap-align:center}
+.gallery-dots{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:6px;pointer-events:none}
+.gallery-dots i{width:7px;height:7px;border-radius:50%;background:var(--line);border:1px solid var(--soft)}
+.gallery-dots i.on{background:var(--fg);border-color:var(--fg)}
+.section[hidden]{display:none}
 .media--craft{aspect-ratio:4/3;border-bottom:1px solid var(--line);color:var(--muted)}
 .media--craft .plan{width:82%;height:auto;display:block}
 .media--mini{aspect-ratio:1/1;background:radial-gradient(circle at 50% 38%,color-mix(in srgb,var(--c) 42%,var(--media-base)),var(--media-base) 78%)}
