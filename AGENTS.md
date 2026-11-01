@@ -96,7 +96,7 @@ baixas pendentes (`dirty`) e traz o que o dono editou; o que não está no Notio
 As fotos da coluna Fotos são copiadas para o R2 (`worker/src/photos.ts`) e servidas em `/api/img/fotos/…`, com chave pelo
 hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na conta, o site publica sem fotos próprias.
 
-**ID do produto:** a coluna `ID` (texto) manda. Se ela sumir ou estiver vazia, vale o id que o site já guarda para aquela página (linhas antigas não mudam de id) e, para linha nova, a numeração automática `# ID` do Notion (`72`, ou `PRD-72` se tiver prefixo). Linha sem nenhum id é ignorada (o log mostra "catálogo sincronizado" a cada ciclo e "sync do catálogo falhou" se der erro).
+**ID do produto:** é a numeração automática do Notion (coluna `# ID`: `72`, ou `PRD-72` se a coluna tiver prefixo), que nunca se repete; vale também para as linhas antigas (migradas em 01/11: o `i2` virou `24`, etc.). Sem `# ID` (banco antigo), vale a coluna `ID` em texto. **Não troque o prefixo da coluna depois de vender**: o id muda para todos. Apagar e recriar uma linha gera id novo (estoque, fotos e cofre do id antigo ficam órfãos): edite a linha. Linha sem nenhum id é ignorada; o log mostra `catálogo sincronizado` a cada ciclo e `sync do catálogo falhou` se der erro.
 
 **Produto novo só pelo Notion (miniatura, peça, acessório, selado, pacote):** crie uma linha em Produtos com `ID` único (ex.: `m13`,
 `k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e a `Categoria` (o que o produto é: carta, miniatura, peça, acessório, selado ou pacote;
