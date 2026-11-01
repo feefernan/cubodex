@@ -23,11 +23,22 @@ type Prop = {
   files?: { name: string; file?: { url: string }; external?: { url: string } }[];
 };
 
-/** O que a linha descreve (Tipo, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
+/** O que a linha descreve (Categoria, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
+const choice = (x?: Prop) => (x?.select?.name ?? plain(x)).trim();
+
+const KINDS = new Set(['carta', 'miniatura', 'peça', 'peca', 'acessório', 'acessorio', 'pacote', 'selado', 'lacrado']);
+
 const rowDef = (p: Record<string, Prop>, name: string, created: string | undefined) => {
   const note = plain(p.Nota);
-  // Maiúscula e espaço sobrando no nome da opção não mudam o tipo ("Lacrado", "acessório ").
-  switch (p.Tipo?.select?.name?.trim().toLowerCase()) {
+  // A coluna que diz o que o produto é se chama "Categoria" (antes, "Tipo"); a coluna "Tipo" (antes, "Subtipo") guarda
+  // o tipo do selado ou do acessório. Vale a que tiver um valor conhecido, para a troca de nome não derrubar a loja.
+  const kindProp = [p.Categoria, p.Tipo].find((c) => KINDS.has(choice(c).toLowerCase()));
+  const subtype = [p.Tipo, p.Categoria, p.Subtipo]
+    .filter((c) => c !== kindProp)
+    .map(choice)
+    .find(Boolean);
+  // Maiúscula e espaço sobrando no nome da opção não mudam o tipo ("Selado", "acessório ").
+  switch (kindProp ? choice(kindProp).toLowerCase() : '') {
     case 'carta':
       return {
         kind: 'item',
@@ -40,6 +51,7 @@ const rowDef = (p: Record<string, Prop>, name: string, created: string | undefin
     case 'miniatura':
       return { kind: 'mini', name, n: p.Número?.number, rar: p.Raridade?.select?.name, color: plain(p.Cor) };
     case 'peça':
+    case 'peca':
       return {
         kind: 'craft',
         name,
@@ -51,13 +63,8 @@ const rowDef = (p: Record<string, Prop>, name: string, created: string | undefin
         ].filter(([, v]) => v),
       };
     case 'acessório':
-      return {
-        kind: 'acc',
-        name,
-        note,
-        category: p.Categoria?.select?.name ?? plain(p.Categoria),
-        color: plain(p.Cor),
-      };
+    case 'acessorio':
+      return { kind: 'acc', name, note, subtype, color: plain(p.Cor) };
     case 'lacrado':
     case 'selado':
       return {
@@ -67,6 +74,7 @@ const rowDef = (p: Record<string, Prop>, name: string, created: string | undefin
         group: 'lacrado',
         lang: p.Idioma?.select?.name,
         set: p.Série?.select?.name ?? plain(p.Série),
+        subtype,
       };
     case 'pacote':
       return { kind: 'pack', discount: p['Desconto do pacote']?.number };

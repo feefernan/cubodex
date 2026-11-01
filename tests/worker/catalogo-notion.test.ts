@@ -39,6 +39,23 @@ describe('catálogo vindo só do Notion (2.3)', () => {
       Nota: text('com tampa'),
       Preço: { number: 52 },
     };
+    // Colunas já renomeadas no Notion: "Categoria" diz o que é, "Tipo" é o tipo do selado ou do acessório.
+    api.state.rows.a7 = {
+      Nome: { title: [{ plain_text: 'blister triplo' }] },
+      Categoria: choice('selado'),
+      Tipo: choice('blister triplo'),
+      Idioma: choice('PT'),
+      Série: choice('Caos Ascendente'),
+      Nota: text(''),
+      Preço: { number: 80 },
+    };
+    api.state.rows.a8 = {
+      Nome: { title: [{ plain_text: 'fichário' }] },
+      Categoria: choice('Acessório'),
+      Tipo: choice('fichário'),
+      Cor: text('azul'),
+      Preço: { number: 60 },
+    };
     api.state.rows.a6 = {
       Nome: { title: [{ plain_text: 'triple pack' }] },
       Tipo: choice(' Lacrado '),
@@ -75,6 +92,22 @@ describe('catálogo vindo só do Notion (2.3)', () => {
         ['medidas', '100 × 80 × 40 mm'],
       ],
     });
+    expect(stored.find((p) => p.id === 'a7')?.def).toEqual({
+      kind: 'acc',
+      name: 'blister triplo',
+      note: '',
+      group: 'lacrado',
+      lang: 'PT',
+      set: 'Caos Ascendente',
+      subtype: 'blister triplo',
+    });
+    expect(stored.find((p) => p.id === 'a8')?.def).toEqual({
+      kind: 'acc',
+      name: 'fichário',
+      note: '',
+      subtype: 'fichário',
+      color: 'azul',
+    });
     expect(stored.find((p) => p.id === 'a5')?.featured).toBe(true);
     expect(stored.find((p) => p.id === 'a6')?.featured).toBeUndefined();
     expect(stored.find((p) => p.id === 'a6')?.def).toEqual({
@@ -89,7 +122,7 @@ describe('catálogo vindo só do Notion (2.3)', () => {
       kind: 'acc',
       name: 'luva',
       note: 'macia',
-      category: 'luva',
+      subtype: 'luva',
       color: 'azul',
     });
     expect(stored.find((p) => p.id === 'pack')?.def).toEqual({ kind: 'pack', discount: 10 });

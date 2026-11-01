@@ -353,6 +353,7 @@ describe('tcg', () => {
         group: 'lacrado',
         lang: 'PT',
         set: 'Equilíbrio Perfeito',
+        subtype: 'blister triplo',
       },
       25,
     );
@@ -365,6 +366,12 @@ describe('tcg', () => {
     type('#sh-lang', 'PT');
     click('#accFilter [data-g="lacrado"]');
     expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
+    // O tipo (subtipo) também filtra os selados, e a lista de ordenar tem Z–A.
+    expect([...$<HTMLSelectElement>('#sh-tipo').options].map((o) => o.value)).toEqual(['', 'blister triplo']);
+    type('#sh-tipo', 'blister triplo');
+    expect(document.querySelectorAll('#accGrid .tile')).toHaveLength(1);
+    expect($('#accGrid .tile').textContent).toContain('blister triplo');
+    expect([...$<HTMLSelectElement>('#sh-sort').options].map((o) => o.value)).toContain('za');
     click('[data-action="shelf-clear"]');
     expect($<HTMLSelectElement>('#sh-set').value).toBe('');
     expect($('#accFilter [data-g="lacrado"]').getAttribute('aria-pressed')).toBe('true');
@@ -385,7 +392,7 @@ describe('tcg', () => {
     expect($('#accGrid .tile button').hasAttribute('disabled')).toBe(true);
     click('#accFilter [data-g="acc"]');
     // Acessórios filtram por tipo e cor; coleção, idioma e "só em estoque" são dos selados.
-    expect($('#sh-cat').closest('.field')?.hasAttribute('hidden')).toBe(false);
+    expect($('#sh-tipo').closest('.field')?.hasAttribute('hidden')).toBe(false);
     expect($('#sh-color').closest('.field')?.hasAttribute('hidden')).toBe(false);
     expect($('#sh-set').closest('.field')?.hasAttribute('hidden')).toBe(true);
     expect($('#sh-lang').closest('.field')?.hasAttribute('hidden')).toBe(true);

@@ -12,7 +12,7 @@ export interface Filters {
   stock: boolean;
   min: string;
   max: string;
-  sort: 'recentes' | 'menor' | 'maior' | 'az';
+  sort: 'recentes' | 'menor' | 'maior' | 'az' | 'za';
 }
 
 export const emptyFilters = (): Filters => ({
@@ -52,6 +52,7 @@ const SORTS: Record<Filters['sort'], (a: Item, b: Item) => number> = {
   menor: (a, b) => a.price - b.price,
   maior: (a, b) => b.price - a.price,
   az: (a, b) => itemName(a).localeCompare(itemName(b), 'pt'),
+  za: (a, b) => itemName(b).localeCompare(itemName(a), 'pt'),
 };
 
 /** Carta fora de venda (inativa no Notion) não aparece; esgotada, sim. */
@@ -78,12 +79,12 @@ export interface ShelfFilters {
   group: 'all' | 'lacrado' | 'acc';
   set: string;
   lang: string;
-  category: string;
+  subtype: string;
   color: string;
   stock: boolean;
   min: string;
   max: string;
-  sort: 'padrao' | 'menor' | 'maior' | 'az';
+  sort: 'padrao' | 'menor' | 'maior' | 'az' | 'za';
 }
 
 export const emptyShelf = (): ShelfFilters => ({
@@ -91,7 +92,7 @@ export const emptyShelf = (): ShelfFilters => ({
   group: 'all',
   set: '',
   lang: '',
-  category: '',
+  subtype: '',
   color: '',
   stock: false,
   min: '',
@@ -104,15 +105,16 @@ const SHELF_SORTS: Record<ShelfFilters['sort'], (a: Shelf, b: Shelf) => number> 
   menor: (a, b) => a.price - b.price,
   maior: (a, b) => b.price - a.price,
   az: (a, b) => a.name.localeCompare(b.name, 'pt'),
+  za: (a, b) => b.name.localeCompare(a.name, 'pt'),
 };
 
 const isSealed = (p: Shelf) => p.group === 'lacrado';
 
 /**
- * Opções dos filtros. Selados filtram por coleção e idioma; acessórios, por tipo e cor (não têm coleção nem idioma).
- * "Todos" só tem preço e estoque, que valem para os dois.
+ * Opções dos filtros do grupo escolhido. Selados: coleção, idioma e tipo; acessórios: tipo e cor (não têm coleção nem
+ * idioma). "Todos" só tem preço e estoque, que valem para os dois.
  */
-export const shelfOptions = (all: Product[]) => {
+export const shelfOptions = (all: Product[], group: ShelfFilters['group'] = 'all') => {
   const list = all.filter((p): p is Shelf => p.kind === 'acc');
   const sealed = list.filter(isSealed);
   const acc = list.filter((p) => !isSealed(p));
@@ -121,7 +123,7 @@ export const shelfOptions = (all: Product[]) => {
   return {
     sets: sorted(sealed.map((p) => p.set)),
     langs: sorted(sealed.map((p) => p.lang)),
-    categories: sorted(acc.map((p) => p.category)),
+    subtypes: group === 'all' ? [] : sorted((group === 'lacrado' ? sealed : acc).map((p) => p.subtype)),
     colors: sorted(acc.map((p) => p.color)),
   };
 };
@@ -137,11 +139,11 @@ export const filterShelf = (all: Product[], f: ShelfFilters): Shelf[] => {
     .filter((p): p is Shelf => p.kind === 'acc')
     .filter((p) => {
       if (f.group !== 'all' && isSealed(p) !== sealed) return false;
-      if (q && !normalize(`${p.name} ${p.set ?? ''} ${p.category ?? ''} ${p.color ?? ''} ${p.note}`).includes(q))
+      if (q && !normalize(`${p.name} ${p.set ?? ''} ${p.subtype ?? ''} ${p.color ?? ''} ${p.note}`).includes(q))
         return false;
       if (sealed && f.set && p.set !== f.set) return false;
       if (sealed && f.lang && p.lang !== f.lang) return false;
-      if (acc && f.category && p.category !== f.category) return false;
+      if (f.group !== 'all' && f.subtype && p.subtype !== f.subtype) return false;
       if (acc && f.color && p.color !== f.color) return false;
       if (!acc && f.stock && p.qty === 0) return false;
       if (!Number.isNaN(min) && p.price < min) return false;
