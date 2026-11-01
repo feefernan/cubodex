@@ -102,6 +102,8 @@ hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na
 `pack` com `Desconto do pacote` (%). Em até 10 min o cron leva a linha ao D1 (`def`, validado por `parseDef`) e o site a mostra.
 Sem preço, o produto novo fica fora de venda.
 
+**Fotos:** coluna `Fotos` do Notion, até **3** por produto (as 3 primeiras; o resto é ignorado). Selados e acessórios com mais de uma foto mostram uma faixa que se desliza, com um ponto por foto; cartas, peças e miniaturas usam a primeira.
+
 **Destaques da home:** coluna `Destaque` (caixa de seleção) em qualquer produto. "Destaques · tcg" mostra até 8 marcados (cartas e selados/acessórios com estoque; carta de exemplo e inativa nunca); sem nenhum marcado, as 4 cartas mais recentes em estoque. "Destaques · criar" segue a mesma regra com as peças. Vem do cron (até 10 min).
 
 **Carta à venda só pelo Notion:** `Tipo` = carta, `Carta TCGdex` (o id do TCGdex, ex.: `base1-4` ou `sv03.5-006`; está na

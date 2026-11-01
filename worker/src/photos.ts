@@ -12,6 +12,8 @@ import type { PhotoFile } from './notion';
 type Fetch = typeof fetch;
 
 const MAX_BYTES = 8 * 1024 * 1024;
+/** Fotos por produto: as 3 primeiras do Notion. O resto não é copiado (limita R2 e o trabalho do cron). */
+const MAX_PHOTOS = 3;
 const EXT = /\.(jpe?g|png|webp|gif)$/i;
 const TYPE_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -72,6 +74,7 @@ export const syncPhotos = async (
       const key = await photoKey(p.id, file);
       if (key && !want.some((w) => w.key === key)) want.push({ key, file });
     }
+    want.splice(MAX_PHOTOS);
     const keys = want.map((w) => w.key);
     const old = stored.get(p.id) ?? [];
     let complete = true;

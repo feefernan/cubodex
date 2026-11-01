@@ -27,7 +27,11 @@ const renderHome = () => {
     .map((x) => ('card' in x ? itemTile(x) : productTile(x)))
     .join('');
   if (FEATURES.colecionaveis) fillProducts($('#hl-col'), listedOf('mini', 4));
-  fillProducts($('#hl-criar'), craftHighlights(listedOf('craft')));
+  const crafts = craftHighlights(listedOf('craft'));
+  fillProducts($('#hl-criar'), crafts);
+  // Sem peça ativa, o bloco "destaques · criar" não aparece vazio.
+  const criar = $('#hl-criar').closest<HTMLElement>('.section');
+  if (criar) criar.hidden = !crafts.length;
   $('#news').innerHTML = (FEATURES.colecionaveis ? LAUNCH_NEWS : '') + homeNews().map(newsCard).join('') + OPT_IN_NEWS;
   if (FEATURES.colecionaveis) tickCountdowns();
 };

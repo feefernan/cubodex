@@ -162,6 +162,37 @@ describe('navegação', () => {
     expect(document.body.className).toBe('a-home');
   });
 
+  it('"destaques · criar" some enquanto não há peça ativa e volta quando há', async () => {
+    const { productById } = await import('../../src/domain/catalog');
+    const crafts = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6'].map((id) => productById[id]);
+    for (const c of crafts) c.listed = false;
+    goTo('carrinho');
+    goTo('home');
+    expect($('#hl-criar').closest('.section')?.hasAttribute('hidden')).toBe(true);
+    for (const c of crafts) c.listed = undefined;
+    goTo('carrinho');
+    goTo('home');
+    expect($('#hl-criar').closest('.section')?.hasAttribute('hidden')).toBe(false);
+    expect(document.querySelectorAll('#hl-criar .tile').length).toBeGreaterThan(0);
+  });
+
+  it('faixa de fotos: o ponto aceso acompanha a rolagem', async () => {
+    const { productById } = await import('../../src/domain/catalog');
+    productById.a1.photos = [1, 2, 3].map((n) => `fotos/a1/000000000000000${n}.png`);
+    goTo('tcg');
+    goTo('acessorios');
+    const track = $('#accGrid .gallery-track');
+    Object.defineProperty(track, 'clientWidth', { value: 200, configurable: true });
+    track.scrollLeft = 400;
+    track.dispatchEvent(new Event('scroll'));
+    const dots = [...(track.parentElement?.querySelectorAll('.gallery-dots i') ?? [])];
+    expect(dots.map((d) => d.classList.contains('on'))).toEqual([false, false, true]);
+    track.scrollLeft = 0;
+    track.dispatchEvent(new Event('scroll'));
+    expect(dots.map((d) => d.classList.contains('on'))).toEqual([true, false, false]);
+    productById.a1.photos = undefined;
+  });
+
   it('troca de tela, acende menu e subnavegação, e grava o hash', () => {
     goTo('colecionar');
     expect(visible()).toEqual(['v-colecionar']);
