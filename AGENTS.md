@@ -96,9 +96,15 @@ baixas pendentes (`dirty`) e traz o que o dono editou; o que não está no Notio
 As fotos da coluna Fotos são copiadas para o R2 (`worker/src/photos.ts`) e servidas em `/api/img/fotos/…`, com chave pelo
 hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na conta, o site publica sem fotos próprias.
 
-**Produto novo só pelo Notion (miniatura, peça, acessório, pacote):** crie uma linha em Produtos com `ID` único (ex.: `m13`,
-`k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e o `Tipo`, e os campos do tipo: miniatura = `Cor` (#RRGGBB), `Raridade`
-(comum, rara, especial) e `Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota` + `Categoria` (o tipo: fichário, caixa, deck box…, coluna de seleção) + `Cor` (o nome da cor, como `azul`); acessório filtra só por tipo, cor e preço, sem coleção nem idioma; produto selado do TCG (booster, caixa) = `Tipo` selado (ou `lacrado`, vale igual) + `Idioma` (PT/EN) + `Série` (a coleção) + `Nota`; selado e acessório aparecem em "selados e acessórios", com busca, filtros (coleção, idioma, preço, em estoque) e esgotados no fim, e mostram `Disponíveis` como estoque; pacote = uma linha
+**Produto novo só pelo Notion (miniatura, peça, acessório, selado, pacote):** crie uma linha em Produtos com `ID` único (ex.: `m13`,
+`k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e a `Categoria` (o que o produto é: carta, miniatura, peça, acessório, selado ou pacote;
+antes essa coluna se chamava `Tipo`), e os campos da categoria: miniatura = `Cor` (#RRGGBB), `Raridade` (comum, rara, especial) e
+`Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota` + `Tipo` (fichário, caixa, deck box…; a coluna `Tipo`
+era o `Subtipo`) + `Cor` (o nome da cor, como `azul`); selado do TCG (booster, caixa; antes "lacrado", e `lacrado` ainda vale) = `Tipo`
+(booster, blister triplo…) + `Idioma` (PT/EN) + `Série` (a coleção) + `Nota`. Selados e acessórios aparecem em "selados e acessórios",
+com busca, ordenar (A–Z e Z–A), esgotados no fim e `Disponíveis` como estoque. Filtros: selados = coleção, idioma, tipo, preço e
+estoque; acessórios = tipo, cor e preço. O Worker lê as duas formas das colunas (a que tiver um valor de categoria conhecido é a
+`Categoria`), então a troca de nomes no Notion não derruba a loja; pacote = uma linha
 `pack` com `Desconto do pacote` (%). Em até 10 min o cron leva a linha ao D1 (`def`, validado por `parseDef`) e o site a mostra.
 Sem preço, o produto novo fica fora de venda.
 
@@ -106,7 +112,7 @@ Sem preço, o produto novo fica fora de venda.
 
 **Destaques da home:** coluna `Destaque` (caixa de seleção) em qualquer produto. "Destaques · tcg" mostra até 8 marcados (cartas e selados/acessórios com estoque; carta de exemplo e inativa nunca); sem nenhum marcado, as 4 cartas mais recentes em estoque. "Destaques · criar" segue a mesma regra com as peças. Vem do cron (até 10 min).
 
-**Carta à venda só pelo Notion:** `Tipo` = carta, `Carta TCGdex` (o id do TCGdex, ex.: `base1-4` ou `sv03.5-006`; está na
+**Carta à venda só pelo Notion:** `Categoria` = carta, `Carta TCGdex` (o id do TCGdex, ex.: `base1-4` ou `sv03.5-006`; está na
 URL da carta na enciclopédia do site), `Idioma` (EN/PT), `Variante` (normal, holo, reverse holo, 1ª edição), `Gradação`
 (ex.: `PSA 8`), mais `Preço`, `Disponíveis` e `Ativo no site`. O nome, o set, o número, a raridade e a imagem vêm da
 enciclopédia (D1): o Worker junta a linha do Notion com `tcg_cards` e `tcg_sets` ao ler (`readProducts`). Item em PT mostra o

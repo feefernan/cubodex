@@ -80,6 +80,7 @@ const fillFilters = () => {
     ['menor', 'menor preço'],
     ['maior', 'maior preço'],
     ['az', 'A–Z'],
+    ['za', 'Z–A'],
   ]
     .map(([v, l]) => `<option value="${v}">${l}</option>`)
     .join('');
@@ -293,7 +294,7 @@ const SHELF_FIELDS: Record<Exclude<keyof ShelfFilters, 'group' | 'stock'>, strin
   q: '#sh-q',
   set: '#sh-set',
   lang: '#sh-lang',
-  category: '#sh-cat',
+  subtype: '#sh-tipo',
   color: '#sh-color',
   min: '#sh-min',
   max: '#sh-max',
@@ -302,45 +303,6 @@ const SHELF_FIELDS: Record<Exclude<keyof ShelfFilters, 'group' | 'stock'>, strin
 
 /** Selados e acessórios: o filtro separa o selado do TCG (group "lacrado") do resto; esgotados vão para o fim. */
 const renderShelf = () => {
-  const all = listedOf('acc');
-  const o = shelfOptions(all);
-  const keep = (id: string, html: string, v: string) => {
-    const sel = $<HTMLSelectElement>(id);
-    sel.innerHTML = html;
-    sel.value = v;
-  };
-  keep(
-    '#sh-set',
-    options(
-      o.sets.map((v) => [v, v]),
-      'todas as coleções',
-    ),
-    shelf.set,
-  );
-  keep(
-    '#sh-lang',
-    options(
-      o.langs.map((v) => [v, v]),
-      'todos os idiomas',
-    ),
-    shelf.lang,
-  );
-  keep(
-    '#sh-cat',
-    options(
-      o.categories.map((v) => [v, v]),
-      'todos os tipos',
-    ),
-    shelf.category,
-  );
-  keep(
-    '#sh-color',
-    options(
-      o.colors.map((v) => [v, v]),
-      'todas as cores',
-    ),
-    shelf.color,
-  );
   const sort = $<HTMLSelectElement>('#sh-sort');
   if (!sort.options.length) {
     sort.innerHTML = [
@@ -348,6 +310,7 @@ const renderShelf = () => {
       ['menor', 'menor preço'],
       ['maior', 'maior preço'],
       ['az', 'A–Z'],
+      ['za', 'Z–A'],
     ]
       .map(([v, l]) => `<option value="${v}">${l}</option>`)
       .join('');
@@ -356,12 +319,30 @@ const renderShelf = () => {
   sort.value = shelf.sort;
   $<HTMLInputElement>('#sh-stock').checked = shelf.stock;
   for (const [k, sel] of Object.entries(SHELF_FIELDS))
-    if (k !== 'set' && k !== 'lang' && k !== 'category' && k !== 'color' && k !== 'sort')
+    if (k !== 'set' && k !== 'lang' && k !== 'subtype' && k !== 'color' && k !== 'sort')
       $<HTMLInputElement>(sel).value = shelf[k as keyof typeof SHELF_FIELDS];
   drawShelf();
 };
 
+/** Opções dos filtros do grupo escolhido (o "tipo" do selado e o do acessório são listas diferentes). */
+const fillShelfOptions = () => {
+  const o = shelfOptions(listedOf('acc'), shelf.group);
+  const keep = (id: string, values: string[], label: string, v: string) => {
+    const sel = $<HTMLSelectElement>(id);
+    sel.innerHTML = options(
+      values.map((x) => [x, x]),
+      label,
+    );
+    sel.value = v;
+  };
+  keep('#sh-set', o.sets, 'todas as coleções', shelf.set);
+  keep('#sh-lang', o.langs, 'todos os idiomas', shelf.lang);
+  keep('#sh-tipo', o.subtypes, 'todos os tipos', shelf.subtype);
+  keep('#sh-color', o.colors, 'todas as cores', shelf.color);
+};
+
 const drawShelf = () => {
+  fillShelfOptions();
   const list = filterShelf(listedOf('acc'), shelf);
   $('#shelfCount').textContent = `${list.length}${list.length === 1 ? ' item' : ' itens'}`;
   $('#accGrid').innerHTML = list.length

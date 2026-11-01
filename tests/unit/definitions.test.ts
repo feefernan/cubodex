@@ -439,35 +439,55 @@ describe('selados e acessórios: busca, filtros e esgotados no fim', () => {
     applyStock([
       ...everything,
       ...rows,
-      acc('e1', 20, 4, { category: 'fichário', color: 'Azul' }),
-      acc('e2', 45, 0, { category: 'caixa', color: 'Preto' }),
-      acc('e3', 30, 2, { category: 'caixa', color: 'Azul' }),
+      acc('e1', 20, 4, { subtype: 'fichário', color: 'Azul' }),
+      acc('e2', 45, 0, { subtype: 'caixa', color: 'Preto' }),
+      acc('e3', 30, 2, { subtype: 'caixa', color: 'Azul' }),
     ]);
     const eIds = (f: Partial<ReturnType<typeof emptyShelf>>) =>
       filterShelf(shelf(), { ...emptyShelf(), group: 'acc', ...f })
         .map((p) => p.id)
         .filter((id) => id.startsWith('e'));
-    expect(eIds({ category: 'caixa' })).toEqual(['e3', 'e2']);
+    expect(eIds({ subtype: 'caixa' })).toEqual(['e3', 'e2']);
     expect(eIds({ color: 'Azul' })).toEqual(['e1', 'e3']);
-    expect(eIds({ category: 'caixa', color: 'Azul' })).toEqual(['e3']);
+    expect(eIds({ subtype: 'caixa', color: 'Azul' })).toEqual(['e3']);
     expect(eIds({ min: '25' })).toEqual(['e3', 'e2']);
     // "Só em estoque" não é filtro de acessório.
     expect(eIds({ stock: true })).toEqual(['e1', 'e3', 'e2']);
-    const o = shelfOptions(shelf());
-    expect(o.categories).toEqual(['caixa', 'fichário']);
+    const o = shelfOptions(shelf(), 'acc');
+    expect(o.subtypes).toEqual(['caixa', 'fichário']);
     expect(o.colors).toEqual(['Azul', 'Preto']);
+    expect(shelfOptions(shelf(), 'all').subtypes).toEqual([]);
     expect(o.sets).not.toContain('Azul');
     expect(
-      filterShelf(shelf(), { ...emptyShelf(), group: 'lacrado', category: 'caixa', color: 'Azul' })
+      filterShelf(shelf(), { ...emptyShelf(), group: 'lacrado', subtype: 'caixa', color: 'Azul' })
         .map((p) => p.id)
         .filter((id) => id.startsWith('e')),
     ).toEqual([]);
-    expect(parseDef({ kind: 'acc', name: 'x', note: '', category: 'c'.repeat(80), color: ' ' })).toEqual({
+    expect(parseDef({ kind: 'acc', name: 'x', note: '', subtype: 'c'.repeat(80), color: ' ' })).toEqual({
       kind: 'acc',
       name: 'x',
       note: '',
-      category: 'c'.repeat(40),
+      subtype: 'c'.repeat(40),
     });
+  });
+
+  it('Z–A inverte a ordem alfabética (esgotados continuam no fim) e o tipo filtra selados e acessórios', () => {
+    applyStock([
+      ...everything,
+      acc('b1', 30, 0, { group: 'lacrado', subtype: 'booster' }),
+      acc('b2', 20, 5, { group: 'lacrado', subtype: 'blister triplo' }),
+      acc('b3', 10, 2, { group: 'lacrado', subtype: 'blister triplo' }),
+      acc('c1', 15, null, { subtype: 'fichário' }),
+    ]);
+    expect(ids({ sort: 'az' })).toEqual(['b2', 'b3', 'c1', 'b1']);
+    expect(ids({ sort: 'za' })).toEqual(['c1', 'b3', 'b2', 'b1']);
+    expect(ids({ group: 'lacrado', subtype: 'blister triplo' })).toEqual(['b2', 'b3']);
+    expect(ids({ group: 'acc', subtype: 'fichário' })).toEqual(['c1']);
+    expect(ids({ subtype: 'fichário' })).toHaveLength(4); // em "todos" o tipo não filtra
+    expect(shelfOptions(shelf(), 'lacrado').subtypes).toEqual(['blister triplo', 'booster']);
+    const names = (sort: 'az' | 'za') => filterItems({ ...emptyFilters(), stock: true, sort }).map((i) => itemName(i));
+    expect(names('az').length).toBeGreaterThan(1);
+    expect(names('za')).toEqual(names('az').reverse());
   });
 
   it('cartas esgotadas vão para o fim da lista de cartas à venda', () => {

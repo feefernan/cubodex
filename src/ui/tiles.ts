@@ -57,11 +57,12 @@ const media = (p: Product): string => {
 const accDetails = (p: Extract<Product, { kind: 'acc' }>): string => {
   const qty = p.qty === undefined ? '' : `<p class="mono qty-un num">${p.qty} un.</p>`;
   if (p.group !== 'lacrado') {
-    const kind = [p.category, p.color].filter(Boolean).map(esc).join(' · ');
+    const kind = [p.subtype, p.color].filter(Boolean).map(esc).join(' · ');
     return `${kind ? `<p class="mono muted">${kind}</p>` : ''}<p class="mono meta">${esc(p.note)}</p>${qty}`;
   }
   const set = p.set ? `<p class="mono muted">${esc(p.set)}</p>` : '';
-  const lang = p.lang ? `<div class="badges">${flag(p.lang)}</div>` : '';
+  const sub = p.subtype ? `<span class="mono pill">${esc(p.subtype)}</span>` : '';
+  const lang = p.lang || sub ? `<div class="badges">${p.lang ? flag(p.lang) : ''}${sub}</div>` : '';
   return `${set}${lang}<p class="mono meta">${esc(p.note)}</p>${qty}`;
 };
 
