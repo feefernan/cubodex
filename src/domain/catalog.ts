@@ -28,8 +28,8 @@ interface Accessory extends BaseProduct {
   note: string;
   /** "lacrado": produto lacrado do TCG (booster, caixa). Sem isso é acessório. */
   group?: 'lacrado';
-  /** Tipo (fichário, deck box…) e cor, só nos acessórios. */
-  category?: string;
+  /** Tipo (coluna "Tipo" do Notion: booster, fichário, deck box…), nos selados e nos acessórios; e cor, só nos acessórios. */
+  subtype?: string;
   color?: string;
   /** Idioma e coleção, só nos selados (como nas cartas avulsas). */
   lang?: 'PT' | 'EN';
@@ -363,7 +363,7 @@ export type ProductDef =
       group?: 'lacrado';
       lang?: 'PT' | 'EN';
       set?: string;
-      category?: string;
+      subtype?: string;
       color?: string;
     }
   | { kind: 'pack'; discount: number }
@@ -463,7 +463,7 @@ export const parseDef = (v: unknown): ProductDef | null => {
             ...(o.group === 'lacrado' ? { group: 'lacrado' } : {}),
             ...(o.lang === 'PT' || o.lang === 'EN' ? { lang: o.lang } : {}),
             ...(str(o.set, 60) ? { set: str(o.set, 60) } : {}),
-            ...(str(o.category, 40) ? { category: str(o.category, 40) } : {}),
+            ...(str(o.subtype, 40) ? { subtype: str(o.subtype, 40) } : {}),
             ...(str(o.color, 30) ? { color: str(o.color, 30) } : {}),
           }
         : null;
@@ -503,7 +503,7 @@ export const defineProduct = (
             ...(def.group ? { group: def.group } : {}),
             ...(def.lang ? { lang: def.lang } : {}),
             ...(def.set ? { set: def.set } : {}),
-            ...(def.category ? { category: def.category } : {}),
+            ...(def.subtype ? { subtype: def.subtype } : {}),
             ...(def.color ? { color: def.color } : {}),
           };
   if (old) PRODUCTS[PRODUCTS.indexOf(old)] = next;

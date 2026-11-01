@@ -20,7 +20,7 @@ export const packRow = (discount: number) => ({
 });
 
 /** Ids que os testes criam só pelo Notion; saem do catálogo na restauração. */
-const ADDED = ['m13', 'k7', 'a5', 'a6', 'i13'];
+const ADDED = ['m13', 'k7', 'a5', 'a6', 'a7', 'a8', 'i13'];
 
 export const resetCatalog = () => {
   applyStock([...everything, packRow(DEFAULT_PACK_DISCOUNT)]);

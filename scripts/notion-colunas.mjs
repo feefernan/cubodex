@@ -16,7 +16,10 @@ if (!TOKEN || !DB) {
 }
 
 const COLUMNS = {
-  Tipo: { select: { options: ['carta', 'miniatura', 'peça', 'acessório', 'pacote'].map((name) => ({ name })) } },
+  // "Categoria" diz o que o produto é (antes se chamava "Tipo"; a coluna "Tipo" agora é o tipo do selado/acessório).
+  Categoria: {
+    select: { options: ['carta', 'miniatura', 'peça', 'acessório', 'pacote', 'selado'].map((name) => ({ name })) },
+  },
   Cor: { rich_text: {} },
   Raridade: { select: { options: ['comum', 'rara', 'especial'].map((name) => ({ name })) } },
   Número: { number: { format: 'number' } },
@@ -82,7 +85,7 @@ const CARTAS = [
 const rich = (v) => ({ rich_text: [{ text: { content: v } }] });
 const sel = (v) => ({ select: { name: v } });
 const toProps = (d) => ({
-  Tipo: sel(d.tipo),
+  Categoria: sel(d.tipo),
   ...(d.cor && { Cor: rich(d.cor) }),
   ...(d.raridade && { Raridade: sel(d.raridade) }),
   ...(d.numero && { Número: { number: d.numero } }),
@@ -140,7 +143,7 @@ for (const d of [...MINIS, ...ACESSORIOS, ...PECAS, ...CARTAS]) {
     console.log(`- ${d.id}: não está no Notion, ignorado`);
     continue;
   }
-  if (page.properties.Tipo?.select) {
+  if (page.properties.Categoria?.select || page.properties.Tipo?.select) {
     skipped++;
     continue;
   }
@@ -161,7 +164,7 @@ if (!byId.has('pack')) {
       properties: {
         Nome: { title: [{ text: { content: 'pacote fiozinho' } }] },
         ID: rich('pack'),
-        Tipo: sel('pacote'),
+        Categoria: sel('pacote'),
         'Desconto do pacote': { number: 10 },
         'Ativo no site': { checkbox: true },
       },
