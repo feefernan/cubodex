@@ -42,6 +42,7 @@ describe('chave da foto', () => {
     );
     expect(await photoKey('m1', file('nota.pdf', 'ws/x/nota.pdf'))).toBeNull();
     expect(await photoKey('M 1', file('a.png', 'ws/x/a.png'))).toBeNull();
+    expect(await photoKey('pack3POR', file('a.png', 'ws/x/a.png'))).toMatch(/^fotos\/pack3POR\/[0-9a-f]{16}\.png$/);
     expect(await photoKey('m1', file('a.jpeg', 'ws/x/a.jpeg'))).toMatch(/\.jpeg$/);
   });
 });

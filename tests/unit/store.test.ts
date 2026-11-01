@@ -124,11 +124,20 @@ describe('estoque do Notion', () => {
           { id: 'i1', price: 10, available: 'x', photos: ['fotos/i1/0123456789abcdef.jpg', '../x', 7] },
           { price: 1 },
           { id: 'i2', active: false, presale: true },
+          { id: 'POR1', photos: ['fotos/POR1/0123456789abcdef.png'] },
         ],
       }),
     ).toEqual([
       { id: 'i1', price: 10, available: null, active: true, presale: false, photos: ['fotos/i1/0123456789abcdef.jpg'] },
       { id: 'i2', price: null, available: null, active: false, presale: true, photos: [] },
+      {
+        id: 'POR1',
+        price: null,
+        available: null,
+        active: true,
+        presale: false,
+        photos: ['fotos/POR1/0123456789abcdef.png'],
+      },
     ]);
   });
 });
