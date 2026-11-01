@@ -177,3 +177,23 @@ Regras:
 ## Idioma
 
 Código (identificadores) em inglês; textos de interface, commits, issues, PRs e comentários em **português**.
+
+## Religar colecionáveis (miniaturas, pacote e Dex)
+
+A seção está **desligada** por `FEATURES.colecionaveis = false` em `src/domain/features.ts`. Nada foi apagado: as telas (`collectibles.ts`,
+`#v-colecionaveis`, `#v-serie`, `#v-dex`), o pacote, a Dex (navegador e servidor) e as linhas `m*` e `pack` do Notion continuam no código.
+Desligada, os endereços `#/colecionaveis`, `#/serie`, `#/dex` e `#/colecionar` levam ao TCG, o carrinho descarta miniatura e pacote salvos e os
+blocos marcados com `data-feature="colecionaveis"` saem do HTML ao carregar. O servidor continua aceitando pedido de miniatura e pacote.
+
+Para religar: troque a constante para `true`, restaure os textos abaixo e faça o PR e o deploy (os testes em `tests/setup.ts` já rodam com a seção
+ligada; `tests/integration/sem-colecionaveis.test.ts` cobre a desligada).
+
+- `index.html` título: `Cubodex · cartas de pokémon, miniaturas e impressão 3D` (e o mesmo em `HOME_TITLE`, `src/ui/router.ts`, e `tests/unit/seo.test.ts`).
+- `index.html` descrição: `Cartas de pokémon originais com cofre virtual, miniaturas Cubodex em séries numeradas com a sua Dex e peças impressas em 3D sob medida.`
+- `og:description` e JSON-LD: `Cartas de pokémon originais, miniaturas em séries numeradas e peças impressas em 3D sob medida.`
+- `og:image:alt`: `Cubodex: colecione. crie. Cartas de pokémon, miniaturas e impressão 3D`; imagem: `scripts/og-image.ts` (linha `cartas de pokémon · miniaturas · impressão 3D`) e rodar o script.
+- Home, texto de apoio: `Cards originais, miniaturas em séries numeradas e peças impressas em 3D sob medida. Escolha por onde começar.`
+- Home, porta "colecionar": `href="#/colecionar"` `data-view="colecionar"`, texto `Cards de pokémon, miniaturas Cubodex em séries e a Dex para acompanhar o que falta.` e pílulas `tcg`, `colecionáveis`, `dex`.
+- Lista de avisos: `saiba antes quando sair a próxima série.` e, em `src/ui/pages.ts`, `Você recebe um e-mail quando sair a próxima série.`
+- `src/ui/apoio.ts`: termos `guarda sua Dex, seu cofre e seus pedidos`; o parágrafo `O pacote de miniaturas fiozinho reúne 3 miniaturas que você escolhe. O preço do pacote aparece no carrinho, antes do pagamento.` (depois do parágrafo do cofre); privacidade `Pedidos, Dex e cofre`.
+- `README.md`: `Cartas de pokémon, colecionáveis e peças impressas em 3D`.

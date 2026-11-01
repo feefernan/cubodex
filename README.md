@@ -1,6 +1,6 @@
 # Cubodex
 
-Cartas de pokémon, colecionáveis e peças impressas em 3D — [@cubodex](https://instagram.com/cubodex)
+Cartas de pokémon, produtos selados e peças impressas em 3D — [@cubodex](https://instagram.com/cubodex)
 
 ```bash
 npm install

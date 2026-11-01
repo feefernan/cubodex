@@ -1,5 +1,6 @@
 import './styles/main.css';
 import './styles/motion.css';
+import { FEATURES } from './domain/features';
 import { applyStock, parseStockRows } from './domain/stock';
 import { api } from './infra/api';
 import { initAccount } from './ui/account';
@@ -18,7 +19,7 @@ bindEvents();
 initCart();
 initTcg();
 initVault();
-initCollectibles();
+if (FEATURES.colecionaveis) initCollectibles();
 initAccount();
 initPages();
 initOrder();

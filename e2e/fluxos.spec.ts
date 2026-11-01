@@ -60,16 +60,16 @@ test.describe('fluxos principais', () => {
     await expect(page.locator('#pedidoBody')).toContainText('Pedido registrado');
   });
 
-  test('pacote de miniaturas e dex', async ({ page }) => {
+  test('colecionáveis desligados: endereços antigos levam ao TCG e a home não os mostra', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#hl-col')).toHaveCount(0);
     await page.goto('/#serie');
-    for (const id of ['m1', 'm2', 'm3']) await page.locator(`[data-action="pack-add"][data-id="${id}"]`).click();
-    await page.locator('[data-action="pack-buy"]').click();
-    await expect(page.locator('#cartCount')).toHaveText('1');
-    await page.locator('#v-serie .colnav [data-view="dex"]').click();
-    // Visitante novo começa deslogado; a demo traz a Dex de exemplo.
-    await page.locator('#dexBody [data-action="login-demo"]').click();
-    await page.locator('[data-action="dex"][data-id="m3"][data-st="have"]').click();
-    await expect(page.locator('#dexBody .dex-count')).toContainText('6');
+    await expect(page.locator('#v-tcg')).toBeVisible();
+    await expect(page).toHaveURL(/#\/tcg$/);
+    await page.goto('/#/dex');
+    await expect(page.locator('#v-tcg')).toBeVisible();
+    await page.locator('[data-nav="col"]').click();
+    await expect(page.locator('#v-tcg')).toBeVisible();
   });
 
   test('link compartilhado abre a carta e o voltar do navegador volta de tela', async ({ page }) => {

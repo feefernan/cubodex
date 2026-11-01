@@ -8,7 +8,7 @@ const meta = (attr: string, name: string) => html.match(new RegExp(`<meta ${attr
 
 describe('SEO e prévia de link (#12)', () => {
   it('título, descrição e endereço canônico no domínio', () => {
-    expect(html).toContain('<title>Cubodex · cartas de pokémon, miniaturas e impressão 3D</title>');
+    expect(html).toContain('<title>Cubodex · cartas de pokémon, produtos selados e impressão 3D</title>');
     expect(meta('name', 'description')?.length).toBeGreaterThan(80);
     expect(html).toContain('<link rel="canonical" href="https://acubodex.com.br/">');
   });

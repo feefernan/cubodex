@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    setupFiles: ['tests/setup.ts'],
     projects: [
       { extends: true, test: { name: 'unit', include: ['tests/unit/**/*.test.ts'], environment: 'node' } },
       { extends: true, test: { name: 'worker', include: ['tests/worker/**/*.test.ts'], environment: 'node' } },
