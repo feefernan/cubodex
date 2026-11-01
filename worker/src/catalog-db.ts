@@ -223,8 +223,15 @@ export const refreshCatalog = async (
 ) => {
   if (!env.NOTION_TOKEN || !env.NOTION_PRODUCTS_DB) return 0;
   await flushStock(db, f, env.NOTION_TOKEN);
-  const rows = await fetchProducts(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB);
+  // Linhas que já conhecemos mantêm o id, mesmo que a coluna "ID" do Notion mude ou suma.
+  const known = new Map(
+    (
+      await db.prepare("SELECT id, page_id FROM products WHERE page_id <> ''").all<{ id: string; page_id: string }>()
+    ).results.map((r) => [r.page_id, r.id] as const),
+  );
+  const rows = await fetchProducts(f, env.NOTION_TOKEN, env.NOTION_PRODUCTS_DB, known);
   const synced = await syncProducts(db, rows);
+  log('info', 'catálogo sincronizado', { linhas: synced });
   // Fotos não derrubam o catálogo: o que não copiou agora tenta de novo na próxima rodada.
   if (env.FOTOS)
     await syncPhotos(db, env.FOTOS, rows, f).catch((e) => log('warn', 'fotos não copiadas', { error: String(e) }));

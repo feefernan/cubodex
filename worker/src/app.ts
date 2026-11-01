@@ -77,7 +77,7 @@ const expireUnpaid = async (db: NonNullable<Env['DB']>, env: Env, f: typeof fetc
 export const scheduled = (env: Env, ctx: Ctx, f: typeof fetch = fetch) => {
   const { DB } = env;
   if (!DB) return;
-  ctx.waitUntil(refreshCatalog(DB, env, f));
+  ctx.waitUntil(refreshCatalog(DB, env, f).catch((e) => log('error', 'sync do catálogo falhou', { error: String(e) })));
   ctx.waitUntil(
     expireUnpaid(DB, env, f).catch((e) => log('error', 'cancelamento de pedidos parados falhou', { error: String(e) })),
   );

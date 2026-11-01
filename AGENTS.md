@@ -96,6 +96,8 @@ baixas pendentes (`dirty`) e traz o que o dono editou; o que não está no Notio
 As fotos da coluna Fotos são copiadas para o R2 (`worker/src/photos.ts`) e servidas em `/api/img/fotos/…`, com chave pelo
 hash do arquivo (cache de 1 ano). O balde é criado pelo deploy; sem R2 ativo na conta, o site publica sem fotos próprias.
 
+**ID do produto:** a coluna `ID` (texto) manda. Se ela sumir ou estiver vazia, vale o id que o site já guarda para aquela página (linhas antigas não mudam de id) e, para linha nova, a numeração automática `# ID` do Notion (`72`, ou `PRD-72` se tiver prefixo). Linha sem nenhum id é ignorada (o log mostra "catálogo sincronizado" a cada ciclo e "sync do catálogo falhou" se der erro).
+
 **Produto novo só pelo Notion (miniatura, peça, acessório, pacote):** crie uma linha em Produtos com `ID` único (ex.: `m13`,
 `k7`, `a5`), `Nome`, `Preço`, `Ativo no site` e o `Tipo`, e os campos do tipo: miniatura = `Cor` (#RRGGBB), `Raridade`
 (comum, rara, especial) e `Número`; peça = `Material`, `Medidas`, `Impressão`, `Nota`; acessório = `Nota` + `Categoria` (o tipo: fichário, caixa, deck box…, coluna de seleção) + `Cor` (o nome da cor, como `azul`); acessório filtra só por tipo, cor e preço, sem coleção nem idioma; produto selado do TCG (booster, caixa) = `Tipo` selado (ou `lacrado`, vale igual) + `Idioma` (PT/EN) + `Série` (a coleção) + `Nota`; selado e acessório aparecem em "selados e acessórios", com busca, filtros (coleção, idioma, preço, em estoque) e esgotados no fim, e mostram `Disponíveis` como estoque; pacote = uma linha

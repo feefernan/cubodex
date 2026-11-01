@@ -21,6 +21,21 @@ type Prop = {
   title?: { plain_text: string }[];
   select?: { name: string } | null;
   files?: { name: string; file?: { url: string }; external?: { url: string } }[];
+  unique_id?: { prefix?: string | null; number: number } | null;
+};
+
+/**
+ * Id do produto: a coluna "ID" (texto) manda; sem ela, o id que o D1 já guarda para essa página (as linhas antigas
+ * mantêm o id, mesmo que a coluna "ID" tenha sido trocada pela numeração automática do Notion); e, para linha nova,
+ * a numeração automática ("# ID", como `72` ou `PRD-72`).
+ */
+const rowId = (pageId: string, p: Record<string, Prop>, known: ReadonlyMap<string, string>) => {
+  const auto = p['# ID']?.unique_id;
+  return (
+    plain(p.ID) ||
+    known.get(pageId) ||
+    (auto ? (auto.prefix ? `${auto.prefix}-${auto.number}` : String(auto.number)) : '')
+  );
 };
 
 /** O que a linha descreve (Tipo, Cor, Raridade…), ainda sem validar: quem valida é `parseDef` do domínio. */
@@ -140,10 +155,11 @@ export const fetchProducts = async (
   f: Fetch,
   token: string,
   db: string,
+  known: ReadonlyMap<string, string> = new Map(),
 ): Promise<(Omit<StockRow, 'def'> & { def?: StoredDef; pageId: string; files: PhotoFile[] })[]> =>
   (await query(f, token, db, null, 'ler produtos'))
     .map(({ id: pageId, created_time, properties: p }) => ({
-      id: plain(p.ID),
+      id: rowId(pageId, p, known),
       pageId,
       def: parseStoredDef(rowDef(p, plain(p.Nome), created_time)) ?? undefined,
       files: (p.Fotos?.files ?? []).flatMap((x) => {
@@ -185,7 +201,7 @@ export const decrementStock = async (
 ) => {
   if (from >= items.length) return [];
   const byId = new Map(
-    (await query(f, token, db, null, 'ler produtos')).map((p) => [plain(p.properties.ID), p] as const),
+    (await query(f, token, db, null, 'ler produtos')).map((p) => [rowId(p.id, p.properties, new Map()), p] as const),
   );
   const short: string[] = [];
   for (let i = from; i < items.length; i++) {
