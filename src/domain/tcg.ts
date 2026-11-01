@@ -54,33 +54,39 @@ const SORTS: Record<Filters['sort'], (a: Item, b: Item) => number> = {
   az: (a, b) => itemName(a).localeCompare(itemName(b), 'pt'),
 };
 
+/** Carta fora de venda (inativa no Notion) não aparece; esgotada, sim. */
+const shown = (it: Item) => it.listed !== false;
+
 export const filterItems = (f: Filters, items: Item[] = ITEMS): Item[] =>
-  items.filter((it) => matches(it, f)).sort(SORTS[f.sort] ?? SORTS.recentes);
+  items.filter((it) => shown(it) && matches(it, f)).sort(SORTS[f.sort] ?? SORTS.recentes);
 
 /** Itens à venda (não esgotados) de uma carta do TCGdex. */
 export const itemsOfTcgdexCard = (id: string): Item[] =>
-  ITEMS.filter((it) => it.status !== 'esgotado' && it.card.id === id);
+  ITEMS.filter((it) => shown(it) && it.status !== 'esgotado' && it.card.id === id);
 
 /** Quantas cartas diferentes de cada set do TCGdex a Cubodex tem à venda. */
 export const onSaleBySet = (): Map<string, number> => {
   const cards = new Map<string, Set<string>>();
   for (const it of ITEMS) {
-    if (it.status === 'esgotado') continue;
+    if (!shown(it) || it.status === 'esgotado') continue;
     cards.set(it.card.setId, (cards.get(it.card.setId) ?? new Set()).add(it.card.id));
   }
   return new Map([...cards].map(([set, ids]) => [set, ids.size]));
 };
 
 /** As opções dos filtros da página "cartas à venda" vêm das próprias cartas à venda: carta nova entra sozinha. */
-export const filterOptions = (items: Item[] = ITEMS) => ({
-  sets: [...new Map(items.map((it) => [it.card.setId, it.card.setName])).entries()].sort((a, b) =>
-    a[1].localeCompare(b[1]),
-  ),
-  rarities: uniq(items.map((it) => it.card.rarity).filter(Boolean)).sort(),
-  types: uniq(items.flatMap((it) => it.card.types.split(',').filter(Boolean))).sort(),
-  langs: uniq(items.map((it) => it.lang)).sort(),
-  variants: uniq(items.map((it) => it.variant)).sort(),
-});
+export const filterOptions = (all: Item[] = ITEMS) => {
+  const items = all.filter(shown);
+  return {
+    sets: [...new Map(items.map((it) => [it.card.setId, it.card.setName])).entries()].sort((a, b) =>
+      a[1].localeCompare(b[1]),
+    ),
+    rarities: uniq(items.map((it) => it.card.rarity).filter(Boolean)).sort(),
+    types: uniq(items.flatMap((it) => it.card.types.split(',').filter(Boolean))).sort(),
+    langs: uniq(items.map((it) => it.lang)).sort(),
+    variants: uniq(items.map((it) => it.variant)).sort(),
+  };
+};
 
 /** Tipo e variante do TCGdex, em português (o valor do filtro continua o do TCGdex). */
 export const TYPE_PT: Record<string, string> = {
