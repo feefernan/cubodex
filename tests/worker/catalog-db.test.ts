@@ -135,4 +135,16 @@ describe('catálogo servido pelo D1', () => {
     await Promise.all(waits);
     expect((await readProducts(d1.db)).length).toBeGreaterThan(30);
   });
+
+  it('falha do Notion no cron não passa em silêncio: vira um log de erro', async () => {
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((m: string) => void errors.push(String(m)));
+    const down = (async () => new Response('x', { status: 500 })) as unknown as typeof fetch;
+    const waits: Promise<unknown>[] = [];
+    scheduled(env({ DB: d1.db }), { waitUntil: (p: Promise<unknown>) => void waits.push(p) }, down);
+    await Promise.all(waits);
+    spy.mockRestore();
+    expect(errors.some((e) => e.includes('sync do catálogo falhou'))).toBe(true);
+    expect(errors.some((e) => e.includes('cancelamento de pedidos parados falhou'))).toBe(false);
+  });
 });
