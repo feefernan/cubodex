@@ -52,6 +52,7 @@ const rowDef = (p: Record<string, Prop>, name: string, created: string | undefin
     case 'acessório':
       return { kind: 'acc', name, note };
     case 'lacrado':
+    case 'selado':
       return {
         kind: 'acc',
         name,

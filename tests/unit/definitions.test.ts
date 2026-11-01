@@ -15,7 +15,16 @@ import {
   productById,
 } from '../../src/domain/catalog';
 import { applyStock, parseStockRows } from '../../src/domain/stock';
-import { emptyFilters, filterItems, filterOptions, itemsOfTcgdexCard, onSaleBySet } from '../../src/domain/tcg';
+import {
+  emptyFilters,
+  emptyShelf,
+  filterItems,
+  filterOptions,
+  filterShelf,
+  itemsOfTcgdexCard,
+  onSaleBySet,
+  shelfOptions,
+} from '../../src/domain/tcg';
 import { everything, packRow, resetCatalog } from '../catalog';
 
 afterEach(resetCatalog);
@@ -351,5 +360,58 @@ describe('carta inativa no Notion some das vitrines; esgotada continua aparecend
     expect(itemsOfTcgdexCard(hidden?.card.id ?? '').map((i) => i.id)).not.toContain('i2');
     expect(filterOptions().sets.length).toBeGreaterThan(0);
     expect(onSaleBySet().size).toBeGreaterThan(0);
+  });
+});
+
+describe('selados e acessórios: busca, filtros e esgotados no fim', () => {
+  const acc = (id: string, price: number, available: number | null, extra: object) => ({
+    id,
+    price,
+    available,
+    active: true,
+    presale: false,
+    def: parseDef({ kind: 'acc', name: id, note: '', ...extra }),
+  });
+  const rows = [
+    acc('b1', 30, 0, { group: 'lacrado', lang: 'PT', set: 'Caos Ascendente' }),
+    acc('b2', 20, 5, { group: 'lacrado', lang: 'EN', set: 'Equilíbrio Perfeito' }),
+    acc('b3', 10, 2, { group: 'lacrado', lang: 'PT', set: 'Equilíbrio Perfeito' }),
+    acc('c1', 15, null, {}),
+  ];
+  const shelf = () => listedOf('acc');
+  const ids = (f: Partial<ReturnType<typeof emptyShelf>>) =>
+    filterShelf(shelf(), { ...emptyShelf(), ...f })
+      .map((p) => p.id)
+      .filter((id) => /^[bc]/.test(id));
+
+  it('esgotado vai para o fim, e a ordem de cada grupo se mantém', () => {
+    applyStock([...everything, ...rows]);
+    const all = ids({});
+    expect(all.at(-1)).toBe('b1');
+    expect(ids({ sort: 'menor' })).toEqual(['b3', 'c1', 'b2', 'b1']);
+    expect(ids({ sort: 'maior' }).slice(0, 3)).toEqual(['b2', 'c1', 'b3']);
+    expect(ids({ sort: 'az' }).slice(0, 2)).toEqual(['b2', 'b3']);
+  });
+
+  it('busca por nome ou coleção sem acento, e filtros de tipo, coleção, idioma, preço e estoque', () => {
+    applyStock([...everything, ...rows]);
+    expect(ids({ q: 'equilibrio' })).toEqual(['b2', 'b3']);
+    expect(ids({ group: 'acc' })).toContain('c1');
+    expect(ids({ group: 'acc' })).not.toContain('b2');
+    expect(ids({ group: 'lacrado', lang: 'PT' }).sort()).toEqual(['b1', 'b3']);
+    expect(ids({ set: 'Caos Ascendente' })).toEqual(['b1']);
+    expect(ids({ stock: true })).not.toContain('b1');
+    expect(ids({ min: '12', max: '25', group: 'lacrado' })).toEqual(['b2']);
+    expect(shelfOptions(shelf())).toEqual({
+      sets: ['Caos Ascendente', 'Equilíbrio Perfeito'],
+      langs: ['EN', 'PT'],
+    });
+  });
+
+  it('cartas esgotadas vão para o fim da lista de cartas à venda', () => {
+    applyStock(everything.map((r) => (r.id === 'i2' ? { ...r, available: 0 } : r)));
+    const list = filterItems(emptyFilters()).map((i) => i.id);
+    expect(list.at(-1)).toBe('i2');
+    expect(list.indexOf('i2')).toBeGreaterThan(list.indexOf('i3'));
   });
 });

@@ -31,7 +31,7 @@ const soldOutButton = `<button class="btn btn--sm"${disabledAttr(true)}>esgotado
 const media = (p: Product): string => {
   const own = p.photos?.[0];
   if (own && p.kind !== 'item')
-    return `<div class="media media--${p.kind === 'craft' ? 'craft' : 'sq'}">${photoImg(p, own)}</div>`;
+    return `<div class="media media--${p.kind === 'craft' ? 'craft' : 'sq'}${p.kind === 'acc' ? ' media--shelf' : ''}">${photoImg(p, own)}</div>`;
   switch (p.kind) {
     case 'acc':
       // shortcut: acessórios ainda sem foto (#15); o campo liso guarda o lugar até a foto chegar.
