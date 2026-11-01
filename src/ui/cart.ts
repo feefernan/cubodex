@@ -9,6 +9,8 @@ import {
   resolveCart,
   toEntry,
 } from '../domain/cart';
+import { productById } from '../domain/catalog';
+import { FEATURES } from '../domain/features';
 import { brl, escapeHtml as esc } from '../domain/format';
 import { type ShippingOption, shippingDays, shippingLabel } from '../domain/shipping';
 import type { BuyerField } from '../domain/state';
@@ -103,7 +105,11 @@ const checkoutForm = (shipped: boolean) =>
  * quantidade nunca passa do estoque. Devolve as linhas prontas para mostrar.
  */
 const syncCart = (): CartLine[] => {
-  const { lines, dropped } = resolveCart(S.cart);
+  // Com os colecionáveis desligados, miniatura e pacote que já estavam salvos no carrinho saem com o mesmo aviso.
+  const kept = FEATURES.colecionaveis ? S.cart : S.cart.filter((e) => !e.pack && productById[e.id]?.kind !== 'mini');
+  const resolved = resolveCart(kept);
+  const lines = resolved.lines;
+  const dropped = resolved.dropped + (S.cart.length - kept.length);
   const entries = lines.map(toEntry);
   if (dropped || JSON.stringify(entries) !== JSON.stringify(S.cart)) {
     S.cart = entries;

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Cubodex · cartas de pokémon, miniaturas e impressão 3D</title>
-<meta name="description" content="Cartas de pokémon originais com cofre virtual, miniaturas Cubodex em séries numeradas com a sua Dex e peças impressas em 3D sob medida.">
+<title>Cubodex · cartas de pokémon, produtos selados e impressão 3D</title>
+<meta name="description" content="Cartas de pokémon originais, produtos selados do TCG, cofre virtual e peças impressas em 3D sob medida.">
 <link rel="canonical" href="https://acubodex.com.br/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -16,13 +16,13 @@
 <meta property="og:locale" content="pt_BR">
 <meta property="og:url" content="https://acubodex.com.br/">
 <meta property="og:title" content="Cubodex · colecione. crie.">
-<meta property="og:description" content="Cartas de pokémon originais, miniaturas em séries numeradas e peças impressas em 3D sob medida.">
+<meta property="og:description" content="Cartas de pokémon originais, produtos selados e peças impressas em 3D sob medida.">
 <meta property="og:image" content="https://acubodex.com.br/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="Cubodex: colecione. crie. Cartas de pokémon, miniaturas e impressão 3D">
+<meta property="og:image:alt" content="Cubodex: colecione. crie. Cartas de pokémon, produtos selados e impressão 3D">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Store","name":"Cubodex","url":"https://acubodex.com.br/","logo":"https://acubodex.com.br/apple-touch-icon.png","image":"https://acubodex.com.br/og.png","description":"Cartas de pokémon originais, miniaturas em séries numeradas e peças impressas em 3D sob medida.","sameAs":["https://instagram.com/cubodex","https://www.tiktok.com/@cubodex"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Store","name":"Cubodex","url":"https://acubodex.com.br/","logo":"https://acubodex.com.br/apple-touch-icon.png","image":"https://acubodex.com.br/og.png","description":"Cartas de pokémon originais, produtos selados e peças impressas em 3D sob medida.","sameAs":["https://instagram.com/cubodex","https://www.tiktok.com/@cubodex"]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -57,7 +57,7 @@
   <nav class="wrap" aria-label="Colecionar">
     <a href="#/colecionar" data-action="go" data-view="colecionar" data-sub="colecionar">visão geral</a>
     <a href="#/tcg" data-action="go" data-view="tcg" data-sub="tcg">tcg</a>
-    <a href="#/colecionaveis" data-action="go" data-view="colecionaveis" data-sub="colecionaveis">colecionáveis cubodex</a>
+    <a href="#/colecionaveis" data-action="go" data-view="colecionaveis" data-sub="colecionaveis" data-feature="colecionaveis">colecionáveis cubodex</a>
   </nav>
 </div>
 
@@ -68,15 +68,15 @@
   <div class="wrap hero">
     <span class="eyebrow mono">cartas de pokémon · impressão 3d</span>
     <h1 class="display">colecione<span class="dot">.</span><br>crie<span class="dot">.</span></h1>
-    <p class="lead">Cards originais, miniaturas em séries numeradas e peças impressas em 3D sob medida. Escolha por onde começar.</p>
+    <p class="lead">Cards originais, produtos selados do TCG e peças impressas em 3D sob medida. Escolha por onde começar.</p>
   </div>
   <div class="wrap">
     <div class="doors">
-      <a class="door door-col" href="#/colecionar" data-action="go" data-view="colecionar">
+      <a class="door door-col" href="#/tcg" data-action="go" data-view="tcg">
         <div class="door-art" aria-hidden="true"><div class="stack"><i></i><i></i><i></i></div></div>
         <h2 class="display">colecionar</h2>
-        <p>Cards de pokémon, miniaturas Cubodex em séries e a Dex para acompanhar o que falta.</p>
-        <div class="pills mono"><span class="pill">tcg</span><span class="pill">colecionáveis</span><span class="pill">dex</span></div>
+        <p>Cards de pokémon, produtos selados e acessórios, e o cofre virtual para guardar suas cartas.</p>
+        <div class="pills mono"><span class="pill">tcg</span><span class="pill">selados</span><span class="pill">cofre</span></div>
       </a>
       <a class="door door-criar" href="#/criar" data-action="go" data-view="criar">
         <div class="door-art" aria-hidden="true">
@@ -99,7 +99,7 @@
     <div class="section-head"><h2 class="display">destaques · tcg</h2><a class="link-more" href="#/tcg" data-action="go" data-view="tcg">ver tudo →</a></div>
     <div class="grid grid--hl" id="hl-tcg"></div>
   </div>
-  <div class="wrap section a-col" style="background:transparent">
+  <div class="wrap section a-col" style="background:transparent" data-feature="colecionaveis">
     <div class="section-head"><h2 class="display">destaques · colecionáveis</h2><a class="link-more" href="#/colecionaveis" data-action="go" data-view="colecionaveis">ver séries →</a></div>
     <div class="grid grid--hl" id="hl-col"></div>
   </div>
@@ -112,7 +112,7 @@
     <div class="opt-in">
       <div>
         <span class="eyebrow mono">lista de avisos</span>
-        <h2 class="display">saiba antes quando sair a próxima série.</h2>
+        <h2 class="display">saiba antes das novidades da cubodex.</h2>
       </div>
       <form id="formAvisos" class="form-stack" novalidate>
         <div class="field"><label for="av-email">e-mail</label><input class="input" id="av-email" type="email" placeholder="voce@exemplo.com" autocomplete="email" required></div>
@@ -139,7 +139,7 @@
         <p class="soft">Cartas de pokémon originais com filtros, enciclopédia de sets e cofre virtual, e acessórios sem personagens.</p>
         <span class="link-more">ver catálogo →</span>
       </a>
-      <a class="choice choice--col" href="#/colecionaveis" data-action="go" data-view="colecionaveis">
+      <a class="choice choice--col" href="#/colecionaveis" data-action="go" data-view="colecionaveis" data-feature="colecionaveis">
         <span class="mono">miniaturas 3d · personagens originais</span>
         <h2 class="display">colecionáveis cubodex</h2>
         <p>Séries numeradas, pacote montado por você, lançamentos e a Dex para marcar o que já é seu.</p>

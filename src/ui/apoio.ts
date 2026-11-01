@@ -38,13 +38,12 @@ ${updated}`,
   termos: `<h2>termos de uso</h2>
 <p>Estes termos valem para quem usa o site da Cubodex e compra dela. Quem vende é ${who}.</p>
 <h3>Conta</h3>
-<p>Você entra com a sua conta Google. A conta da Cubodex é criada com o seu nome e e-mail e guarda sua Dex, seu cofre e seus pedidos. Você é responsável pelo que acontece na sua conta e pode apagá-la quando quiser.</p>
+<p>Você entra com a sua conta Google. A conta da Cubodex é criada com o seu nome e e-mail e guarda seu cofre e seus pedidos. Você é responsável pelo que acontece na sua conta e pode apagá-la quando quiser.</p>
 <h3>Compras</h3>
 <p>Os preços estão em reais. O pagamento acontece no Mercado Pago. O pedido só vale depois da confirmação do pagamento, e o estoque é reservado nesse momento. Se um item não estiver mais disponível, devolvemos o valor. Descrições, fotos e valores podem ser corrigidos quando houver erro evidente, e avisamos antes de qualquer cobrança.</p>
 <h3>Cofre virtual</h3>
 <p>O cofre guarda as cartas que você comprou na Cubodex e escolheu guardar. Elas são suas, ficam separadas para você e saem do cofre quando você pede o envio, que é cobrado à parte (frete). O cofre guarda só itens comprados na Cubodex. A Cubodex não é depositária de cartas de terceiros.</p>
 <h3>Pacotes</h3>
-<p>O pacote de miniaturas fiozinho reúne 3 miniaturas que você escolhe. O preço do pacote aparece no carrinho, antes do pagamento.</p>
 <h3>Marcas e imagens</h3>
 <p>A Cubodex não é afiliada à The Pokémon Company. Pokémon e os nomes e imagens das cartas pertencem a seus titulares. As imagens das cartas vêm do TCGdex (tcgdex.net). O desenho e as peças da Cubodex são nossos; peça autorização antes de copiá-los.</p>
 <h3>Uso do site</h3>
@@ -59,7 +58,7 @@ ${updated}`,
 <ul>
 <li><b style="color:var(--fg)">Nome e e-mail</b> (do Google, quando você entra): para criar e manter a sua conta e falar sobre o pedido.</li>
 <li><b style="color:var(--fg)">CPF, telefone e endereço</b>: só em compra. Servem para a nota fiscal, a etiqueta de envio e a entrega.</li>
-<li><b style="color:var(--fg)">Pedidos, Dex e cofre</b>: para entregar o que você comprou e guardar sua coleção.</li>
+<li><b style="color:var(--fg)">Pedidos e cofre</b>: para entregar o que você comprou e guardar sua coleção.</li>
 <li><b style="color:var(--fg)">E-mail na lista de avisos</b>: só se você pedir, para avisar de lançamentos. Todo e-mail traz o link para sair.</li>
 </ul>
 <h3>Com quem dividimos</h3>

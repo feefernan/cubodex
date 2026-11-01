@@ -1,4 +1,5 @@
 import { dexTotals } from '../domain/collection';
+import { FEATURES } from '../domain/features';
 import { brl, escapeHtml as esc } from '../domain/format';
 import { demoAccount } from '../domain/state';
 import { api } from '../infra/api';
@@ -52,7 +53,9 @@ const renderConta = () => {
   b.innerHTML =
     `<p class="soft" style="margin-top:8px">Olá, <b style="color:var(--fg)">${esc(S.user.name)}</b>${demo ? ' <span class="mono muted">(demonstração)</span>' : ''}. <button class="linkbtn" data-action="logout">sair</button></p>` +
     `<div class="cols-2"><div class="card"><h3>pedidos</h3>${demo ? EXAMPLE_ORDERS : ordersHtml()}</div>` +
-    `<div class="card"><h3>minha dex</h3><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p>${dexBar(S.dex)}<a class="btn btn--ghost" href="#/dex" data-action="go" data-view="dex">abrir dex</a></div>` +
+    (FEATURES.colecionaveis
+      ? `<div class="card"><h3>minha dex</h3><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p>${dexBar(S.dex)}<a class="btn btn--ghost" href="#/dex" data-action="go" data-view="dex">abrir dex</a></div>`
+      : '') +
     `<div class="card"><h3>cofre</h3><p class="dex-count num">${inVault}<small>itens guardados</small></p><a class="btn btn--ghost" href="#/cofre" data-action="go" data-view="cofre">abrir cofre</a></div>` +
     `<div class="card"><h3>dados e privacidade</h3><p class="soft">${esc(S.user.email || '')}</p>${demo ? '<p class="muted" style="font-size:14px">A demonstração vive só neste navegador; sair apaga tudo.</p>' : PRIVACY_REAL}</div></div>`;
 };

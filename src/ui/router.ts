@@ -1,6 +1,8 @@
+import { FEATURES } from '../domain/features';
 import {
   areaOf,
   isColView,
+  isHiddenView,
   isTcgView,
   isView,
   navGroup,
@@ -14,7 +16,7 @@ import { $, $$, onAction } from './dom';
 import { S } from './store';
 
 /** Título da página inicial: o mesmo do index.html, que é o que buscadores e prévias de link leem. */
-const HOME_TITLE = 'Cubodex · cartas de pokémon, miniaturas e impressão 3D';
+const HOME_TITLE = 'Cubodex · cartas de pokémon, produtos selados e impressão 3D';
 
 type Render = () => void;
 const renders = new Map<View, Render>();
@@ -87,8 +89,14 @@ const show = ({ view: v, id }: Route, focus: boolean) => {
 let shownHref = '';
 
 const showHref = (href: string, focus: boolean) => {
+  const route = parseRoute(href);
+  // Endereço de uma seção desligada: troca pela tela que vale, sem criar entrada no histórico (o voltar não repete).
+  if (isHiddenView(href.replace(/^#\/?/, '').split(/[/?]/)[0] ?? '')) {
+    href = routeHref(route.view, route.id);
+    history.replaceState(null, '', href);
+  }
   shownHref = href;
-  show(parseRoute(href), focus);
+  show(route, focus);
 };
 
 /** Vai para uma tela: grava uma entrada no histórico (o voltar do navegador funciona) e mostra na hora. */
@@ -99,6 +107,8 @@ export const go = (target: string, id?: string | null) => {
 };
 
 export const initRouter = () => {
+  // Partes do HTML que só existem com a seção ligada.
+  if (!FEATURES.colecionaveis) for (const el of $$('[data-feature="colecionaveis"]')) el.remove();
   onAction('go', (el) => go(el.dataset.view ?? 'home', el.dataset.tab ?? el.dataset.id));
   onAction('scroll', (el) => {
     document.getElementById(el.dataset.target ?? '')?.scrollIntoView({ behavior: 'smooth', block: 'center' });

@@ -20,7 +20,7 @@ const og = `<!doctype html><html><head>${fonts}<style>
   .big{position:absolute;right:56px;top:150px;width:320px;height:320px}
 </style></head><body><div class="brand">${cube}<span>cubodex</span></div>
   <h1>colecione<span class="dot">.</span><br>crie<span class="dot">.</span></h1>
-  <p>cartas de pokémon · miniaturas · impressão 3D</p><div class="big">${cube}</div></body></html>`;
+  <p>cartas de pokémon · selados · impressão 3D</p><div class="big">${cube}</div></body></html>`;
 
 const icon = `<!doctype html><html><body style="margin:0;width:180px;height:180px;background:#101419;display:grid;place-items:center">
   <div style="width:120px;height:120px">${cube}</div></body></html>`;

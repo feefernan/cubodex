@@ -1,5 +1,6 @@
 import { ITEMS, listedOf } from '../domain/catalog';
 import { quoteRequestText, whatsappUrl } from '../domain/contact';
+import { FEATURES } from '../domain/features';
 import { escapeHtml as esc } from '../domain/format';
 import { homeNews, type NewsCard } from '../domain/news';
 import { isEmail } from '../domain/validation';
@@ -25,10 +26,10 @@ const renderHome = () => {
     .flatMap((id) => ITEMS.filter((it) => it.id === id && it.status !== 'esgotado'))
     .map(itemTile)
     .join('');
-  fillProducts($('#hl-col'), listedOf('mini', 4));
+  if (FEATURES.colecionaveis) fillProducts($('#hl-col'), listedOf('mini', 4));
   fillProducts($('#hl-criar'), listedOf('craft', 4));
-  $('#news').innerHTML = LAUNCH_NEWS + homeNews().map(newsCard).join('') + OPT_IN_NEWS;
-  tickCountdowns();
+  $('#news').innerHTML = (FEATURES.colecionaveis ? LAUNCH_NEWS : '') + homeNews().map(newsCard).join('') + OPT_IN_NEWS;
+  if (FEATURES.colecionaveis) tickCountdowns();
 };
 
 const renderApoio = () => {
@@ -64,7 +65,7 @@ export const initPages = () => {
     msg.innerHTML = progress('inscrevendo…');
     try {
       await api.subscribe(email.value.trim());
-      message(msg, '<b>Na lista.</b> Você recebe um e-mail quando sair a próxima série.');
+      message(msg, '<b>Na lista.</b> Você recebe um e-mail quando tiver novidade.');
       (form as HTMLFormElement).reset();
     } catch (e) {
       msg.innerHTML = alertMsg((e as Error).message);
