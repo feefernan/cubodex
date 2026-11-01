@@ -147,6 +147,11 @@ describe('pacote com desconto do Notion', () => {
     expect(packPrice(['m1', 'nao-existe', 'm10'])).toBe(45.75); // id que sumiu vale 0: (22 + 39) × 0,75
   });
 
+  it('uma linha de outro produto com Tipo "pacote" não mexe no desconto do pacote de miniaturas', () => {
+    applyStock([...everything, packRow(25), { ...packRow(0), id: 'pack3MEG', price: 140 }]);
+    expect(PACK.discount).toBe(25);
+  });
+
   it('sem a linha do pacote no Notion (ou inativa) o pacote não se vende', () => {
     applyStock(everything);
     expect(PACK.listed).toBe(false);
