@@ -89,6 +89,8 @@ export interface Item {
   qty: number;
   grade?: Grade;
   status: StockStatus;
+  /** Falso = fora de venda no Notion (inativa ou sem preço): some das vitrines. Esgotada (ativa, 0 un.) continua aparecendo. */
+  listed?: boolean;
   /** Quanto menor, mais recente (ordena "mais recentes"). */
   added: number;
 }

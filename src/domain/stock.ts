@@ -49,10 +49,13 @@ export const applyStock = (rows: StockRow[]): string[] => {
   for (const p of PRODUCTS) {
     // Sem preço não vende: produto novo sem preço no Notion fica fora de venda até alguém preencher.
     p.listed = active.has(p.id) && p.price > 0;
-    if (p.kind === 'item' && !p.listed) {
-      p.status = 'esgotado';
+    if (p.kind === 'item') {
       const item = ITEMS.find((it) => it.id === p.id);
-      if (item) item.status = 'esgotado';
+      if (item) item.listed = p.listed;
+      if (!p.listed) {
+        p.status = 'esgotado';
+        if (item) item.status = 'esgotado';
+      }
     }
   }
   for (const row of rows) {

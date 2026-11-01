@@ -15,6 +15,7 @@ import {
   productById,
 } from '../../src/domain/catalog';
 import { applyStock, parseStockRows } from '../../src/domain/stock';
+import { emptyFilters, filterItems, filterOptions, itemsOfTcgdexCard, onSaleBySet } from '../../src/domain/tcg';
 import { everything, packRow, resetCatalog } from '../catalog';
 
 afterEach(resetCatalog);
@@ -333,5 +334,22 @@ describe('estoque de acessórios e lacrados', () => {
       note: '',
       set: 'a'.repeat(60),
     });
+  });
+});
+
+describe('carta inativa no Notion some das vitrines; esgotada continua aparecendo', () => {
+  it('filtros, página da carta e contagem por set só consideram o que está à venda ou esgotado de verdade', () => {
+    applyStock(
+      everything.map((r) => (r.id === 'i2' ? { ...r, active: false } : r.id === 'i3' ? { ...r, available: 0 } : r)),
+    );
+    const ids = filterItems(emptyFilters()).map((i) => i.id);
+    expect(ids).not.toContain('i2');
+    expect(ids).toContain('i3');
+    expect(ITEMS.find((i) => i.id === 'i3')).toMatchObject({ status: 'esgotado', listed: true });
+    expect(ITEMS.find((i) => i.id === 'i2')?.listed).toBe(false);
+    const hidden = ITEMS.find((i) => i.id === 'i2');
+    expect(itemsOfTcgdexCard(hidden?.card.id ?? '').map((i) => i.id)).not.toContain('i2');
+    expect(filterOptions().sets.length).toBeGreaterThan(0);
+    expect(onSaleBySet().size).toBeGreaterThan(0);
   });
 });
