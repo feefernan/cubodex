@@ -51,7 +51,13 @@ const rowDef = (p: Record<string, Prop>, name: string, created: string | undefin
         ].filter(([, v]) => v),
       };
     case 'acessório':
-      return { kind: 'acc', name, note };
+      return {
+        kind: 'acc',
+        name,
+        note,
+        category: p.Categoria?.select?.name ?? plain(p.Categoria),
+        color: plain(p.Cor),
+      };
     case 'lacrado':
     case 'selado':
       return {

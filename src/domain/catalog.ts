@@ -26,6 +26,9 @@ interface Accessory extends BaseProduct {
   note: string;
   /** "lacrado": produto lacrado do TCG (booster, caixa). Sem isso é acessório. */
   group?: 'lacrado';
+  /** Tipo (fichário, deck box…) e cor, só nos acessórios. */
+  category?: string;
+  color?: string;
   /** Idioma e coleção, só nos selados (como nas cartas avulsas). */
   lang?: 'PT' | 'EN';
   set?: string;
@@ -349,7 +352,16 @@ export interface ItemDef {
 export type ProductDef =
   | { kind: 'mini'; name: string; n: number; rar: Rarity; color: string }
   | { kind: 'craft'; name: string; spec: [string, string][]; note: string }
-  | { kind: 'acc'; name: string; note: string; group?: 'lacrado'; lang?: 'PT' | 'EN'; set?: string }
+  | {
+      kind: 'acc';
+      name: string;
+      note: string;
+      group?: 'lacrado';
+      lang?: 'PT' | 'EN';
+      set?: string;
+      category?: string;
+      color?: string;
+    }
   | { kind: 'pack'; discount: number }
   | ItemDef;
 
@@ -447,6 +459,8 @@ export const parseDef = (v: unknown): ProductDef | null => {
             ...(o.group === 'lacrado' ? { group: 'lacrado' } : {}),
             ...(o.lang === 'PT' || o.lang === 'EN' ? { lang: o.lang } : {}),
             ...(str(o.set, 60) ? { set: str(o.set, 60) } : {}),
+            ...(str(o.category, 40) ? { category: str(o.category, 40) } : {}),
+            ...(str(o.color, 30) ? { color: str(o.color, 30) } : {}),
           }
         : null;
     case 'item': {
@@ -485,6 +499,8 @@ export const defineProduct = (
             ...(def.group ? { group: def.group } : {}),
             ...(def.lang ? { lang: def.lang } : {}),
             ...(def.set ? { set: def.set } : {}),
+            ...(def.category ? { category: def.category } : {}),
+            ...(def.color ? { color: def.color } : {}),
           };
   if (old) PRODUCTS[PRODUCTS.indexOf(old)] = next;
   else PRODUCTS.push(next);

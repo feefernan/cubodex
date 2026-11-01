@@ -421,12 +421,50 @@ describe('selados e acessórios: busca, filtros e esgotados no fim', () => {
     expect(ids({ group: 'acc' })).toContain('c1');
     expect(ids({ group: 'acc' })).not.toContain('b2');
     expect(ids({ group: 'lacrado', lang: 'PT' }).sort()).toEqual(['b1', 'b3']);
-    expect(ids({ set: 'Caos Ascendente' })).toEqual(['b1']);
+    expect(ids({ group: 'lacrado', set: 'Caos Ascendente' })).toEqual(['b1']);
+    // Filtro de coleção só vale para selados: em "todos" e em acessórios é ignorado.
+    expect(ids({ set: 'Caos Ascendente' })).toHaveLength(4);
+    expect(ids({ group: 'acc', set: 'Caos Ascendente', lang: 'EN' })).toEqual(['c1']);
     expect(ids({ stock: true })).not.toContain('b1');
     expect(ids({ min: '12', max: '25', group: 'lacrado' })).toEqual(['b2']);
-    expect(shelfOptions(shelf())).toEqual({
+    expect(shelfOptions(shelf())).toMatchObject({
       sets: ['Caos Ascendente', 'Equilíbrio Perfeito'],
       langs: ['EN', 'PT'],
+    });
+  });
+
+  it('acessórios filtram por tipo, cor e preço; selados não aparecem nem entram nas opções', () => {
+    applyStock([
+      ...everything,
+      ...rows,
+      acc('e1', 20, 4, { category: 'fichário', color: 'Azul' }),
+      acc('e2', 45, 0, { category: 'caixa', color: 'Preto' }),
+      acc('e3', 30, 2, { category: 'caixa', color: 'Azul' }),
+    ]);
+    const eIds = (f: Partial<ReturnType<typeof emptyShelf>>) =>
+      filterShelf(shelf(), { ...emptyShelf(), group: 'acc', ...f })
+        .map((p) => p.id)
+        .filter((id) => id.startsWith('e'));
+    expect(eIds({ category: 'caixa' })).toEqual(['e3', 'e2']);
+    expect(eIds({ color: 'Azul' })).toEqual(['e1', 'e3']);
+    expect(eIds({ category: 'caixa', color: 'Azul' })).toEqual(['e3']);
+    expect(eIds({ min: '25' })).toEqual(['e3', 'e2']);
+    // "Só em estoque" não é filtro de acessório.
+    expect(eIds({ stock: true })).toEqual(['e1', 'e3', 'e2']);
+    const o = shelfOptions(shelf());
+    expect(o.categories).toEqual(['caixa', 'fichário']);
+    expect(o.colors).toEqual(['Azul', 'Preto']);
+    expect(o.sets).not.toContain('Azul');
+    expect(
+      filterShelf(shelf(), { ...emptyShelf(), group: 'lacrado', category: 'caixa', color: 'Azul' })
+        .map((p) => p.id)
+        .filter((id) => id.startsWith('e')),
+    ).toEqual([]);
+    expect(parseDef({ kind: 'acc', name: 'x', note: '', category: 'c'.repeat(80), color: ' ' })).toEqual({
+      kind: 'acc',
+      name: 'x',
+      note: '',
+      category: 'c'.repeat(40),
     });
   });
 
