@@ -24,12 +24,19 @@ describe('identidade da loja (Decreto 7.962)', () => {
     expect(cnpjOk(STORE.cnpj)).toBe(true);
     expect(STORE.legalName.startsWith(STORE.cnpj.slice(0, 10))).toBe(true);
   });
-  it('o rodapé estático traz razão social, CNPJ, endereço e e-mail, iguais ao módulo', () => {
+  it('o rodapé traz só CNPJ, cidade e e-mail; razão social e endereço ficam em "sobre"', () => {
     const t = text(footer);
-    for (const v of [STORE.legalName, STORE.cnpj, STORE.address, STORE.email]) expect(t).toContain(v);
+    for (const v of [STORE.cnpj, 'São Paulo/SP', STORE.email]) expect(t).toContain(v);
+    for (const v of [STORE.legalName, STORE.address]) expect(t).not.toContain(v);
     expect(footer).toContain(`href="mailto:${STORE.email}"`);
+    expect(APOIO.sobre).toContain(STORE.legalName);
+    expect(APOIO.sobre).toContain(STORE.address);
     // O endereço fica sem complemento (decisão do dono, casa).
     expect(STORE.address).not.toMatch(/apto|ap\.|bloco|casa/i);
+  });
+  it('instagram e tiktok do rodapé são links para os perfis, em nova aba', () => {
+    for (const url of ['https://instagram.com/cubodex', 'https://www.tiktok.com/@cubodex'])
+      expect(footer).toMatch(new RegExp(`href="${url}" target="_blank" rel="noopener noreferrer"`));
   });
   it('o rodapé leva a todas as páginas legais, e todas existem', () => {
     for (const tab of ['termos', 'privacidade', 'trocas', 'contato']) {
