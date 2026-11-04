@@ -248,12 +248,19 @@ export const setStockDone = (db: Db, serial: string, n: number) =>
  * Efeito do pagamento no cofre, uma vez só: compra → itens marcados entram no cofre; envio → itens separados
  * saem para envio. Tudo num batch junto com vault_done = 1 (ou tudo, ou nada).
  */
-export const applyVaultEffects = async (db: Db, serial: string, order: OrderRow, now = Date.now()) => {
+export const applyVaultEffects = async (
+  db: Db,
+  serial: string,
+  order: OrderRow,
+  now = Date.now(),
+  /** Produtos sem estoque no pagamento: não entram no cofre (a loja reembolsa essa parte). */
+  skip: readonly string[] = [],
+) => {
   if (order.vault_done || !order.user_id) return;
   const at = day(now);
   const done = db.prepare('UPDATE orders SET vault_done = 1 WHERE serial = ? AND vault_done = 0').bind(serial);
   if (order.kind === 'compra') {
-    const items = JSON.parse(order.vault_json) as VaultIntent[];
+    const items = (JSON.parse(order.vault_json) as VaultIntent[]).filter((it) => !skip.includes(it.id));
     const created = new Date(now).toISOString();
     await db.batch([
       ...items.flatMap((it) => [
