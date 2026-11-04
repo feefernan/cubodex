@@ -416,6 +416,28 @@ describe('pagamento sem baixa dupla (#39)', () => {
     expect(api.state.orders[0].status).toBe('Sem estoque');
   });
 
+  it('acessório com estoque no Notion baixa na venda, como as cartas', async () => {
+    api.state.stock.a1 = 3;
+    await create({ ...ORDER, items: [{ id: 'a1', qty: 2 }] });
+    await hook(E);
+    expect(rows("SELECT qty FROM products WHERE id = 'a1'")).toEqual([{ qty: 1 }]);
+    expect(api.state.stock.a1).toBe(1); // e o novo valor já foi para o Notion
+    expect(api.state.orders[0].status).toBe('Pago');
+  });
+
+  it('carta sem estoque no pagamento não entra no cofre, e o estorno não devolve o que não foi baixado', async () => {
+    const cookie = await login();
+    await create({ ...ORDER, items: [{ id: 'i2', qty: 1, dest: 'vault' }] }, cookie);
+    d1.sqlite.exec("UPDATE products SET qty = 0 WHERE id = 'i2'");
+    await hook(E);
+    expect(api.state.orders[0].status).toBe('Sem estoque');
+    expect(rows('SELECT * FROM vault_items')).toEqual([]);
+    api.state.payment = { ...api.state.payment, status: 'refunded' };
+    await hook(E);
+    expect(rows('SELECT status FROM orders')).toEqual([{ status: 'Estornado' }]);
+    expect(rows("SELECT qty FROM products WHERE id = 'i2'")).toEqual([{ qty: 0 }]);
+  });
+
   it('estorno depois de pago vira "Estornado" e tira o item do cofre', async () => {
     const cookie = await login();
     const qty = () => rows("SELECT qty FROM products WHERE id = 'i2'")[0].qty;

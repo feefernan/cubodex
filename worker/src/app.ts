@@ -220,8 +220,10 @@ const createOrder = async (request: Request, env: Env, f: typeof fetch) => {
     const total = Math.round((order.goods + (shipping?.price ?? 0)) * 100) / 100;
     const serial = makeSerial(new Date(), crypto.getRandomValues(new Uint8Array(6)));
     const count = order.lines.reduce((a, l) => a + l.qty, 0);
-    // Só cartas têm estoque contado; pacotes e peças impressas não.
-    const stock = order.lines.filter((l) => l.kind === 'item').map((l) => ({ id: l.id, qty: l.qty }));
+    // Têm estoque contado as cartas e os acessórios/selados (quando o Notion informa "Disponíveis"); pacotes e peças impressas não.
+    const stock = order.lines
+      .filter((l) => l.kind === 'item' || l.kind === 'acc')
+      .map((l) => ({ id: l.id, qty: l.qty }));
 
     // A cobrança vem antes de qualquer registro: se ela falhar, nenhum pedido "aguardando" fica órfão.
     const checkoutUrl = await createCheckout(f, env.MP_ACCESS_TOKEN, {
@@ -287,7 +289,8 @@ const settlePaid = async (env: Env, f: typeof fetch, serial: string) => {
     clearStockCache();
     if (env.NOTION_TOKEN) await flushStock(db, f, env.NOTION_TOKEN).catch(() => 0);
   }
-  await applyVaultEffects(db, serial, order);
+  // Carta sem estoque no pagamento não entra no cofre: a loja reembolsa, e o estorno só devolve o que foi baixado.
+  await applyVaultEffects(db, serial, order, Date.now(), short);
   return short;
 };
 
@@ -394,7 +397,7 @@ const settleWithoutDb = async (
   if (!first || !env.NOTION_TOKEN || !env.NOTION_PRODUCTS_DB) return [];
   const items = (raw ?? []).flatMap((it) =>
     typeof it.id === 'string' &&
-    productById[it.id]?.kind === 'item' &&
+    (productById[it.id]?.kind === 'item' || productById[it.id]?.kind === 'acc') &&
     Number.isInteger(Number(it.qty)) &&
     Number(it.qty) > 0
       ? [{ id: it.id, qty: Number(it.qty) }]
