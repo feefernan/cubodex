@@ -17,3 +17,4 @@ playwright-report/
 
 # design-taste-frontend: screenshots e relatórios do inspetor (locais)
 .taste-skill/
+.dev.vars

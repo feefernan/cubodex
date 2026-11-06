@@ -144,6 +144,7 @@ export const reserveForShipment = async (db: Db, userId: string, ids: string[], 
   const { results } = await db
     .prepare(
       `UPDATE vault_items SET shipment_serial = ? WHERE user_id = ? AND status = 'cofre' AND id IN (${marks})
+       AND (order_serial IS NULL OR order_serial IN (SELECT serial FROM orders WHERE status = 'Pago'))
        AND (shipment_serial IS NULL OR shipment_serial IN
          (SELECT serial FROM orders WHERE kind = 'envio' AND status <> 'Pago' AND created_at < ?))
        RETURNING id, product_id, name, meta, qty`,
@@ -297,7 +298,8 @@ export const applyVaultEffects = async (
  * - compra: as cartas dessa compra que ainda estão no cofre saem dele (não podem ser enviadas de graça) e voltam ao
  *   estoque da loja, pois continuam com a loja;
  * - envio: os itens que ainda não saíram ("envio") voltam ao cofre.
- * Itens já enviados ficam como estão — a loja resolve à parte.
+ * Itens já enviados ficam como estão — a loja resolve à parte. (Itens de uma compra estornada não entram em novo
+ * envio: `reserveForShipment` só separa itens de compra paga.)
  */
 export const markRefunded = async (db: Db, serial: string, now = Date.now()) => {
   const order = await db

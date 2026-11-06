@@ -333,7 +333,11 @@ export const PRODUCTS: Product[] = [
   ),
 ];
 
-export const productById: Record<string, Product> = Object.fromEntries(PRODUCTS.map((p) => [p.id, p]));
+// Sem protótipo: ids como 'constructor' ou '__proto__' não acham nada em vez de achar métodos de Object.
+export const productById: Record<string, Product> = Object.assign(
+  Object.create(null),
+  Object.fromEntries(PRODUCTS.map((p) => [p.id, p])),
+);
 export const MINIS = PRODUCTS.filter((p): p is Mini => p.kind === 'mini');
 
 /** Produtos à venda de um tipo, na ordem do catálogo (limite opcional): vitrines e destaques saem daqui. */

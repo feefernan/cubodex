@@ -33,7 +33,10 @@ const rows = (sql: string) => d1.sqlite.prepare(sql).all() as Record<string, unk
 describe('entrar com Google', () => {
   const G = () => ({ ...E, GOOGLE_CLIENT_ID: 'cid.apps.googleusercontent.com', GOOGLE_CLIENT_SECRET: 'segredo' });
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  let nonce = '';
   const claims = (over: Record<string, unknown> = {}) => ({
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    nonce,
     iss: 'https://accounts.google.com',
     aud: 'cid.apps.googleusercontent.com',
     email: 'Ana@Exemplo.com',
@@ -56,6 +59,7 @@ describe('entrar com Google', () => {
     const res = await handle(new Request(`${origin}/api/auth/google`), G(), ctx, api.f);
     const to = new URL(res.headers.get('Location') ?? '');
     const cookie = (res.headers.get('Set-Cookie') ?? '').split(';')[0];
+    nonce = to.searchParams.get('nonce') ?? '';
     return { res, to, cookie, state: to.searchParams.get('state') ?? '' };
   };
   const back = (state: string, cookie: string, extra = 'code=c1') =>
@@ -73,12 +77,27 @@ describe('entrar com Google', () => {
       scope: 'openid email profile',
       code_challenge_method: 'S256',
     });
-    expect(cookie).toMatch(/^cbx_oauth=[\w-]{43}\.[\w-]{43}$/);
+    expect(cookie).toMatch(/^cbx_oauth=[\w-]{43}\.[\w-]{43}\.[\w-]{43}$/);
     expect(res.headers.get('Set-Cookie')).toContain(
       'HttpOnly; Secure; SameSite=Lax; Path=/api/auth/google; Max-Age=600',
     );
     const local = await start('http://localhost:5173');
     expect(local.to.searchParams.get('redirect_uri')).toBe('http://localhost:5173/api/auth/google/callback');
+  });
+
+  it('só volta para o site (ou www/localhost); outro Host cai no SITE_URL', async () => {
+    const www = await start('https://www.cubodex.test');
+    expect(www.to.searchParams.get('redirect_uri')).toBe('https://www.cubodex.test/api/auth/google/callback');
+    const evil = await start('https://evil.example');
+    expect(evil.to.searchParams.get('redirect_uri')).toBe('https://cubodex.test/api/auth/google/callback');
+  });
+
+  it('o retorno do Google também tem limite por IP', async () => {
+    const { state, cookie } = await start();
+    const blocked = { limit: async () => ({ success: false }) };
+    const res = await handle(back(state, cookie), { ...G(), QUOTES_LIMITER: blocked }, ctx, google(claims()).f);
+    expect(res.headers.get('Location')).toBe('/#/conta/erro-login');
+    expect(rows('SELECT * FROM users')).toEqual([]);
   });
 
   it('volta do Google: troca o código com o verificador, cria a conta e abre a sessão', async () => {
@@ -125,6 +144,8 @@ describe('entrar com Google', () => {
     await refused(back(state, cookie), claims({ aud: 'outro-app' }));
     await refused(back(state, cookie), claims({ iss: 'https://evil.test' }));
     await refused(back(state, cookie), claims({ email: 'sem-arroba' }));
+    await refused(back(state, cookie), claims({ nonce: 'outro' }));
+    await refused(back(state, cookie), claims({ exp: Math.floor(Date.now() / 1000) - 10 }));
     await refused(back(state, cookie), null);
     expect(rows('SELECT * FROM users')).toEqual([]);
   });
@@ -461,10 +482,24 @@ describe('pagamento sem baixa dupla (#39)', () => {
 
   it('valor pago diferente do pedido fica anotado no Notion', async () => {
     await create();
+    const reserved = rows("SELECT qty FROM products WHERE id = 'i2'")[0].qty;
     api.state.payment = { ...api.state.payment, transaction_amount: 1 } as typeof api.state.payment;
     await hook(E);
     const patch = api.calls.filter((c) => c.method === 'PATCH' && c.url.endsWith('/pages/p0')).at(-1);
     expect(JSON.stringify(patch?.body)).toContain('VALOR DIVERGENTE');
+    // Não liquida: o pedido segue como estava e nada é baixado do estoque.
+    expect(rows('SELECT status FROM orders')[0].status).not.toBe('Pago');
+    expect(rows("SELECT qty FROM products WHERE id = 'i2'")[0].qty).toBe(reserved);
+  });
+
+  it('item de compra que deixou de estar paga não entra em envio', async () => {
+    const cookie = await login();
+    await create({ ...ORDER, items: [{ id: 'i2', qty: 1, dest: 'vault' }] }, cookie);
+    await hook(E);
+    const [item] = rows('SELECT id FROM vault_items');
+    d1.sqlite.prepare("UPDATE orders SET status = 'Estornado'").run();
+    const ship = { items: [item.id], address: ORDER.address, contact: CONTACT, shipping: { serviceId: 1 } };
+    expect((await handle(withCookie('/api/vault/ship', cookie, ship), E, ctx, api.f)).status).toBe(409);
   });
 
   it('pedido sem pagamento há mais de 24 h é cancelado pelo cron, no D1 e no Notion', async () => {
