@@ -4,20 +4,21 @@
  * (o plano gratuito tem 5 milhões de linhas lidas por dia, e uma busca por trecho no banco leria as 24 mil).
  */
 import type { Ctx, Env } from './env';
-import { json, limited } from './http';
+import { cacheKey, json, limited } from './http';
 
 const CARD_ID = /^[\w.!%-]{1,80}$/;
 
 /** Responde da Cache API quando há; senão monta, guarda (sem atrapalhar a resposta) e devolve. */
 const cached = async (request: Request, ctx: Ctx, maxAge: number, build: () => Promise<Response>) => {
   const cache = typeof caches === 'undefined' ? null : (caches as unknown as { default: Cache }).default;
-  const hit = await cache?.match(request);
+  const key = cacheKey(request);
+  const hit = await cache?.match(key);
   if (hit) return hit;
   const res = await build();
   if (res.status === 200 && cache) {
     const stored = new Response(res.clone().body, res);
     stored.headers.set('Cache-Control', `public, max-age=${maxAge}`);
-    ctx.waitUntil(cache.put(request, stored));
+    ctx.waitUntil(cache.put(key, stored));
   }
   return res;
 };

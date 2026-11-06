@@ -41,7 +41,7 @@ import {
 } from './accounts';
 import { flushStock, readProducts, refreshCatalog, takeStock } from './catalog-db';
 import type { Ctx, Env } from './env';
-import { handleError, json, limited, log, notice, page, readJson, unavailable } from './http';
+import { cacheKey, handleError, json, limited, log, notice, page, readJson, unavailable } from './http';
 import { quoteShipping } from './melhor-envio';
 import { createCheckout, getPayment, verifySignature } from './mercado-pago';
 import {
@@ -124,7 +124,8 @@ const loadStock = async (env: Env, f: typeof fetch): Promise<StockRow[]> => {
 const photo = async (request: Request, env: Env, key: string, ctx: Ctx) => {
   if (!PHOTO_KEY.test(key)) return json({ error: 'Não encontrado' }, 404);
   const cache = typeof caches === 'undefined' ? null : (caches as unknown as { default: Cache }).default;
-  const hit = await cache?.match(request);
+  const cacheReq = cacheKey(request);
+  const hit = await cache?.match(cacheReq);
   if (hit) return hit;
   const obj = await env.FOTOS?.get(key);
   if (!obj?.body) return json({ error: 'Não encontrado' }, 404);
@@ -135,7 +136,7 @@ const photo = async (request: Request, env: Env, key: string, ctx: Ctx) => {
       'X-Content-Type-Options': 'nosniff',
     },
   });
-  if (cache) ctx.waitUntil(cache.put(request, res.clone()));
+  if (cache) ctx.waitUntil(cache.put(cacheReq, res.clone()));
   return res;
 };
 
@@ -334,27 +335,30 @@ const paymentWebhook = async (request: Request, env: Env, f: typeof fetch) => {
     }
     // O D1 é a fonte da verdade do status (o Notion pode estar um passo atrás depois de uma falha).
     const current = mirror?.status ?? page?.status ?? '';
-    const next = nextOrderStatus(current, payment.status);
     let note = `${payment.id} · ${payment.status}`;
+    // Valor aprovado diferente do total do pedido: não liquida (nem baixa estoque nem libera item do cofre); o
+    // pedido fica como está e o dono confere no painel do Mercado Pago.
+    const advance = nextOrderStatus(current, payment.status);
+    const diverged =
+      advance === 'Pago' &&
+      !!mirror &&
+      payment.transaction_amount != null &&
+      Math.abs(payment.transaction_amount - mirror.total) > 0.01 &&
+      Math.abs(payment.transaction_amount + (payment.shipping_amount ?? 0) - mirror.total) > 0.01;
+    if (diverged) {
+      log('warn', 'valor pago diferente do pedido', {
+        serial,
+        pago: payment.transaction_amount,
+        pedido: mirror?.total,
+      });
+      note += ` · VALOR DIVERGENTE (pago ${payment.transaction_amount}, pedido ${mirror?.total}) — não liquidado`;
+      if (page && current) await updatePaymentStatus(f, env.NOTION_TOKEN, page.id, current as PaymentStatus, note);
+      return new Response(null, { status: 200 });
+    }
+    const next = advance;
 
     let claimed = false;
-    if (next === 'Pago' && env.DB) {
-      claimed = await claimPaid(env.DB, serial);
-      if (
-        claimed &&
-        mirror &&
-        payment.transaction_amount != null &&
-        Math.abs(payment.transaction_amount - mirror.total) > 0.01 &&
-        Math.abs(payment.transaction_amount + (payment.shipping_amount ?? 0) - mirror.total) > 0.01
-      ) {
-        log('warn', 'valor pago diferente do pedido', {
-          serial,
-          pago: payment.transaction_amount,
-          pedido: mirror.total,
-        });
-        note += ` · VALOR DIVERGENTE (pago ${payment.transaction_amount}, pedido ${mirror.total})`;
-      }
-    }
+    if (next === 'Pago' && env.DB) claimed = await claimPaid(env.DB, serial);
     if (next === 'Estornado' && env.DB) await markRefunded(env.DB, serial);
     if (next === 'Cancelado' && env.DB) {
       await markOrderStatus(env.DB, serial, 'Cancelado');
@@ -539,6 +543,7 @@ const unsubscribePage = (url: URL) => {
 /** POST /api/avisos/sair — formulário da página acima. */
 const unsubscribe = async (request: Request, env: Env, f: typeof fetch) => {
   if (request.headers.get('Origin') !== new URL(request.url).origin) return notice('Origem inválida.', 403);
+  if (await limited(request, env.QUOTES_LIMITER)) return notice('Muitos pedidos seguidos, tente em 1 minuto.', 429);
   const token = String((await request.formData().catch(() => null))?.get('t') ?? '');
   if (!env.NOTION_TOKEN || !/^[0-9a-f]{32}$/.test(token)) return notice('Link inválido.', 400);
   try {

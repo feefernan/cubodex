@@ -15,6 +15,12 @@ export const json = (body: unknown, status = 200, extra: Record<string, string> 
 
 export const unavailable = () => json({ error: 'Isso ainda não está disponível. Tente mais tarde.' }, 503);
 
+/** Chave do cache da borda: o caminho sem a query string, que não muda a resposta e deixaria forçar misses. */
+export const cacheKey = (request: Request) => {
+  const u = new URL(request.url);
+  return new Request(`${u.origin}${u.pathname}`);
+};
+
 /** Limite por IP; null = pode seguir. */
 export const limited = async (
   request: Request,

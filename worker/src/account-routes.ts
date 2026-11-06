@@ -35,8 +35,16 @@ const b64url = (bytes: Uint8Array) =>
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 const random = () => b64url(crypto.getRandomValues(new Uint8Array(32)));
-/** Volta para este mesmo endereço (domínio, www ou localhost): o cookie do state só existe nele. */
-const callbackUrl = (request: Request) => `${new URL(request.url).origin}/api/auth/google/callback`;
+/**
+ * Volta para este mesmo endereço (domínio, www ou localhost): o cookie do state só existe nele. Só vale a origem do
+ * pedido quando é o site (ou o www dele) ou localhost; qualquer outro Host cai no endereço oficial do SITE_URL.
+ */
+const callbackUrl = (request: Request, env: Env) => {
+  const origin = new URL(request.url);
+  const site = new URL(env.SITE_URL);
+  const own = [site.hostname, `www.${site.hostname.replace(/^www\./, '')}`, 'localhost', '127.0.0.1'];
+  return `${own.includes(origin.hostname) ? origin.origin : site.origin}/api/auth/google/callback`;
+};
 
 /** GET /api/auth/google — manda para o Google com state (contra CSRF) e PKCE, guardados num cookie de 10 min. */
 const googleStart = async (request: Request, env: Env) => {
@@ -46,19 +54,21 @@ const googleStart = async (request: Request, env: Env) => {
   if (blocked) return blocked;
   const state = random();
   const verifier = random();
+  const nonce = random();
   const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
   const to = new URL(GOOGLE_AUTH);
   to.search = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID,
-    redirect_uri: callbackUrl(request),
+    redirect_uri: callbackUrl(request, env),
     response_type: 'code',
     scope: 'openid email profile',
     state,
+    nonce,
     code_challenge: challenge,
     code_challenge_method: 'S256',
     prompt: 'select_account',
   }).toString();
-  return redirect(to.toString(), [oauthCookie(`${state}.${verifier}`, 600)]);
+  return redirect(to.toString(), [oauthCookie(`${state}.${verifier}.${nonce}`, 600)]);
 };
 
 /** Dados do id_token. Veio direto do Google por HTTPS, autenticado com o segredo: dispensa conferir a assinatura. */
@@ -78,9 +88,11 @@ const googleCallback = async (request: Request, env: Env, f: typeof fetch) => {
     return redirect('/#/conta/erro-login', [oauthCookie('', 0)]);
   };
   if (!env.DB || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return fail('desligado');
-  const [state, verifier] = (readCookie(request, OAUTH_COOKIE) ?? '').split('.');
+  const blocked = await limited(request, env.QUOTES_LIMITER);
+  if (blocked) return fail('limite');
+  const [state, verifier, nonce] = (readCookie(request, OAUTH_COOKIE) ?? '').split('.');
   const code = url.searchParams.get('code');
-  if (!state || !verifier || url.searchParams.get('state') !== state) return fail('state');
+  if (!state || !verifier || !nonce || url.searchParams.get('state') !== state) return fail('state');
   if (!code) return fail(url.searchParams.get('error') ?? 'sem código');
   try {
     const res = await f(GOOGLE_TOKEN, {
@@ -89,7 +101,7 @@ const googleCallback = async (request: Request, env: Env, f: typeof fetch) => {
         code,
         client_id: env.GOOGLE_CLIENT_ID,
         client_secret: env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: callbackUrl(request),
+        redirect_uri: callbackUrl(request, env),
         grant_type: 'authorization_code',
         code_verifier: verifier,
       }),
@@ -99,7 +111,15 @@ const googleCallback = async (request: Request, env: Env, f: typeof fetch) => {
     const claims = idClaims(String(((await res.json()) as { id_token?: string }).id_token ?? ''));
     const email = String(claims.email ?? '').toLowerCase();
     const issuer = claims.iss === 'https://accounts.google.com' || claims.iss === 'accounts.google.com';
-    if (claims.aud !== env.GOOGLE_CLIENT_ID || !issuer || claims.email_verified !== true || !isEmail(email))
+    const fresh = typeof claims.exp === 'number' && claims.exp * 1000 > Date.now();
+    if (
+      claims.aud !== env.GOOGLE_CLIENT_ID ||
+      !issuer ||
+      !fresh ||
+      claims.nonce !== nonce ||
+      claims.email_verified !== true ||
+      !isEmail(email)
+    )
       return fail('id_token');
     const session = await startSession(env.DB, email, String(claims.given_name ?? claims.name ?? '').slice(0, 80));
     if (!session) return fail('sessão');

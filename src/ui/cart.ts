@@ -23,7 +23,22 @@ import { persist, S } from './store';
 import { toast } from './toast';
 
 /** Saída para o checkout do Mercado Pago (trocável nos testes: o jsdom não navega para fora). */
-export const nav = { to: (url: string) => location.assign(url) };
+export const isCheckoutUrl = (url: string) => {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' && /(^|\.)(mercadopago\.com(\.br)?|mercadolivre\.com\.br)$/.test(u.hostname);
+  } catch {
+    return false;
+  }
+};
+
+/** Só segue para o Mercado Pago (https): uma resposta adulterada não leva o cliente para outro site. */
+export const nav = {
+  to: (url: string) => {
+    if (!isCheckoutUrl(url)) throw new Error('Link de pagamento inválido. Tente de novo.');
+    location.assign(url);
+  },
+};
 
 export const updateBadge = () => {
   const b = $('#cartCount');
