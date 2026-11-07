@@ -4,7 +4,7 @@
  * Nome, número, imagem e variantes da carta vêm de tcg_cards/tcg_sets (/api/tcg/*); aqui só a posse.
  */
 import { OrderError } from '../../src/domain/order';
-import { currentUser } from './account-routes';
+import { currentUser, isOwner } from './account-routes';
 import type { User } from './accounts';
 import type { Env } from './env';
 import { handleError, json, readJson } from './http';
@@ -12,15 +12,6 @@ import { handleError, json, readJson } from './http';
 const ID = /^[\w.!%-]{1,80}$/;
 const MAX_QTY = 999;
 const notFound = () => json({ error: 'Não encontrado' }, 404);
-
-/** Os e-mails autorizados, em minúsculas; vazio = ninguém (a coleção fica fechada). */
-const owners = (env: Env) =>
-  (env.OWNER_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
-const isOwner = (env: Env, user: User | null) => !!user && owners(env).includes(user.email.toLowerCase());
 
 const state = async (db: NonNullable<Env['DB']>) => {
   const sets = (await db.prepare('SELECT set_id FROM col_sets ORDER BY added_at, set_id').all<{ set_id: string }>())

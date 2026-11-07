@@ -31,6 +31,7 @@ const api = {
   status: 'Aguardando pagamento',
   products: [] as unknown[],
   account: null as null | {
+    colecao?: boolean;
     user: { name: string; email: string };
     dex: Record<string, 'have' | 'want'>;
     vault: {
@@ -785,6 +786,34 @@ describe('conta e formulários', () => {
     await vi.waitFor(() => expect($('#contaBody').textContent).toContain('Conta apagada'));
     expect(saved().user).toBeNull();
     confirm.mockRestore();
+  });
+
+  it('o cartão "coleção" só aparece na conta de e-mail autorizado, e some ao sair', async () => {
+    const { syncSession } = await import('../../src/ui/session');
+    const cartao = () => document.querySelector('#contaBody a[href="#/colecao"]');
+    api.account = { ...structuredClone(ACCOUNT), colecao: true };
+    await syncSession();
+    goTo('conta');
+    expect(cartao()).not.toBeNull();
+    expect($('#contaBody').textContent).toContain('abrir coleção');
+    expect(cartao()?.getAttribute('data-view')).toBe('colecao');
+    // o aviso não fica salvo no navegador: vem do servidor a cada visita
+    expect(JSON.stringify(saved())).not.toContain('colecao');
+
+    goTo('conta');
+    api.account = structuredClone(ACCOUNT);
+    await syncSession();
+    expect(cartao()).toBeNull();
+
+    api.account = { ...structuredClone(ACCOUNT), colecao: true };
+    await syncSession();
+    click('[data-action="logout"]');
+    await vi.waitFor(() => expect(document.querySelector('[data-action="login-demo"]')).not.toBeNull());
+    expect(cartao()).toBeNull();
+    api.account = null;
+    click('[data-action="login-demo"]');
+    expect(cartao()).toBeNull();
+    click('[data-action="logout"]');
   });
 
   it('sessão que expirou tira o usuário real deste navegador', async () => {

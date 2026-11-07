@@ -42,6 +42,8 @@ export type BuyerField =
   | 'uf';
 
 export interface AppState extends PersistedState {
+  /** Conta autorizada a abrir a coleção interna: vem de /api/me a cada visita, não fica salvo no navegador. */
+  colecao: boolean;
   pack: string[];
   dexF: DexFilter;
   dexS: string;
@@ -111,6 +113,7 @@ export const demoAccount = (): Pick<PersistedState, 'user' | 'dex' | 'vault' | '
 /** Visitante novo: deslogado, carrinho, Dex e cofre vazios. */
 export const initialState = (): AppState => ({
   user: null,
+  colecao: false,
   cart: [],
   dex: {},
   vault: [],

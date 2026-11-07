@@ -56,12 +56,15 @@ const renderConta = () => {
     (FEATURES.colecionaveis
       ? `<div class="card"><h3>minha dex</h3><p class="dex-count num">${t.have}<small>de ${t.total} coletados</small></p>${dexBar(S.dex)}<a class="btn btn--ghost" href="#/dex" data-action="go" data-view="dex">abrir dex</a></div>`
       : '') +
+    (S.colecao && !demo
+      ? '<div class="card"><h3>coleção</h3><p class="soft">Área interna da Cubodex: o que já temos e o que falta de cada set.</p><a class="btn btn--ghost" href="#/colecao" data-action="go" data-view="colecao">abrir coleção</a></div>'
+      : '') +
     `<div class="card"><h3>cofre</h3><p class="dex-count num">${inVault}<small>itens guardados</small></p><a class="btn btn--ghost" href="#/cofre" data-action="go" data-view="cofre">abrir cofre</a></div>` +
     `<div class="card"><h3>dados e privacidade</h3><p class="soft">${esc(S.user.email || '')}</p>${demo ? '<p class="muted" style="font-size:14px">A demonstração vive só neste navegador; sair apaga tudo.</p>' : PRIVACY_REAL}</div></div>`;
 };
 
 const clearAccount = () => {
-  Object.assign(S, { user: null, dex: {}, vault: [], hist: [], orders: [] });
+  Object.assign(S, { user: null, colecao: false, dex: {}, vault: [], hist: [], orders: [] });
   persist();
 };
 

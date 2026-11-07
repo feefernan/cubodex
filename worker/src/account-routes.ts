@@ -23,6 +23,14 @@ export const currentUser = async (request: Request, env: Env): Promise<User | nu
   return env.DB && token && /^[0-9a-f]{64}$/.test(token) ? sessionUser(env.DB, token) : null;
 };
 
+/** Coleção interna (#80): e-mails de OWNER_EMAILS (minúsculas, separados por vírgula). Vazio = ninguém. */
+export const isOwner = (env: Env, user: User | null) =>
+  !!user &&
+  (env.OWNER_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .includes(user.email.toLowerCase());
+
 const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
 const OAUTH_COOKIE = 'cbx_oauth';
@@ -171,7 +179,9 @@ export const accountRoutes = async (
     if (path === '/api/auth/google/callback' && method === 'GET') return await googleCallback(request, env, f);
     if (path === '/api/auth/logout' && method === 'POST') return await logout(request, env);
     if (path === '/api/me' && method === 'GET')
-      return await withUser(request, env, async (u, db) => json(await getAccount(db, u)));
+      return await withUser(request, env, async (u, db) =>
+        json({ ...(await getAccount(db, u)), ...(isOwner(env, u) ? { colecao: true } : {}) }),
+      );
     if (path === '/api/me/export' && method === 'GET')
       return await withUser(request, env, async (u, db) =>
         json(await exportAccount(db, u), 200, {
