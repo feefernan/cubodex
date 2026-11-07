@@ -42,6 +42,8 @@ export default defineConfig({
       // Entrar com Google (#43). O client ID é público; vazio (ou sem o segredo) = login desligado.
       GOOGLE_CLIENT_ID: bindings.text('812025645528-r0nmle0ecuaacvmoqji17l218oho69t9.apps.googleusercontent.com'),
       GOOGLE_CLIENT_SECRET: bindings.secret(),
+      // Coleção interna (#80): e-mails autorizados (segredo, para não versionar e-mail pessoal).
+      OWNER_EMAILS: bindings.secret(),
       // 5 pedidos por minuto por IP: suficiente para quem compra, freia spam.
       ORDERS_LIMITER: bindings.rateLimit({ namespace: '2001', simple: { limit: 5, period: 60 } }),
       // Cotações, status e inscrições: o cliente pode testar alguns CEPs.

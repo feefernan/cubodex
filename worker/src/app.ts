@@ -40,6 +40,7 @@ import {
   setStockDone,
 } from './accounts';
 import { flushStock, readProducts, refreshCatalog, takeStock } from './catalog-db';
+import { colecaoRoutes } from './colecao';
 import type { Ctx, Env } from './env';
 import { cacheKey, handleError, json, limited, log, notice, page, readJson, unavailable } from './http';
 import { quoteShipping } from './melhor-envio';
@@ -574,6 +575,8 @@ export const handle = async (request: Request, env: Env, ctx: Ctx, f: typeof fet
   if (path === '/api/vault/ship' && method === 'POST') return shipVault(request, env, f);
   const account = await accountRoutes(request, env, path, f);
   if (account) return account;
+  const colecao = await colecaoRoutes(request, env, path);
+  if (colecao) return colecao;
   const status = path.match(/^\/api\/orders\/([^/]+)\/status$/);
   if (status && method === 'GET') return orderStatus(request, status[1], env, f);
   return json({ error: 'Não encontrado' }, 404);
