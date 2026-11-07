@@ -209,7 +209,7 @@ describe('coleção interna: página do set', () => {
       'todas 3',
       'tenho 1',
       'preciso 2',
-      'para trocar 1',
+      'para trocar 0',
     ]);
     expect([state('base1-2'), state('base1-4'), state('base1-58')]).toEqual(['falta', 'repetida', 'falta']);
     expect(tile('base1-4').querySelector('.cx-qty')?.textContent).toBe('×2');
@@ -439,20 +439,18 @@ describe('coleção interna: página do set', () => {
     const trocar = () => $('[data-action="cx-tab"][data-tab="trocar"]').click();
     const rows = () => $$('.cx-trade').map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
 
-    it('junta as sobras da coleção e o estoque da loja, com a origem de cada uma, e esconde as ações de marcar', async () => {
+    it('lista o estoque da loja neste set e esconde as ações de marcar', async () => {
       server.stock = () => Response.json(STOCK);
       server.stockCalls = 0;
       await open('base1', [['base1-4', 'holo', 3]]);
       trocar();
-      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
       expect(rows()).toEqual([
-        expect.stringMatching(/Charizard.*duplicada.*sobram 2/),
-        expect.stringMatching(/Charizard.*holo · EN · PSA 8.*estoque.*R\$\s?5\.000,00.*1 un\./),
-        expect.stringMatching(/Pikachu.*normal · PT.*estoque.*R\$\s?12,50/),
+        expect.stringMatching(/Charizard.*holo · EN · PSA 8.*R\$\s?5\.000,00.*1 un\./),
+        expect.stringMatching(/Pikachu.*normal · PT.*R\$\s?12,50/),
       ]);
-      expect($$('.cx-trade').map((r) => r.dataset.origin)).toEqual(['duplicada', 'estoque', 'estoque']);
       expect($('.cx-actions').hidden).toBe(true);
-      expect($$('#cxTabs .chip').map((c) => c.textContent?.replace(/\s+/g, ' '))).toContain('para trocar 3');
+      expect($$('#cxTabs .chip').map((c) => c.textContent?.replace(/\s+/g, ' '))).toContain('para trocar 2');
       type('[data-input="cx-set-q"]', 'pika');
       expect($$('.cx-trade')).toHaveLength(1);
       type('[data-input="cx-set-q"]', 'zzz');
@@ -462,11 +460,11 @@ describe('coleção interna: página do set', () => {
       expect($('.cx-actions').hidden).toBe(false);
       expect($$('.cx-tile')).toHaveLength(3);
       trocar();
-      expect($$('.cx-trade')).toHaveLength(3);
+      expect($$('.cx-trade')).toHaveLength(2);
       expect(server.stockCalls).toBe(1);
     });
 
-    it('as sobras aparecem enquanto o estoque carrega', async () => {
+    it('mostra "carregando" enquanto o estoque chega', async () => {
       let release = () => {};
       server.stockHold = new Promise<void>((r) => {
         release = r;
@@ -475,28 +473,28 @@ describe('coleção interna: página do set', () => {
       await open('base1', [['base1-2', 'normal', 2]]);
       trocar();
       expect($('#cxGrid').textContent).toContain('carregando o estoque da loja');
-      expect($$('.cx-trade')).toHaveLength(1);
+      expect($$('.cx-trade')).toHaveLength(0);
       release();
-      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
       expect($('#cxGrid').textContent).not.toContain('carregando');
       server.stockHold = null;
     });
 
-    it('se o estoque falha, as sobras continuam, o aviso diz o motivo e tentar de novo funciona', async () => {
+    it('se o estoque falha, o aviso diz o motivo e tentar de novo funciona', async () => {
       server.stock = () => Response.json({ error: 'Notion fora do ar' }, { status: 502 });
       await open('base1', [['base1-4', 'normal', 2]]);
       trocar();
       await vi.waitFor(() =>
         expect($('#cxGrid').textContent).toContain('Estoque da loja indisponível: Notion fora do ar'),
       );
-      expect($$('.cx-trade')).toHaveLength(1);
+      expect($$('.cx-trade')).toHaveLength(0);
       server.stock = () => Response.json(STOCK);
       $('[data-action="cx-stock-retry"]').click();
-      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
       expect($('#cxGrid').textContent).not.toContain('indisponível');
     });
 
-    it('sem sobras nem estoque, avisa que não há nada para trocar', async () => {
+    it('sem estoque, avisa que não há nada para trocar', async () => {
       server.stock = () => Response.json({ stock: [] });
       await open('base1', [['base1-2', 'normal', 1]]);
       trocar();

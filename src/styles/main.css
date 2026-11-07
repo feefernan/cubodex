@@ -507,5 +507,3 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-trade-info .mono{font-size:11px;letter-spacing:.04em}
 .cx-trade-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font:800 14px/1.2 var(--f-body)}
 .cx-trade-side .mono{font-size:11px}
-.cx-origin{padding:2px 8px;border-radius:999px;border:1px solid var(--tag);color:var(--tag);font:600 10px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
-.cx-trade[data-origin="duplicada"] .cx-origin{border-color:var(--action);color:var(--action)}
