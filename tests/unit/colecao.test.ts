@@ -101,6 +101,26 @@ describe('variantes', () => {
 describe('quadrados do set', () => {
   const own = { 'base1-4|holo': 1, 'base1-4|normal': 2, 'base1-6|normal': 1 };
 
+  it('o estoque da loja soma ao total (qty) sem mexer na coleção (col)', () => {
+    const shop = [
+      { id: 'a', cardId: 'base1-5', lang: 'EN', variant: 'normal', grade: '', price: 1, available: 2 },
+      { id: 'b', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: '', price: 1, available: null },
+      { id: 'c', cardId: 'outro-1', lang: 'EN', variant: 'normal', grade: '', price: 1, available: 5 },
+    ];
+    expect(tiles(CARDS, own, false, shop).map((t) => [t.card.id, t.qty, t.col])).toEqual([
+      ['base1-4', 4, 3],
+      ['base1-5', 2, 0],
+      ['base1-6', 1, 1],
+    ]);
+    expect(tiles(CARDS, own, true, shop).map((t) => `${t.card.id}|${t.variant}|${t.qty}|${t.col}`)).toEqual([
+      'base1-4|normal|2|2',
+      'base1-4|holo|2|1',
+      'base1-4|firstEdition|0|0',
+      'base1-5|normal|2|0',
+      'base1-6|normal|1|1',
+    ]);
+  });
+
   it('modo simples: uma carta por quadrado, "tenho" soma as variantes', () => {
     const list = tiles(CARDS, own, false);
     expect(list.map((t) => [t.card.id, t.variant, t.qty])).toEqual([

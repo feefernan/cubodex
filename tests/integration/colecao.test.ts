@@ -497,6 +497,26 @@ describe('coleção interna: página do set', () => {
       expect($('#cxGrid').textContent).not.toContain('indisponível');
     });
 
+    it('o estoque da loja conta como "tenho" sem marcar a coleção; desmarcar volta ao que o estoque cobre', async () => {
+      server.stock = () => Response.json(STOCK);
+      await open('base1', []);
+      await vi.waitFor(() => expect(state('base1-4')).toBe('tenho'));
+      expect(state('base1-58')).toBe('tenho'); // sem controle de estoque, a unidade à venda conta como 1
+      expect(stats()).toContain('2/3');
+      expect(tile('base1-4').querySelector('.cx-qty')?.textContent).toBe('✓');
+      server.sent = [];
+      main('base1-4').click(); // coleção 0: marca (+1 na coleção), total 2
+      await vi.waitFor(() => expect(server.sent).toHaveLength(1));
+      expect(server.sent[0]?.body).toMatchObject({ cardId: 'base1-4', qty: 1 });
+      expect(state('base1-4')).toBe('repetida');
+      main('base1-4').click(); // coleção 1: desmarca, o estoque ainda cobre
+      await vi.waitFor(() => expect(server.sent).toHaveLength(2));
+      expect(server.sent[1]?.body).toMatchObject({ cardId: 'base1-4', qty: 0 });
+      expect(state('base1-4')).toBe('tenho');
+      $('[data-action="cx-open"][data-card="base1-4"]').click();
+      expect($('.cx-panel').textContent).toContain('+1 na loja');
+    });
+
     it('− e + ajustam o estoque da loja; zerar pede confirmação e o + desfaz', async () => {
       server.stock = () => Response.json(STOCK);
       await open('base1', []);
