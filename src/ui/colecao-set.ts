@@ -28,6 +28,7 @@ import { brl, escapeHtml as esc } from '../domain/format';
 import { VARIANT_PT } from '../domain/tcg';
 import { api } from '../infra/api';
 import { emptyState } from './art';
+import { initColecaoTroca, openTrade } from './colecao-troca';
 import { $, $$, onAction, onInput } from './dom';
 import { toast } from './toast';
 
@@ -148,7 +149,7 @@ const tradeHtml = (p: Page, r: TradeRow) => {
   const side =
     r.qty === null
       ? price
-      : `${price}<span class="cx-step"><button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="-1" aria-label="Tirar uma unidade de ${esc(c.name)}"${off}>−</button>` +
+      : `${price}<button class="btn btn--ghost btn--sm" type="button" data-action="cx-trade" data-id="${esc(r.id)}">registrar troca</button><span class="cx-step"><button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="-1" aria-label="Tirar uma unidade de ${esc(c.name)}"${off}>−</button>` +
         `<output class="num" aria-label="${r.qty} unidades">${r.qty}</output>` +
         `<button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="1" aria-label="Pôr uma unidade de ${esc(c.name)}"${off}>+</button></span>`;
   return (
@@ -176,6 +177,31 @@ const drawTrade = (p: Page) => {
         : emptyState('nada para trocar.', 'A loja não tem estoque de cartas deste set.'));
   $('#cxMore', p.el).hidden = true;
   drawBulk(p);
+};
+
+/** Abre a folha de troca; ao registrar, o estoque e a coleção da página já refletem o que mudou. */
+const startTrade = (p: Page, id: string) => {
+  openedBy = null;
+  openTrade(
+    tradeRows(p.cards, p.stock ?? []).filter((r) => r.qty),
+    id,
+    (res) => {
+      for (const g of res.gave) {
+        const item = p.stock?.find((s) => s.id === g.id);
+        if (item) item.available = g.available;
+      }
+      for (const g of res.got)
+        p.own = withQty(
+          p.own,
+          g.cardId,
+          g.variant,
+          Math.min(MAX_QTY, (p.own[ownKey(g.cardId, g.variant)] ?? 0) + g.qty),
+        );
+      closeSheet();
+      toast('troca registrada');
+      if (page === p) drawAll(p);
+    },
+  );
 };
 
 /** Ajusta o estoque da loja em ±1. Zerar tira a carta de venda, então pede confirmação; o "+" desfaz. */
@@ -423,6 +449,7 @@ export const closeSetPage = () => {
 };
 
 export const initColecaoSet = () => {
+  initColecaoTroca();
   onAction('cx-mark', (el) => page && toggle(page, el.dataset.card ?? '', el.dataset.variant ?? ''));
   onAction('cx-open', (el) => page && openSheet(page, el.dataset.card ?? ''));
   onAction('cx-close', closeSheet);
@@ -441,6 +468,7 @@ export const initColecaoSet = () => {
     if (page.tab === 'trocar') void loadStock(page);
   });
   onAction('cx-stock', (el) => page && void adjustStock(page, el.dataset.id ?? '', el.dataset.d === '-1' ? -1 : 1));
+  onAction('cx-trade', (el) => page && startTrade(page, el.dataset.id ?? ''));
   onAction('cx-stock-retry', () => {
     if (!page) return;
     page.stockState = 'parado';

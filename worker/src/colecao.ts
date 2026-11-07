@@ -178,6 +178,104 @@ const adjustStock = async (db: NonNullable<Env['DB']>, id: string, body: Record<
   throw new OrderError(409, delta < 0 ? 'Não há mais unidades no estoque.' : 'Estoque no limite.');
 };
 
+const MAX_GIVE = 10;
+const MAX_GET = 30;
+
+const qtyOf = (v: unknown) => {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 1 || v > MAX_QTY)
+    throw new OrderError(400, 'Quantidade inválida');
+  return v;
+};
+
+/**
+ * POST /api/colecao/troca — `{ give: [{ id, qty }], get: [{ cardId, variant, qty }] }`: registra uma troca, que não precisa
+ * ser 1:1. Baixa o estoque da loja do que sai e soma à coleção o que entra, tudo ou nada (um batch): se o estoque mudou
+ * e já não cobre, nada é gravado (409). A baixa fica pendente (`dirty`) e o cron grava no Notion. Guarda uma foto da
+ * troca em `col_trades`.
+ */
+const registerTrade = async (db: NonNullable<Env['DB']>, user: User, body: Record<string, unknown>) => {
+  const { give, get } = body;
+  if (
+    !Array.isArray(give) ||
+    !give.length ||
+    give.length > MAX_GIVE ||
+    !Array.isArray(get) ||
+    !get.length ||
+    get.length > MAX_GET
+  )
+    throw new OrderError(400, 'Pedido inválido');
+  const out = new Map<string, number>();
+  for (const g of give as Record<string, unknown>[]) {
+    if (typeof g?.id !== 'string' || !ID.test(g.id)) throw new OrderError(400, 'Pedido inválido');
+    out.set(g.id, (out.get(g.id) ?? 0) + qtyOf(g.qty));
+  }
+  const inn = new Map<string, { cardId: string; variant: string; qty: number }>();
+  for (const g of get as Record<string, unknown>[]) {
+    if (typeof g?.cardId !== 'string' || !ID.test(g.cardId) || typeof g.variant !== 'string')
+      throw new OrderError(400, 'Pedido inválido');
+    const key = `${g.cardId}|${g.variant}`;
+    const prev = inn.get(key);
+    inn.set(key, { cardId: g.cardId, variant: g.variant, qty: Math.min(MAX_QTY, (prev?.qty ?? 0) + qtyOf(g.qty)) });
+  }
+  const gave = [];
+  for (const [id, qty] of out) {
+    const p = await db
+      .prepare('SELECT id, price, qty, def FROM products WHERE id = ? AND active = 1 AND def IS NOT NULL')
+      .bind(id)
+      .first<{ id: string; price: number | null; qty: number | null; def: string }>();
+    if (!p || p.qty === null) return notFound();
+    gave.push({ id, qty, price: p.price, def: p.def });
+  }
+  for (const { cardId, variant } of inn.values()) {
+    const card = await db
+      .prepare('SELECT variants FROM tcg_cards WHERE id = ?')
+      .bind(cardId)
+      .first<{ variants: string | null }>();
+    if (!card) return notFound();
+    if (!(card.variants ?? 'normal').split(',').includes(variant)) throw new OrderError(400, 'Variante inválida');
+  }
+  const now = new Date().toISOString();
+  const outJson = JSON.stringify([...out].map(([id, qty]) => ({ id, qty })));
+  try {
+    await db.batch([
+      // Falha de propósito (JSON inválido) se algum estoque já não cobre: o batch inteiro desfaz.
+      db
+        .prepare(
+          `SELECT json(CASE WHEN EXISTS (SELECT 1 FROM json_each(?1) g LEFT JOIN products p ON p.id = json_extract(g.value, '$.id')
+             WHERE p.id IS NULL OR p.active = 0 OR p.qty IS NULL OR p.qty < json_extract(g.value, '$.qty')) THEN 'x' ELSE '1' END)`,
+        )
+        .bind(outJson),
+      db
+        .prepare(
+          `UPDATE products SET dirty = 1, qty = qty - (SELECT json_extract(g.value, '$.qty') FROM json_each(?1) g WHERE json_extract(g.value, '$.id') = products.id)
+           WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?1))`,
+        )
+        .bind(outJson),
+      db
+        .prepare(
+          `INSERT INTO col_items (card_id, variant, qty, updated_at, updated_by)
+           SELECT json_extract(value, '$.cardId'), json_extract(value, '$.variant'), json_extract(value, '$.qty'), ?2, ?3 FROM json_each(?1) WHERE true
+           ON CONFLICT(card_id, variant) DO UPDATE SET qty = MIN(${MAX_QTY}, qty + excluded.qty), updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+        )
+        .bind(JSON.stringify([...inn.values()]), now, user.email),
+      db
+        .prepare('INSERT INTO col_trades (at, by, gave, got) VALUES (?, ?, ?, ?)')
+        .bind(now, user.email, JSON.stringify(gave), JSON.stringify([...inn.values()])),
+    ]);
+  } catch (e) {
+    if (String(e).includes('malformed JSON'))
+      throw new OrderError(409, 'O estoque mudou e não cobre mais a troca. Confira e tente de novo.');
+    throw e;
+  }
+  const left = (
+    await db
+      .prepare(`SELECT id, qty FROM products WHERE id IN (SELECT json_extract(value, '$.id') FROM json_each(?))`)
+      .bind(outJson)
+      .all<{ id: string; qty: number }>()
+  ).results;
+  return json({ gave: left.map((r) => ({ id: r.id, available: r.qty })), got: [...inn.values()] });
+};
+
 /** GET/PUT /api/colecao… Devolve null se o caminho não é da coleção. */
 export const colecaoRoutes = async (request: Request, env: Env, path: string): Promise<Response | null> => {
   if (path !== '/api/colecao' && !path.startsWith('/api/colecao/')) return null;
@@ -192,6 +290,8 @@ export const colecaoRoutes = async (request: Request, env: Env, path: string): P
       if (!ID.test(set)) throw new OrderError(400, 'Set inválido');
       return await stockOfSet(db, set);
     }
+    if (path === '/api/colecao/troca' && method === 'POST')
+      return await registerTrade(db, user, await readJson(request));
     const stockId = path.match(/^\/api\/colecao\/estoque\/([\w.!%-]{1,80})$/);
     if (stockId?.[1] && method === 'PUT') return await adjustStock(db, stockId[1], await readJson(request));
     const set = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})$/);

@@ -329,3 +329,118 @@ describe('coleção interna: ajuste do estoque', () => {
     expect(row('a')).toMatchObject({ qty: 2, dirty: 0 });
   });
 });
+
+describe('coleção interna: registrar troca', () => {
+  const def = JSON.stringify({
+    kind: 'item',
+    tcgdex: 'base1-4',
+    lang: 'EN',
+    variant: 'holo',
+    grade: null,
+    created: null,
+  });
+  const product = (id: string, qty: number | null, active = 1) =>
+    d1.sqlite
+      .prepare('INSERT INTO products (id, price, qty, active, def) VALUES (?, 50, ?, ?, ?)')
+      .run(id, qty, active, def);
+  const prod = (id: string) => d1.sqlite.prepare('SELECT qty, dirty FROM products WHERE id = ?').get(id);
+  const col = () => d1.sqlite.prepare('SELECT card_id, variant, qty FROM col_items ORDER BY card_id, variant').all();
+  const trade = async (body: unknown, email = 'dono@exemplo.com') =>
+    call('/api/colecao/troca', { method: 'POST', body, headers: await login(email) });
+
+  beforeEach(() => {
+    product('a', 3);
+    product('b', 1);
+    product('zero', 0);
+    product('livre', null);
+    product('off', 2, 0);
+  });
+
+  it('1 carta por 2: baixa o estoque, soma à coleção, marca para o Notion e guarda o histórico', async () => {
+    const res = await trade({
+      give: [{ id: 'a', qty: 1 }],
+      get: [
+        { cardId: 'base1-4', variant: 'holo', qty: 1 },
+        { cardId: 'base1-5', variant: 'normal', qty: 2 },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      gave: [{ id: 'a', available: 2 }],
+      got: [
+        { cardId: 'base1-4', variant: 'holo', qty: 1 },
+        { cardId: 'base1-5', variant: 'normal', qty: 2 },
+      ],
+    });
+    expect(prod('a')).toMatchObject({ qty: 2, dirty: 1 });
+    expect(col()).toEqual([
+      { card_id: 'base1-4', variant: 'holo', qty: 1 },
+      { card_id: 'base1-5', variant: 'normal', qty: 2 },
+    ]);
+    const log = rows('SELECT at, by, gave, got FROM col_trades');
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ by: 'dono@exemplo.com' });
+    expect(JSON.parse(String(log[0]?.gave))[0]).toMatchObject({ id: 'a', qty: 1, price: 50 });
+  });
+
+  it('2 por 1, com cartas repetidas somadas e quem já tem na coleção soma por cima', async () => {
+    d1.sqlite.exec("INSERT INTO col_items VALUES ('base1-4', 'holo', 3, '', 'x')");
+    const res = await trade({
+      give: [
+        { id: 'a', qty: 2 },
+        { id: 'b', qty: 1 },
+      ],
+      get: [
+        { cardId: 'base1-4', variant: 'holo', qty: 1 },
+        { cardId: 'base1-4', variant: 'holo', qty: 1 },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(prod('a')).toMatchObject({ qty: 1 });
+    expect(prod('b')).toMatchObject({ qty: 0 });
+    expect(col()).toEqual([{ card_id: 'base1-4', variant: 'holo', qty: 5 }]);
+  });
+
+  it('estoque que não cobre: 409 e nada muda, nem o que já podia ser baixado', async () => {
+    const res = await trade({
+      give: [
+        { id: 'a', qty: 1 },
+        { id: 'b', qty: 2 },
+      ],
+      get: [{ cardId: 'base1-4', variant: 'holo', qty: 1 }],
+    });
+    expect(res.status).toBe(409);
+    expect(prod('a')).toMatchObject({ qty: 3, dirty: 0 });
+    expect(prod('b')).toMatchObject({ qty: 1, dirty: 0 });
+    expect(col()).toEqual([]);
+    expect(rows('SELECT id FROM col_trades')).toEqual([]);
+  });
+
+  it('produto sem controle, inativo ou inexistente e carta ou variante inválida são recusados sem gravar', async () => {
+    const get = [{ cardId: 'base1-4', variant: 'holo', qty: 1 }];
+    for (const id of ['livre', 'off', 'nada']) expect((await trade({ give: [{ id, qty: 1 }], get })).status).toBe(404);
+    const give = [{ id: 'a', qty: 1 }];
+    expect((await trade({ give, get: [{ cardId: 'nada-1', variant: 'normal', qty: 1 }] })).status).toBe(404);
+    expect((await trade({ give, get: [{ cardId: 'base1-4', variant: 'foil', qty: 1 }] })).status).toBe(400);
+    expect(prod('a')).toMatchObject({ qty: 3, dirty: 0 });
+    expect(rows('SELECT id FROM col_trades')).toEqual([]);
+  });
+
+  it('pedido malformado e quem não é da lista', async () => {
+    const get = [{ cardId: 'base1-4', variant: 'holo', qty: 1 }];
+    const give = [{ id: 'a', qty: 1 }];
+    for (const bad of [
+      {},
+      { give: [], get },
+      { give, get: [] },
+      { give: [{ id: 'a', qty: 0 }], get },
+      { give: [{ id: 'a', qty: 1.5 }], get },
+      { give: [{ qty: 1 }], get },
+      { give, get: [{ cardId: 'base1-4', qty: 1 }] },
+      { give: Array.from({ length: 11 }, (_, i) => ({ id: `x${i}`, qty: 1 })), get },
+    ])
+      expect((await trade(bad)).status).toBe(400);
+    expect((await trade({ give, get }, 'fora@exemplo.com')).status).toBe(404);
+    expect(prod('a')).toMatchObject({ qty: 3, dirty: 0 });
+  });
+});
