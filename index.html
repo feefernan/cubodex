@@ -89,7 +89,7 @@
 </section>
 <section class="view" id="v-colset" hidden>
   <div class="wrap page-title">
-    <span class="eyebrow mono">coleção</span>
+    <span class="eyebrow mono" id="colsetSub">coleção</span>
     <h1 class="display">set<span class="dot">.</span></h1>
   </div>
   <div class="wrap" id="colsetBody"></div>
@@ -478,6 +478,11 @@
   <div class="wrap"><p class="disclaimer">A Cubodex não é afiliada à The Pokémon Company. Pokémon e os nomes e imagens das cartas pertencem a seus titulares; as imagens das cartas vêm do TCGdex.</p></div>
 </footer>
 
+<!-- Seletor de quantidades da coleção interna: fixo, então fica fora das .view (a animação de entrada delas quebraria o fixed). -->
+<div class="cx-layer" id="cxSheet" hidden>
+  <div class="cx-backdrop" data-action="cx-close"></div>
+  <div class="cx-panel" role="dialog" aria-modal="true" aria-labelledby="cxSheetTitle"></div>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module" src="/src/main.ts"></script>

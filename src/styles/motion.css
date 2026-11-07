@@ -66,6 +66,7 @@
 .icon-link,
 .cx-card,
 .cx-set,
+.cx-step button,
 .qty button {
   transition-property: background-color, border-color, color, box-shadow, transform;
   transition-duration: var(--dur-fast);
@@ -77,7 +78,8 @@
 .ship-opt:active,
 .icon-link:active,
 .cx-card:active,
-.cx-set:active {
+.cx-set:active,
+.cx-step button:active {
   transform: scale(0.97);
   transition-duration: var(--dur-press);
 }
@@ -106,6 +108,12 @@
 /* ── PROGRESSO ─────────────────────────────────── */
 .progress-label {
   animation: enter var(--dur-fast) var(--ease-out) backwards;
+}
+
+/* ── COLEÇÃO: SELETOR DE QUANTIDADES ───────────── */
+/* O painel sobe como as telas (entrada com transform, opacidade e blur); marcar uma carta, não: é toque de alta frequência. */
+.cx-panel {
+  animation: enter var(--dur-base) var(--ease-out) backwards;
 }
 
 /* ── COLEÇÃO: CARREGANDO ───────────────────────── */

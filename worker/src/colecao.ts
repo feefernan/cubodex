@@ -64,6 +64,59 @@ const setItem = async (db: NonNullable<Env['DB']>, user: User, body: Record<stri
   return json({ cardId, variant, qty });
 };
 
+const MAX_BULK = 2000;
+
+/**
+ * PUT /api/colecao/sets/:id/marcar — `{ on, items: [cartaId, variante][] }`: marca (qtd mínima 1, sem baixar quem já tem
+ * mais) ou desmarca de uma vez. Uma instrução só no D1 (o JSON vai num único parâmetro): o plano gratuito limita
+ * escritas e consultas por chamada, e um lote de centenas de cartas não pode virar centenas de pedidos.
+ * Só vale carta do próprio set e variante que ela tem; o resto é ignorado.
+ */
+const markSet = async (db: NonNullable<Env['DB']>, user: User, setId: string, body: Record<string, unknown>) => {
+  if (typeof body.on !== 'boolean' || !Array.isArray(body.items) || body.items.length > MAX_BULK)
+    throw new OrderError(400, 'Pedido inválido');
+  const cards = (
+    await db
+      .prepare('SELECT id, variants FROM tcg_cards WHERE set_id = ?')
+      .bind(setId)
+      .all<{ id: string; variants: string | null }>()
+  ).results;
+  if (!cards.length) return notFound();
+  const allowed = new Map(cards.map((c) => [c.id, (c.variants ?? 'normal').split(',')]));
+  const rows = [
+    ...new Map(
+      body.items.flatMap((row): [string, [string, string]][] =>
+        Array.isArray(row) &&
+        typeof row[0] === 'string' &&
+        typeof row[1] === 'string' &&
+        allowed.get(row[0])?.includes(row[1])
+          ? [[`${row[0]}|${row[1]}`, [row[0], row[1]]]]
+          : [],
+      ),
+    ).values(),
+  ];
+  if (rows.length) {
+    const pairs = JSON.stringify(rows);
+    if (body.on)
+      await db
+        .prepare(
+          `INSERT INTO col_items (card_id, variant, qty, updated_at, updated_by)
+           SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), 1, ?, ? FROM json_each(?) WHERE true
+           ON CONFLICT(card_id, variant) DO UPDATE SET qty = MAX(qty, 1), updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+        )
+        .bind(new Date().toISOString(), user.email, pairs)
+        .run();
+    else
+      await db
+        .prepare(
+          `DELETE FROM col_items WHERE (card_id, variant) IN (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?))`,
+        )
+        .bind(pairs)
+        .run();
+  }
+  return json({ on: body.on, count: rows.length });
+};
+
 /** GET/PUT /api/colecao… Devolve null se o caminho não é da coleção. */
 export const colecaoRoutes = async (request: Request, env: Env, path: string): Promise<Response | null> => {
   if (path !== '/api/colecao' && !path.startsWith('/api/colecao/')) return null;
@@ -75,6 +128,8 @@ export const colecaoRoutes = async (request: Request, env: Env, path: string): P
     if (path === '/api/colecao' && method === 'GET') return json(await state(db));
     const set = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})$/);
     if (set?.[1] && method === 'PUT') return await trackSet(db, set[1], await readJson(request));
+    const mark = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})\/marcar$/);
+    if (mark?.[1] && method === 'PUT') return await markSet(db, user, mark[1], await readJson(request));
     if (path === '/api/colecao/item' && method === 'PUT') return await setItem(db, user, await readJson(request));
   } catch (e) {
     return handleError(e, 'coleção');

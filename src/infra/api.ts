@@ -85,6 +85,10 @@ export const api = {
   deleteMe: () => send<{ ok: true }>('DELETE', '/api/me', {}),
   /** Coleção interna (#80): só responde a e-mail autorizado; os outros recebem 404. */
   colecao: () => call<{ sets: string[]; items: unknown }>('/api/colecao'),
+  colecaoItem: (cardId: string, variant: string, qty: number) =>
+    send<{ qty: number }>('PUT', '/api/colecao/item', { cardId, variant, qty }),
+  colecaoMarcar: (setId: string, on: boolean, items: [string, string][]) =>
+    send<{ count: number }>('PUT', `/api/colecao/sets/${encodeURIComponent(setId)}/marcar`, { on, items }),
   tcgSets: () => once('sets', () => call<unknown>('/api/tcg/sets')),
   tcgSet: (id: string) => once(`set:${id}`, () => call<unknown>(`/api/tcg/sets/${encodeURIComponent(id)}`)),
   tcgCard: (id: string) => once(`card:${id}`, () => call<unknown>(`/api/tcg/cards/${encodeURIComponent(id)}`)),

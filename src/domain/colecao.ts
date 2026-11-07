@@ -84,6 +84,27 @@ export const tiles = (cards: TcgCardInfo[], own: Own, variantsOn: boolean): Tile
     return [{ card, variant: null, variants: all, qty: all.reduce((n, v) => n + (own[ownKey(card.id, v)] ?? 0), 0) }];
   });
 
+/** Posse com uma variante a mais ou a menos; quantidade 0 tira a entrada. Não altera o mapa recebido. */
+export const withQty = (own: Own, cardId: string, variant: string, qty: number): Own => {
+  const next = { ...own };
+  if (qty > 0) next[ownKey(cardId, variant)] = qty;
+  else delete next[ownKey(cardId, variant)];
+  return next;
+};
+
+/** Todos os quadrados da lista já estão marcados (lista vazia não conta). */
+export const allMarked = (list: Tile[]): boolean => list.length > 0 && list.every((t) => t.qty > 0);
+
+/**
+ * Pares [carta, variante] de "selecionar todas" (`on`) ou "desmarcar todas". Marcar só toca no que falta (a variante do
+ * quadrado, ou a principal no modo simples); desmarcar limpa todas as variantes que o quadrado cobre.
+ */
+export const bulkPairs = (list: Tile[], on: boolean): [string, string][] =>
+  list.flatMap((t): [string, string][] => {
+    if (on) return t.qty > 0 ? [] : [[t.card.id, t.variant ?? primaryVariant(t.card)]];
+    return t.qty > 0 ? t.variants.map((v): [string, string] => [t.card.id, v]) : [];
+  });
+
 export type Status = 'falta' | 'tenho' | 'repetida';
 export const statusOf = (qty: number): Status => (qty <= 0 ? 'falta' : qty === 1 ? 'tenho' : 'repetida');
 
