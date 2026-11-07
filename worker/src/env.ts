@@ -28,6 +28,8 @@ export interface Env {
   /** Entrar com Google (#43): sem os dois, o login responde 503. */
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /** Coleção interna (#80): e-mails autorizados, separados por vírgula. Vazio = a coleção fica fechada. */
+  OWNER_EMAILS?: string;
 }
 
 export interface Ctx {
