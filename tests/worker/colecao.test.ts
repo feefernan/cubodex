@@ -106,3 +106,14 @@ describe('coleção interna: sets e posse', () => {
     expect(res.status).toBe(415);
   });
 });
+
+describe('coleção interna: aviso em /api/me', () => {
+  it('só e-mail da lista recebe colecao: true; os outros e a lista vazia não', async () => {
+    const me = async (email: string) => (await (await call('/api/me', { headers: await login(email) })).json()).colecao;
+    expect(await me('dono@exemplo.com')).toBe(true);
+    expect(await me('SOCIO@exemplo.com')).toBe(true);
+    expect(await me('fora@exemplo.com')).toBeUndefined();
+    E = env({ DB: d1.db });
+    expect(await me('dono@exemplo.com')).toBeUndefined();
+  });
+});

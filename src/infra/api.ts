@@ -57,6 +57,8 @@ export interface Account {
   vault: VaultEntry[];
   hist: HistoryEntry[];
   orders: AccountOrder[];
+  /** Só vem (true) para e-mail autorizado a abrir a coleção interna. */
+  colecao?: boolean;
 }
 
 export interface OrderRequest {

@@ -13,6 +13,7 @@ const applyAccount = (acc: Account) => {
   S.vault = acc.vault;
   S.hist = acc.hist;
   S.orders = acc.orders;
+  S.colecao = acc.colecao === true;
   persist();
 };
 
@@ -31,7 +32,7 @@ export const syncSession = async () => {
     }
   } catch (e) {
     if (!(e instanceof ApiError) || e.status !== 401 || !isRealUser()) return;
-    Object.assign(S, { user: null, dex: {}, vault: [], hist: [], orders: [] });
+    Object.assign(S, { user: null, colecao: false, dex: {}, vault: [], hist: [], orders: [] });
     persist();
   }
   refresh();
