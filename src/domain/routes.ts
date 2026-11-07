@@ -14,6 +14,10 @@ const AREA = {
   serie: 'col',
   dex: 'col',
   criar: 'criar',
+  // Coleção interna (#80): área própria, com cabeçalho de app no lugar do da loja.
+  colecao: 'colecao',
+  colserie: 'colecao',
+  colset: 'colecao',
   conta: 'home',
   carrinho: 'home',
   apoio: 'home',

@@ -64,6 +64,8 @@
 .tog,
 .ship-opt,
 .icon-link,
+.cx-card,
+.cx-set,
 .qty button {
   transition-property: background-color, border-color, color, box-shadow, transform;
   transition-duration: var(--dur-fast);
@@ -73,7 +75,9 @@
 .chip:active,
 .tog:active,
 .ship-opt:active,
-.icon-link:active {
+.icon-link:active,
+.cx-card:active,
+.cx-set:active {
   transform: scale(0.97);
   transition-duration: var(--dur-press);
 }
@@ -102,6 +106,20 @@
 /* ── PROGRESSO ─────────────────────────────────── */
 .progress-label {
   animation: enter var(--dur-fast) var(--ease-out) backwards;
+}
+
+/* ── COLEÇÃO: CARREGANDO ───────────────────────── */
+/* Skeleton: só a opacidade pulsa (sem brilho correndo). Em movimento reduzido o bloco abaixo o deixa parado. */
+.cx-skel {
+  animation: skel 900ms var(--ease-out) infinite alternate;
+}
+@keyframes skel {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ── ACESSIBILIDADE: MOVIMENTO REDUZIDO ─────────── */
