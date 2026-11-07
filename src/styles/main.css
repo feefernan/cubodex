@@ -493,6 +493,8 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-panel{position:relative;width:min(100%,520px);max-height:80dvh;overflow:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0;background:var(--surface)}
 .cx-sheet-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
 .cx-sheet-top b{font-size:22px}
+.cx-panel h3{margin:14px 0 2px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.cx-t-found{list-style:none;margin:8px 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .cx-vrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line);font:800 15px/1.2 var(--f-body);text-transform:lowercase}
 .cx-step{display:inline-flex;align-items:center;gap:10px}
 .cx-step button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line-strong);background:var(--surface-2);font:800 20px/1 var(--f-body);cursor:pointer}

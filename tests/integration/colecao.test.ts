@@ -32,6 +32,11 @@ const server = {
   stockHold: null as Promise<void> | null,
   /** Ajuste de estoque (PUT /api/colecao/estoque/:id): quantas unidades ficam, ou o erro. */
   adjust: (_delta: number): Response => Response.json({ available: 0 }),
+  /** Troca (POST /api/colecao/troca): o corpo recebido e a resposta. */
+  trade: (_body: Record<string, unknown>): Response => Response.json({ gave: [], got: [] }),
+  tradeSent: [] as Record<string, unknown>[],
+  /** Prefixo de /api/tcg/… que falha (para testar a busca e a abertura da carta recebida). */
+  tcgDown: null as string | null,
 };
 
 beforeAll(async () => {
@@ -47,6 +52,13 @@ beforeAll(async () => {
           ? Response.json({ error: 'banco fora do ar' }, { status: 500 })
           : Response.json({ ok: true });
       }
+      if (init?.method === 'POST' && url === '/api/colecao/troca') {
+        const body = JSON.parse(String(init.body));
+        server.tradeSent.push(body);
+        return server.trade(body);
+      }
+      if (server.tcgDown && url.startsWith(`/api/tcg/${server.tcgDown}`))
+        return Response.json({ error: 'TCGdex fora do ar' }, { status: 502 });
       const tcg = tcgApi(url);
       if (tcg) return Response.json(tcg.body, { status: tcg.status });
       if (url === '/api/colecao') return server.reply();
@@ -442,6 +454,33 @@ describe('coleção interna: página do set', () => {
     const trocar = () => $('[data-action="cx-tab"][data-tab="trocar"]').click();
     const rows = () => $$('.cx-trade').map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
 
+    // Primeiro dos testes da folha: o índice e as cartas da enciclopédia ficam guardados depois da primeira busca bem-sucedida.
+    it('registrar troca: busca e carta recebida com erro mostram o motivo e não travam a folha', async () => {
+      server.stock = () =>
+        Response.json({
+          stock: [
+            ...STOCK.stock,
+            { id: 'p3', cardId: 'base1-2', lang: 'PT', variant: 'normal', grade: '', price: null, available: 2 },
+          ],
+        });
+      await open('base1', []);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      $('[data-action="cx-trade"][data-id="p1"]').click();
+      expect($('#cxTGive').textContent).toContain('sem preço');
+      server.tcgDown = 'index';
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($('#cxTFound').textContent).toContain('TCGdex fora do ar'));
+      server.tcgDown = 'cards';
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      $('[data-action="cx-t-pick"]').click();
+      await vi.waitFor(() => expect($('#toast').textContent).toContain('não deu para abrir a carta'));
+      expect($$('#cxTGet .cx-vrow')).toHaveLength(0);
+      server.tcgDown = null;
+      $('[data-action="cx-close"]').click();
+    });
+
     it('lista o estoque da loja neste set e esconde as ações de marcar', async () => {
       server.stock = () => Response.json(STOCK);
       server.stockCalls = 0;
@@ -551,6 +590,78 @@ describe('coleção interna: página do set', () => {
       expect($('.cx-trade output').textContent).toBe('1');
       expect(($('.cx-trade [data-action="cx-stock"]') as HTMLButtonElement).disabled).toBe(false);
       confirm.mockRestore();
+    });
+
+    it('registrar troca: dou do estoque, recebo mais de uma carta, e a página reflete o resultado', async () => {
+      server.stock = () => Response.json(STOCK);
+      await open('base1', []);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
+      expect($$('.cx-trade')[1]?.querySelector('[data-action="cx-trade"]')).toBeNull(); // sem controle de estoque
+      $('[data-action="cx-trade"][data-id="p1"]').click();
+      expect($('#cxSheet').hidden).toBe(false);
+      expect(($('#cxTGo') as HTMLButtonElement).disabled).toBe(true); // ainda nada a receber
+      expect($('#cxTSum').textContent).toContain('sai 1 un.');
+      type('[data-input="cx-t-q"]', 'x');
+      expect($('#cxTFound').textContent).toBe('');
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      $('[data-action="cx-t-pick"]').click();
+      await vi.waitFor(() => expect($$('#cxTGet .cx-vrow')).toHaveLength(1));
+      $('#cxTGet [data-action="cx-t-get"][data-d="1"]').click();
+      expect($('#cxTSum').textContent).toContain('entra 2 un.');
+      $('[data-action="cx-t-pick"]');
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      $('[data-action="cx-t-pick"]').click(); // a mesma carta e variante soma
+      await vi.waitFor(() => expect($('#cxTSum').textContent).toContain('entra 3 un.'));
+      expect($$('#cxTGet .cx-vrow')).toHaveLength(1);
+      const sel = $('#cxTGet select') as HTMLSelectElement;
+      sel.value = sel.options[sel.options.length - 1]?.value ?? '';
+      sel.dispatchEvent(new Event('input', { bubbles: true }));
+      server.trade = () =>
+        Response.json({
+          gave: [{ id: 'p1', available: 0 }],
+          got: [{ cardId: 'base1-58', variant: sel.value, qty: 3 }],
+        });
+      $('[data-action="cx-t-give"][data-d="-1"]').click(); // tirar a única unidade desliga o botão
+      expect(($('#cxTGo') as HTMLButtonElement).disabled).toBe(true);
+      $('[data-action="cx-t-give"][data-d="1"]').click();
+      $('#cxTGo').click();
+      await vi.waitFor(() => expect($('#cxSheet').hidden).toBe(true));
+      expect(server.tradeSent.at(-1)).toEqual({
+        give: [{ id: 'p1', qty: 1 }],
+        get: [{ cardId: 'base1-58', variant: sel.value, qty: 3 }],
+      });
+      expect($('#toast').textContent).toContain('troca registrada');
+      expect($('.cx-trade output').textContent).toBe('0');
+    });
+
+    it('registrar troca: se o servidor recusa, a folha fica aberta com o motivo e dá para tentar de novo', async () => {
+      server.stock = () => Response.json(STOCK);
+      await open('base1', []);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
+      $('[data-action="cx-trade"][data-id="p1"]').click();
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      $('[data-action="cx-t-pick"]').click();
+      await vi.waitFor(() => expect($$('#cxTGet .cx-vrow')).toHaveLength(1));
+      $('#cxTGet [data-action="cx-t-get"][data-d="-1"]').click(); // zera e tira a carta
+      expect($$('#cxTGet .cx-vrow')).toHaveLength(0);
+      type('[data-input="cx-t-q"]', 'zzzz');
+      await vi.waitFor(() => expect($('#cxTFound').textContent).toContain('Nenhuma carta'));
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      $('[data-action="cx-t-pick"]').click();
+      await vi.waitFor(() => expect($$('#cxTGet .cx-vrow')).toHaveLength(1));
+      server.trade = () => Response.json({ error: 'O estoque mudou' }, { status: 409 });
+      $('#cxTGo').click();
+      await vi.waitFor(() => expect($('#cxTErr').textContent).toContain('O estoque mudou'));
+      expect($('#cxSheet').hidden).toBe(false);
+      expect(($('#cxTGo') as HTMLButtonElement).disabled).toBe(false);
+      $('[data-action="cx-close"]').click();
+      expect($('#cxSheet').hidden).toBe(true);
     });
 
     it('sem estoque, avisa que não há nada para trocar', async () => {

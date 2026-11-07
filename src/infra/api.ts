@@ -68,6 +68,11 @@ export interface OrderRequest {
   shipping: { serviceId: number } | null;
 }
 
+export interface TradeResult {
+  gave: { id: string; available: number }[];
+  got: { cardId: string; variant: string; qty: number }[];
+}
+
 export const api = {
   catalog: () => call<unknown>('/api/catalog'),
   quote: (cep: string, items: CartEntry[], owned = false) =>
@@ -88,6 +93,8 @@ export const api = {
   colecaoEstoque: (setId: string) => call<unknown>(`/api/colecao/estoque?set=${encodeURIComponent(setId)}`),
   colecaoAjustaEstoque: (id: string, delta: 1 | -1) =>
     send<{ available: number }>('PUT', `/api/colecao/estoque/${encodeURIComponent(id)}`, { delta }),
+  colecaoTroca: (give: { id: string; qty: number }[], get: { cardId: string; variant: string; qty: number }[]) =>
+    post<TradeResult>('/api/colecao/troca', { give, get }),
   colecaoItem: (cardId: string, variant: string, qty: number) =>
     send<{ qty: number }>('PUT', '/api/colecao/item', { cardId, variant, qty }),
   colecaoMarcar: (setId: string, on: boolean, items: [string, string][]) =>
