@@ -8,6 +8,7 @@ import {
   primaryVariant,
   progress,
   releaseLabel,
+  searchColecao,
   secretCount,
   serieColor,
   setOfCard,
@@ -191,10 +192,21 @@ describe('séries', () => {
     expect(groups[2]?.name).toBe('outros');
   });
 
-  it('o logo da série é o do set mais novo que tem logo; sem nenhum, null', () => {
-    expect(groupSeries(sets)[0]?.logo).toBe('/me02');
-    expect(groupSeries([set('a', 'x', '2020-01-01', null)])[0]?.logo).toBeNull();
-    expect(groupSeries([set('a', 'x', null, null), set('b', 'x', '2021-01-01', '/b')])[0]?.logo).toBe('/b');
+  it('busca séries pelo nome e coleções pelo nome (EN ou PT) ou código, sem acento nem maiúsculas', () => {
+    const named = [
+      { ...set('sv03.5', 'sv', '2023-09-22'), name: '151', name_pt: '151' },
+      { ...set('base2', 'base', '1999-06-16'), name: 'Jungle', name_pt: 'Selva' },
+      { ...set('me01', 'me', '2026-01-01'), serie: 'Mega Evolution', name: 'Mega Evolution', name_pt: 'Mega Evolução' },
+    ];
+    const groups = groupSeries(named);
+    const ids = (r: ReturnType<typeof searchColecao>) => [r.series.map((g) => g.id), r.sets.map((x) => x.id)];
+    expect(ids(searchColecao(groups, ''))).toEqual([['sv', 'base', 'me'], []]);
+    expect(ids(searchColecao(groups, '   '))).toEqual([['sv', 'base', 'me'], []]);
+    expect(ids(searchColecao(groups, 'SELVA'))).toEqual([[], ['base2']]);
+    expect(ids(searchColecao(groups, 'evolucao'))).toEqual([[], ['me01']]);
+    expect(ids(searchColecao(groups, 'sv03'))).toEqual([[], ['sv03.5']]);
+    expect(ids(searchColecao(groups, 'mega'))).toEqual([['me'], ['me01']]);
+    expect(ids(searchColecao(groups, 'nada disso'))).toEqual([[], []]);
   });
 
   it('série fora da tabela não tem cor (usa o cinza do tema)', () => {

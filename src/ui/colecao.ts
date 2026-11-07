@@ -1,11 +1,19 @@
 /** Coleção interna (#80): landing de séries, coleções de cada série e (nas próximas fases) a página do set. */
-import { groupSeries, ownedBySet, parseOwn, releaseLabel, type SerieGroup, serieColor } from '../domain/colecao';
+import {
+  groupSeries,
+  ownedBySet,
+  parseOwn,
+  releaseLabel,
+  type SerieGroup,
+  searchColecao,
+  serieColor,
+} from '../domain/colecao';
 import { logoUrl, parseSets, setTitle, type TcgSetInfo } from '../domain/enciclopedia';
 import { escapeHtml as esc } from '../domain/format';
 import { routeHref, type View } from '../domain/routes';
 import { ApiError, api } from '../infra/api';
 import { emptyState } from './art';
-import { $, onAction } from './dom';
+import { $, onAction, onInput } from './dom';
 import { currentView, registerView } from './router';
 
 interface Data {
@@ -97,12 +105,9 @@ const serieCard = (g: SerieGroup, owned: Map<string, number>) => {
   const mine = have(g.sets, owned);
   const total = cards(g.sets);
   const style = color ? ` style="--cx-bg:${color.bg};--cx-fg:${color.fg}"` : '';
-  const logo = g.logo
-    ? `<img class="cx-card-logo" src="${logoUrl(g.logo)}" alt="" width="240" height="96" loading="lazy" decoding="async">`
-    : `<span class="cx-card-logo cx-card-logo--text display">${esc(g.name)}</span>`;
   return (
-    `<a class="cx-card" href="#/colserie/${esc(g.id)}" data-action="go" data-view="colserie" data-id="${esc(g.id)}"${style}>${logo}` +
-    `<span class="cx-card-name">${esc(g.name)}</span>` +
+    `<a class="cx-card" href="#/colserie/${esc(g.id)}" data-action="go" data-view="colserie" data-id="${esc(g.id)}"${style}>` +
+    `<span class="cx-card-name display">${esc(g.name)}</span>` +
     `<span class="cx-card-meta mono">${g.sets.length} ${g.sets.length === 1 ? 'coleção' : 'coleções'} · ${mine}/${total} cartas</span>` +
     `<span class="cx-bar" role="img" aria-label="${pct(mine, total)}% completa"><i style="width:${pct(mine, total)}%"></i></span></a>`
   );
@@ -121,16 +126,34 @@ const setCard = (s: TcgSetInfo, owned: Map<string, number>) => {
   );
 };
 
-const renderLanding = () =>
-  openView('#colecaoBody', [{ label: 'séries', view: 'colecao' }], 6, ({ groups, owned }, el) => {
-    $('#colecaoSub').textContent = `${groups.length} séries · ${have(
-      groups.flatMap((g) => g.sets),
-      owned,
-    )}/${cards(groups.flatMap((g) => g.sets))} cartas`;
-    el.innerHTML = groups.length
-      ? `<div class="cx-series">${groups.map((g) => serieCard(g, owned)).join('')}</div>`
-      : emptyState('nenhuma série.', 'A enciclopédia ainda não tem sets carregados.');
+/** Dados da landing já carregados: a busca refaz só a lista, sem ir ao servidor nem tirar o foco do campo. */
+let landing: Data | null = null;
+
+const drawLanding = () => {
+  if (!landing) return;
+  const { groups, owned } = landing;
+  const { series, sets } = searchColecao(groups, $<HTMLInputElement>('#colecaoQ').value);
+  const found =
+    (series.length ? `<div class="cx-series">${series.map((g) => serieCard(g, owned)).join('')}</div>` : '') +
+    (sets.length
+      ? `<h2 class="cx-sub display">coleções encontradas</h2><div class="cx-sets">${sets.map((s) => setCard(s, owned)).join('')}</div>`
+      : '');
+  $('#colecaoBody').innerHTML =
+    found ||
+    (groups.length
+      ? emptyState('nada encontrado.', 'Nenhuma série ou coleção com esse nome. Tente outra palavra.')
+      : emptyState('nenhuma série.', 'A enciclopédia ainda não tem sets carregados.'));
+};
+
+const renderLanding = () => {
+  landing = null;
+  return openView('#colecaoBody', [{ label: 'séries', view: 'colecao' }], 6, (data) => {
+    landing = data;
+    const all = data.groups.flatMap((g) => g.sets);
+    $('#colecaoSub').textContent = `${data.groups.length} séries · ${have(all, data.owned)}/${cards(all)} cartas`;
+    drawLanding();
   });
+};
 
 const routeId = () =>
   location.hash
@@ -204,5 +227,6 @@ export const initColecao = () => {
   for (const [view, render] of Object.entries(RENDER) as [View, () => Promise<void>][])
     registerView(view, () => void render());
   onAction('cx-theme', () => $('#themeBtn').click());
+  onInput('cx-search', drawLanding);
   onAction('cx-retry', () => void RENDER[currentView()]?.());
 };

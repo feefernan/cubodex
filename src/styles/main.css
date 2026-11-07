@@ -433,11 +433,9 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-sep{color:var(--faint);flex:none}
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .cx-series,.cx-skels{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));padding-bottom:calc(32px + env(safe-area-inset-bottom,0px))}
-.cx-card{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-height:190px;padding:18px;border-radius:var(--radius);background:var(--cx-bg,var(--surface-2));color:var(--cx-fg,var(--fg));text-decoration:none;overflow:hidden;border:1px solid color-mix(in srgb,var(--fg) 10%,transparent)}
-.cx-card-logo{display:block;max-width:80%;max-height:96px;width:auto;height:auto;margin:6px auto 0;object-fit:contain}
-.cx-card-logo--text{font-size:28px;text-align:center}
-.cx-card-name{font:800 18px/1.2 var(--f-body);text-align:center}
-.cx-card-meta{text-align:center;font-size:12px}
+.cx-card{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-height:150px;padding:18px;border-radius:var(--radius);background:var(--cx-bg,var(--surface-2));color:var(--cx-fg,var(--fg));text-decoration:none;overflow:hidden;border:1px solid color-mix(in srgb,var(--fg) 10%,transparent)}
+.cx-card-name{font-size:clamp(26px,7vw,32px);line-height:1;text-align:left}
+.cx-card-meta{font-size:12px}
 .cx-bar{display:block;height:6px;border-radius:999px;background:color-mix(in srgb,var(--cx-fg,var(--fg)) 22%,transparent);overflow:hidden}
 .cx-bar i{display:block;height:100%;border-radius:inherit;background:var(--cx-fg,var(--tag))}
 .cx-sets{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));padding-bottom:calc(32px + env(safe-area-inset-bottom,0px))}
@@ -452,5 +450,7 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-ring b{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--surface);font:600 11px/1 var(--f-mono)}
 .cx-skel{min-height:190px;border-radius:var(--radius);background:var(--surface-2)}
 .cx-series,.cx-sets,.cx-skels{margin-top:20px}
+.cx-search{max-width:none;margin-top:4px}
+.cx-sub{font-size:22px;margin-top:28px}
 @media (min-width:700px){.cx-sets{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
 @media (max-width:700px){.cx-head-row .cx-shop{display:none}}

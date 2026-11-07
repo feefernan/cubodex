@@ -64,6 +64,31 @@ describe('coleção interna: quem é autorizado', () => {
     expect($('.cx-card[data-id="pop"]').hasAttribute('style')).toBe(false);
     expect($('#colecaoSub').textContent).toMatch(/séries · 2\/\d+ cartas/);
     expect($('#cxHead [aria-current="page"]').textContent).toBe('séries');
+    // landing só com nomes: nenhum logo nos cartões das séries
+    expect($$('.cx-card img')).toHaveLength(0);
+    expect(base.querySelector('.cx-card-name')?.textContent).toBe('Base');
+  });
+
+  it('a busca filtra séries e mostra coleções encontradas, sem perder o campo, e avisa quando nada bate', async () => {
+    await goHash('#/colecao');
+    const input = $<HTMLInputElement>('#colecaoQ');
+    const search = (text: string) => {
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    const total = $$('.cx-card').length;
+    search('selva');
+    expect($$('.cx-card')).toHaveLength(0);
+    expect($('#colecaoBody').textContent).toContain('coleções encontradas');
+    expect($$('#colecaoBody .cx-set').map((e) => e.dataset.id)).toEqual(['base2']);
+    expect($('#colecaoQ')).toBe(input);
+    search('scarlet');
+    expect($$('.cx-card').map((e) => e.dataset.id)).toEqual(['sv']);
+    search('zzzz');
+    expect($('#colecaoBody').textContent).toContain('nada encontrado');
+    search('');
+    expect($$('.cx-card')).toHaveLength(total);
+    expect($('#colecaoBody').textContent).not.toContain('coleções encontradas');
   });
 
   it('série mostra os sets com data, cartas e o anel de progresso; set leva à página do set', async () => {
