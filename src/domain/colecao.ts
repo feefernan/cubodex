@@ -31,6 +31,29 @@ export const parseOwn = (items: unknown): Own => {
   return own;
 };
 
+/** Set de uma carta pelo id do TCGdex (`sv03.5-006` → `sv03.5`): o id é o do set, hífen e o número da carta. */
+export const setOfCard = (cardId: string): string => {
+  const cut = cardId.lastIndexOf('-');
+  return cut > 0 ? cardId.slice(0, cut) : cardId;
+};
+
+/** Quantas cartas diferentes (não variantes) temos de cada set. */
+export const ownedBySet = (own: Own): Map<string, number> => {
+  const cards = new Map<string, Set<string>>();
+  for (const key of Object.keys(own)) {
+    const card = key.slice(0, key.lastIndexOf('|'));
+    const set = setOfCard(card);
+    cards.set(set, (cards.get(set) ?? new Set()).add(card));
+  }
+  return new Map([...cards].map(([set, ids]) => [set, ids.size]));
+};
+
+/** "2023-09-22" → "22/09/2023"; sem data válida, vazio. */
+export const releaseLabel = (released: string | null): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(released ?? '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+};
+
 /** Variantes da carta, na ordem de VARIANT_ORDER; sem informação do TCGdex vale uma só: normal. */
 export const variantsOf = (card: Pick<TcgCardInfo, 'variants'>): string[] => {
   const list = (card.variants ?? '').split(',').filter(Boolean);
