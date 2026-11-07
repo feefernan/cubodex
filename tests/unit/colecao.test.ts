@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  allMarked,
+  bulkPairs,
   filterTiles,
   groupSeries,
   ownedBySet,
@@ -15,6 +17,7 @@ import {
   statusOf,
   tiles,
   variantsOf,
+  withQty,
 } from '../../src/domain/colecao';
 import type { TcgCardInfo, TcgSetInfo } from '../../src/domain/enciclopedia';
 
@@ -273,5 +276,57 @@ describe('set da carta e datas', () => {
     expect(releaseLabel('setembro')).toBe('');
     expect(releaseLabel('2023-9-2')).toBe('');
     expect(releaseLabel(null)).toBe('');
+  });
+});
+
+describe('marcação', () => {
+  it('withQty liga, atualiza e remove sem mexer no mapa original', () => {
+    const own = { 'base1-4|normal': 1 };
+    const more = withQty(own, 'base1-4', 'holo', 2);
+    expect(more).toEqual({ 'base1-4|normal': 1, 'base1-4|holo': 2 });
+    expect(own).toEqual({ 'base1-4|normal': 1 });
+    expect(withQty(more, 'base1-4', 'normal', 0)).toEqual({ 'base1-4|holo': 2 });
+    expect(withQty(own, 'base1-4', 'normal', -3)).toEqual({});
+    expect(withQty({}, 'a-1', 'normal', 0)).toEqual({});
+  });
+
+  it('allMarked: só quando há quadrados e todos têm', () => {
+    const list = tiles(CARDS, { 'base1-4|normal': 1, 'base1-5|normal': 1 }, false);
+    expect(allMarked(list)).toBe(false);
+    expect(allMarked(tiles(CARDS, { 'base1-4|normal': 1, 'base1-5|normal': 1, 'base1-6|normal': 2 }, false))).toBe(
+      true,
+    );
+    expect(allMarked([])).toBe(false);
+  });
+
+  it('selecionar todas marca só o que falta: a variante principal no modo simples, cada variante no modo variantes', () => {
+    const own = { 'base1-4|holo': 1, 'base1-6|normal': 1 };
+    expect(bulkPairs(tiles(CARDS, own, false), true)).toEqual([['base1-5', 'normal']]);
+    expect(bulkPairs(tiles(CARDS, own, true), true)).toEqual([
+      ['base1-4', 'normal'],
+      ['base1-4', 'firstEdition'],
+      ['base1-5', 'normal'],
+    ]);
+    expect(bulkPairs(tiles(CARDS, {}, false), true)).toEqual([
+      ['base1-4', 'normal'],
+      ['base1-5', 'normal'],
+      ['base1-6', 'normal'],
+    ]);
+  });
+
+  it('desmarcar todas limpa todas as variantes dos quadrados marcados', () => {
+    const own = { 'base1-4|holo': 1, 'base1-4|normal': 2, 'base1-6|normal': 1 };
+    expect(bulkPairs(tiles(CARDS, own, false), false)).toEqual([
+      ['base1-4', 'normal'],
+      ['base1-4', 'holo'],
+      ['base1-4', 'firstEdition'],
+      ['base1-6', 'normal'],
+    ]);
+    expect(bulkPairs(tiles(CARDS, own, true), false)).toEqual([
+      ['base1-4', 'normal'],
+      ['base1-4', 'holo'],
+      ['base1-6', 'normal'],
+    ]);
+    expect(bulkPairs([], false)).toEqual([]);
   });
 });

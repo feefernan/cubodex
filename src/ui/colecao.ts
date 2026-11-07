@@ -1,6 +1,7 @@
 /** Coleção interna (#80): landing de séries, coleções de cada série e (nas próximas fases) a página do set. */
 import {
   groupSeries,
+  type Own,
   ownedBySet,
   parseOwn,
   releaseLabel,
@@ -8,17 +9,20 @@ import {
   searchColecao,
   serieColor,
 } from '../domain/colecao';
-import { logoUrl, parseSets, setTitle, type TcgSetInfo } from '../domain/enciclopedia';
+import { logoUrl, parseCardInfo, parseSet, parseSets, setTitle, type TcgSetInfo } from '../domain/enciclopedia';
 import { escapeHtml as esc } from '../domain/format';
 import { routeHref, type View } from '../domain/routes';
 import { ApiError, api } from '../infra/api';
 import { emptyState } from './art';
+import { closeSetPage, initColecaoSet, openSetPage } from './colecao-set';
 import { $, onAction, onInput } from './dom';
 import { currentView, registerView } from './router';
 
 interface Data {
   groups: SerieGroup[];
   owned: Map<string, number>;
+  /** Posse por carta e variante, como o servidor mandou. */
+  own: Own;
 }
 
 /** Cada abertura de tela vale por uma só: resposta que chega depois de o usuário trocar de tela é descartada. */
@@ -26,7 +30,8 @@ let ticket = 0;
 
 const load = async (): Promise<Data> => {
   const [sets, mine] = await Promise.all([api.tcgSets(), api.colecao()]);
-  return { groups: groupSeries(parseSets(sets)), owned: ownedBySet(parseOwn(mine.items)) };
+  const own = parseOwn(mine.items);
+  return { groups: groupSeries(parseSets(sets)), owned: ownedBySet(own), own };
 };
 
 const pct = (have: number, total: number) => (total ? Math.floor((have / total) * 100) : 0);
@@ -83,15 +88,18 @@ const denied = (e: unknown) =>
       );
 
 /** Carrega os dados e desenha a tela; `draw` só roda se esta ainda é a tela aberta. */
-const openView = async (body: string, crumbs: Crumb[], n: number, draw: (d: Data, el: HTMLElement) => void) => {
+type Draw = (d: Data, el: HTMLElement, live: () => boolean) => void | Promise<void>;
+
+const openView = async (body: string, crumbs: Crumb[], n: number, draw: Draw) => {
   const mine = ++ticket;
+  closeSetPage();
   head(crumbs);
   const el = $(body);
   el.innerHTML = skeleton(n);
   try {
     const data = await load();
     if (mine !== ticket) return;
-    draw(data, el);
+    await draw(data, el, () => mine === ticket);
   } catch (e) {
     if (mine === ticket) el.innerHTML = denied(e);
   }
@@ -193,10 +201,9 @@ const renderSerie = () => {
   );
 };
 
-/** A página do set vem na próxima fase: por enquanto só mostra o set e leva de volta. */
 const renderSet = () => {
   const id = routeId();
-  return openView('#colsetBody', [{ label: 'séries', view: 'colecao' }], 1, ({ groups }, el) => {
+  return openView('#colsetBody', [{ label: 'séries', view: 'colecao' }], 6, async ({ groups, own }, el, live) => {
     const g = groups.find((x) => x.sets.some((s) => s.id === id));
     const s = g?.sets.find((x) => x.id === id);
     if (!g || !s) {
@@ -208,12 +215,22 @@ const renderSet = () => {
       );
       return;
     }
+    const data = (await api.tcgSet(id)) as { cards?: unknown };
+    if (!live()) return;
+    // O set da lista é o da série; o do pedido do set só traz as cartas.
+    const info = parseSet((data as { set?: unknown }).set) ?? s;
     head([
       { label: 'séries', view: 'colecao' },
       { label: g.name, view: 'colserie', id: g.id },
       { label: s.name, view: 'colset', id },
     ]);
-    el.innerHTML = emptyState('em breve.', `${esc(setTitle(s))}: a página do set chega na próxima etapa.`);
+    $('#colsetSub').textContent = setTitle(info);
+    openSetPage(
+      el,
+      info,
+      (Array.isArray(data.cards) ? data.cards : []).flatMap((c) => parseCardInfo(c) ?? []),
+      own,
+    );
   });
 };
 
@@ -224,6 +241,7 @@ const RENDER: Partial<Record<View, () => Promise<void>>> = {
 };
 
 export const initColecao = () => {
+  initColecaoSet();
   for (const [view, render] of Object.entries(RENDER) as [View, () => Promise<void>][])
     registerView(view, () => void render());
   onAction('cx-theme', () => $('#themeBtn').click());
