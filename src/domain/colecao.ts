@@ -142,8 +142,6 @@ export interface SerieGroup {
   id: string;
   name: string;
   sets: TcgSetInfo[];
-  /** Logo do set mais novo da série que tem logo; null se nenhum tiver. */
-  logo: string | null;
 }
 
 /** Séries na ordem do primeiro set de cada uma (a API manda do mais novo ao mais antigo); os sets de cada série, do mais novo ao mais antigo. */
@@ -151,12 +149,25 @@ export const groupSeries = (sets: TcgSetInfo[]): SerieGroup[] => {
   const groups = new Map<string, SerieGroup>();
   for (const set of sets) {
     const id = set.serie_id || 'outros';
-    const group = groups.get(id) ?? { id, name: set.serie || 'outros', sets: [], logo: null };
+    const group = groups.get(id) ?? { id, name: set.serie || 'outros', sets: [] };
     group.sets.push(set);
     groups.set(id, group);
   }
-  return [...groups.values()].map((g) => {
-    const sorted = [...g.sets].sort((a, b) => (b.released ?? '').localeCompare(a.released ?? ''));
-    return { ...g, sets: sorted, logo: sorted.find((s) => s.logo)?.logo ?? null };
-  });
+  return [...groups.values()].map((g) => ({
+    ...g,
+    sets: [...g.sets].sort((a, b) => (b.released ?? '').localeCompare(a.released ?? '')),
+  }));
+};
+
+/**
+ * Busca da landing: séries pelo nome e coleções (sets) pelo nome em inglês ou português ou pelo código do set.
+ * Sem texto, vale tudo: todas as séries e nenhuma coleção avulsa.
+ */
+export const searchColecao = (groups: SerieGroup[], query: string): { series: SerieGroup[]; sets: TcgSetInfo[] } => {
+  const q = normalize(query.trim());
+  if (!q) return { series: groups, sets: [] };
+  return {
+    series: groups.filter((g) => normalize(g.name).includes(q)),
+    sets: groups.flatMap((g) => g.sets).filter((s) => normalize(`${s.name} ${s.name_pt ?? ''} ${s.id}`).includes(q)),
+  };
 };
