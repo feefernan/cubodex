@@ -10,6 +10,7 @@ import {
   type Own,
   ownKey,
   parseStockItems,
+  primaryVariant,
   progress,
   releaseLabel,
   type StockItem,
@@ -57,7 +58,8 @@ let page: Page | null = null;
 /** Carta que abriu o seletor: ao fechar, o foco volta ao selo dela (o quadrado pode ter sido refeito no meio). */
 let openedBy: string | null = null;
 
-const list = (p: Page): Tile[] => tiles(p.cards, p.own, p.variantsOn);
+const tilesOf = (p: Page, cards: TcgCardInfo[]): Tile[] => tiles(cards, p.own, p.variantsOn, p.stock ?? []);
+const list = (p: Page): Tile[] => tilesOf(p, p.cards);
 const visibleTiles = (p: Page): Tile[] => filterTiles(list(p), p.tab === 'trocar' ? 'todas' : p.tab, p.q);
 const trade = (p: Page): TradeRow[] => tradeRows(p.cards, p.stock ?? []);
 
@@ -194,13 +196,13 @@ const adjustStock = async (p: Page, id: string, delta: 1 | -1) => {
     toast(`não deu para ajustar: ${(e as Error).message}`);
   }
   p.busy.delete(id);
-  if (page === p && p.tab === 'trocar') drawTrade(p);
+  if (page === p) drawAll(p);
 };
 
 const loadStock = async (p: Page) => {
   if (p.stock || p.stockState === 'carregando') return;
   p.stockState = 'carregando';
-  drawTrade(p);
+  if (p.tab === 'trocar') drawTrade(p);
   try {
     p.stock = parseStockItems(await api.colecaoEstoque(p.set.id));
     p.stockState = 'parado';
@@ -208,10 +210,7 @@ const loadStock = async (p: Page) => {
     p.stockState = 'erro';
     p.stockError = (e as Error).message;
   }
-  if (page === p && p.tab === 'trocar') {
-    drawTabs(p);
-    drawTrade(p);
-  }
+  if (page === p) drawAll(p);
 };
 
 const drawGrid = (p: Page) => {
@@ -241,7 +240,7 @@ const drawAll = (p: Page) => {
 const refreshCard = (p: Page, cardId: string) => {
   const card = p.cards.find((c) => c.id === cardId);
   if (!card) return;
-  const fresh = new Map(tiles([card], p.own, p.variantsOn).map((t) => [`${cardId}|${t.variant ?? ''}`, t]));
+  const fresh = new Map(tilesOf(p, [card]).map((t) => [`${cardId}|${t.variant ?? ''}`, t]));
   for (const el of $$('.cx-tile', p.el)) {
     const t = el.dataset.card === cardId ? fresh.get(el.dataset.key ?? '') : undefined;
     if (t) el.outerHTML = tileHtml(p, t);
@@ -297,15 +296,18 @@ const setQty = (p: Page, cardId: string, variant: string, qty: number) => {
 
 const tileOf = (p: Page, cardId: string, variant: string): Tile | undefined => {
   const card = p.cards.find((c) => c.id === cardId);
-  return card ? tiles([card], p.own, p.variantsOn).find((t) => (t.variant ?? '') === variant) : undefined;
+  return card ? tilesOf(p, [card]).find((t) => (t.variant ?? '') === variant) : undefined;
 };
 
 /** Toque na carta: marca a variante do quadrado (a principal, no modo simples) ou, se já tem, tira todas as dele. */
 const toggle = (p: Page, cardId: string, variant: string) => {
   const t = tileOf(p, cardId, variant);
   if (!t) return;
-  const on = t.qty <= 0;
-  for (const [id, v] of bulkPairs([t], on)) if (on || p.own[ownKey(id, v)]) setQty(p, id, v, on ? 1 : 0);
+  const on = t.col <= 0;
+  const pairs: [string, string][] = on
+    ? [[cardId, t.variant ?? primaryVariant(t.card)]]
+    : t.variants.filter((v) => p.own[ownKey(cardId, v)]).map((v) => [cardId, v]);
+  for (const [id, v] of pairs) setQty(p, id, v, on ? 1 : 0);
 };
 
 const bulk = async (p: Page, on: boolean) => {
@@ -313,7 +315,7 @@ const bulk = async (p: Page, on: boolean) => {
   const pairs = bulkPairs(shown, on);
   if (!pairs.length) return;
   // Conta o que o usuário vê (cartas, ou variantes no modo variantes), não os pares enviados.
-  const n = shown.filter((t) => (on ? t.qty <= 0 : t.qty > 0)).length;
+  const n = shown.filter((t) => (on ? t.qty <= 0 : t.col > 0)).length;
   const unit = p.variantsOn ? 'item' : 'carta';
   if (!window.confirm(`${on ? 'Marcar' : 'Desmarcar'} ${n} ${n === 1 ? unit : `${unit}s`} de ${p.set.name}?`)) return;
   const before = p.own;
@@ -341,7 +343,10 @@ const sheetBody = (p: Page, card: TcgCardInfo) =>
   variantsOf(card)
     .map((v) => {
       const qty = p.own[ownKey(card.id, v)] ?? 0;
-      return `<div class="cx-vrow"><span>${esc(VARIANT_PT[v] ?? v)}</span><span class="cx-step"><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="-1" aria-label="Menos uma ${esc(VARIANT_PT[v] ?? v)}"${qty <= 0 ? ' disabled' : ''}>−</button><output class="num" aria-live="polite">${qty}</output><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="1" aria-label="Mais uma ${esc(VARIANT_PT[v] ?? v)}"${qty >= MAX_QTY ? ' disabled' : ''}>+</button></span></div>`;
+      const shop = (p.stock ?? [])
+        .filter((s) => s.cardId === card.id && s.variant === v)
+        .reduce((n, s) => n + (s.available ?? 1), 0);
+      return `<div class="cx-vrow"><span>${esc(VARIANT_PT[v] ?? v)}${shop ? ` <span class="mono muted">+${shop} na loja</span>` : ''}</span><span class="cx-step"><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="-1" aria-label="Menos uma ${esc(VARIANT_PT[v] ?? v)}"${qty <= 0 ? ' disabled' : ''}>−</button><output class="num" aria-live="polite">${qty}</output><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="1" aria-label="Mais uma ${esc(VARIANT_PT[v] ?? v)}"${qty >= MAX_QTY ? ' disabled' : ''}>+</button></span></div>`;
     })
     .join('');
 
@@ -408,6 +413,7 @@ export const openSetPage = (el: HTMLElement, set: TcgSetInfo, cards: TcgCardInfo
     '<div class="cx-grid" id="cxGrid"></div>' +
     '<p class="cx-more" id="cxMore" hidden><button class="btn btn--ghost" type="button" data-action="cx-more">mostrar mais</button></p>';
   drawAll(p);
+  void loadStock(p);
 };
 
 /** Saiu da página do set: fecha o seletor e esquece o set (pedidos ainda a caminho seguem sem mexer na tela). */

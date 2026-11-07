@@ -70,19 +70,31 @@ export interface Tile {
   variant: string | null;
   /** Variantes que o quadrado cobre: todas no modo simples, só a sua no modo variantes. */
   variants: string[];
+  /** Total que temos: coleção + estoque da loja (o estoque do Notion é só sobra, a cópia da coleção não está nele). */
   qty: number;
+  /** Só a parte da coleção: é o que marcar, desmarcar e o seletor mexem. */
+  col: number;
 }
 
 /**
  * Modo simples: uma carta por quadrado, "tenho" se tiver qualquer variante (soma das quantidades); marcar vale para a
- * variante principal. Modo variantes: cada variante é um quadrado.
+ * variante principal. Modo variantes: cada variante é um quadrado. O estoque da loja soma ao total (`qty`), nunca à
+ * coleção (`col`): quem tem a carta só no estoque aparece como "tenho", e a coleção continua desmarcada.
  */
-export const tiles = (cards: TcgCardInfo[], own: Own, variantsOn: boolean): Tile[] =>
-  cards.flatMap((card): Tile[] => {
+export const tiles = (cards: TcgCardInfo[], own: Own, variantsOn: boolean, stock: StockItem[] = []): Tile[] => {
+  const shop = (cardId: string, variant: string | null) =>
+    stock
+      .filter((s) => s.cardId === cardId && (variant === null || s.variant === variant))
+      .reduce((n, s) => n + (s.available ?? 1), 0);
+  return cards.flatMap((card): Tile[] => {
     const all = variantsOf(card);
-    if (variantsOn) return all.map((v) => ({ card, variant: v, variants: [v], qty: own[ownKey(card.id, v)] ?? 0 }));
-    return [{ card, variant: null, variants: all, qty: all.reduce((n, v) => n + (own[ownKey(card.id, v)] ?? 0), 0) }];
+    const tile = (variant: string | null, variants: string[]): Tile => {
+      const col = variants.reduce((n, v) => n + (own[ownKey(card.id, v)] ?? 0), 0);
+      return { card, variant, variants, col, qty: col + shop(card.id, variant) };
+    };
+    return variantsOn ? all.map((v) => tile(v, [v])) : [tile(null, all)];
   });
+};
 
 /** Posse com uma variante a mais ou a menos; quantidade 0 tira a entrada. Não altera o mapa recebido. */
 export const withQty = (own: Own, cardId: string, variant: string, qty: number): Own => {
@@ -102,7 +114,7 @@ export const allMarked = (list: Tile[]): boolean => list.length > 0 && list.ever
 export const bulkPairs = (list: Tile[], on: boolean): [string, string][] =>
   list.flatMap((t): [string, string][] => {
     if (on) return t.qty > 0 ? [] : [[t.card.id, t.variant ?? primaryVariant(t.card)]];
-    return t.qty > 0 ? t.variants.map((v): [string, string] => [t.card.id, v]) : [];
+    return t.col > 0 ? t.variants.map((v): [string, string] => [t.card.id, v]) : [];
   });
 
 export type Status = 'falta' | 'tenho' | 'repetida';
