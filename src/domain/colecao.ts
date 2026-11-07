@@ -166,16 +166,15 @@ export const parseStockItems = (data: unknown): StockItem[] => {
   });
 };
 
-/** De onde vem uma carta da aba "Para trocar": sobra da coleção ou estoque da loja. */
+/** Uma carta à venda no estoque da loja (Notion), listada na aba "Para trocar". */
 export interface TradeRow {
   card: TcgCardInfo;
-  origin: 'duplicada' | 'estoque';
   variant: string;
-  /** Duplicada: quantas sobram (tenho − 1). Estoque: unidades disponíveis, ou null se o Notion não controla. */
+  /** Unidades disponíveis, ou null se o Notion não controla. */
   qty: number | null;
-  lang?: string;
-  grade?: string;
-  price?: number | null;
+  lang: string;
+  grade: string;
+  price: number | null;
 }
 
 /** Busca da aba "Para trocar": nome em inglês ou português, ou número da carta. */
@@ -186,19 +185,14 @@ export const filterTrade = (rows: TradeRow[], query: string): TradeRow[] => {
     : rows;
 };
 
-/** As cartas do set que dá para trocar: sobras da coleção e estoque da loja, na ordem das cartas (sobras antes do estoque). */
-export const tradeRows = (cards: TcgCardInfo[], own: Own, stock: StockItem[]): TradeRow[] =>
-  cards.flatMap((card): TradeRow[] => [
-    ...variantsOf(card).flatMap((variant): TradeRow[] => {
-      const have = own[ownKey(card.id, variant)] ?? 0;
-      return have > 1 ? [{ card, origin: 'duplicada', variant, qty: have - 1 }] : [];
-    }),
-    ...stock
+/** O estoque da loja neste set, na ordem das cartas. */
+export const tradeRows = (cards: TcgCardInfo[], stock: StockItem[]): TradeRow[] =>
+  cards.flatMap((card) =>
+    stock
       .filter((s) => s.cardId === card.id)
       .map(
         (s): TradeRow => ({
           card,
-          origin: 'estoque',
           variant: s.variant,
           qty: s.available,
           lang: s.lang,
@@ -206,7 +200,7 @@ export const tradeRows = (cards: TcgCardInfo[], own: Own, stock: StockItem[]): T
           price: s.price,
         }),
       ),
-  ]);
+  );
 
 /** Filtro da aba e da busca (nome em inglês ou português, ou o número da carta). */
 export const filterTiles = (list: Tile[], tab: Tab, query: string): Tile[] => {

@@ -57,7 +57,7 @@ let openedBy: string | null = null;
 
 const list = (p: Page): Tile[] => tiles(p.cards, p.own, p.variantsOn);
 const visibleTiles = (p: Page): Tile[] => filterTiles(list(p), p.tab === 'trocar' ? 'todas' : p.tab, p.q);
-const trade = (p: Page): TradeRow[] => tradeRows(p.cards, p.own, p.stock ?? []);
+const trade = (p: Page): TradeRow[] => tradeRows(p.cards, p.stock ?? []);
 
 // ───────── desenho ─────────
 
@@ -139,18 +139,15 @@ const tradeHtml = (p: Page, r: TradeRow) => {
     ? `<img src="${cardImageUrl(c.image)}" alt="" width="245" height="337" loading="lazy" decoding="async">`
     : '';
   const detail = [VARIANT_PT[r.variant] ?? r.variant, r.lang, r.grade].filter(Boolean).map(esc).join(' · ');
-  const side =
-    r.origin === 'duplicada'
-      ? `<b class="num">sobram ${r.qty}</b>`
-      : `<b class="num">${esc(money(r.price))}</b><span class="mono muted">${r.qty === null ? '' : `${r.qty} un.`}</span>`;
+  const side = `<b class="num">${esc(money(r.price))}</b><span class="mono muted">${r.qty === null ? '' : `${r.qty} un.`}</span>`;
   return (
-    `<div class="cx-trade" data-origin="${r.origin}"><span class="cx-trade-art">${img}</span>` +
+    `<div class="cx-trade"><span class="cx-trade-art">${img}</span>` +
     `<span class="cx-trade-info"><b>${esc(c.name)}</b><span class="mono muted">${esc(numberLabel(c, p.set))}${detail ? ` · ${detail}` : ''}</span></span>` +
-    `<span class="cx-trade-side"><span class="cx-origin">${r.origin}</span>${side}</span></div>`
+    `<span class="cx-trade-side">${side}</span></div>`
   );
 };
 
-/** Aba "Para trocar": as sobras já aparecem; o estoque da loja entra quando chega (e o erro dele não esconde as sobras). */
+/** Aba "Para trocar": o estoque da loja (Notion) neste set. */
 const drawTrade = (p: Page) => {
   const rows = filterTrade(trade(p), p.q);
   const note =
@@ -165,7 +162,7 @@ const drawTrade = (p: Page) => {
       ? rows.map((r) => tradeHtml(p, r)).join('')
       : p.stockState === 'carregando'
         ? ''
-        : emptyState('nada para trocar.', 'Sem sobras na coleção nem estoque da loja deste set.'));
+        : emptyState('nada para trocar.', 'A loja não tem estoque de cartas deste set.'));
   $('#cxMore', p.el).hidden = true;
   drawBulk(p);
 };

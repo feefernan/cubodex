@@ -370,24 +370,22 @@ describe('para trocar', () => {
     expect(parseStockItems({ stock: 'x' })).toEqual([]);
   });
 
-  it('junta sobras da coleção e estoque da loja, na ordem das cartas, sobras antes', () => {
-    const own = { 'base1-4|normal': 3, 'base1-4|holo': 1, 'base1-6|normal': 2, 'base1-5|normal': 1 };
-    const rows = tradeRows(CARDS, own, stock);
-    expect(rows.map((r) => [r.card.id, r.origin, r.variant, r.qty])).toEqual([
-      ['base1-4', 'duplicada', 'normal', 2],
-      ['base1-4', 'estoque', 'holo', 1],
-      ['base1-4', 'estoque', 'normal', null],
-      ['base1-6', 'duplicada', 'normal', 1],
+  it('lista só o estoque da loja, na ordem das cartas', () => {
+    const rows = tradeRows(CARDS, stock);
+    expect(rows.map((r) => [r.card.id, r.variant, r.qty])).toEqual([
+      ['base1-4', 'holo', 1],
+      ['base1-4', 'normal', null],
     ]);
-    expect(rows[1]).toMatchObject({ lang: 'EN', grade: 'PSA 8', price: 5000 });
-    expect(rows[0]?.lang).toBeUndefined();
+    expect(rows[0]).toMatchObject({ lang: 'EN', grade: 'PSA 8', price: 5000 });
   });
 
   it('a busca da aba filtra por nome (EN ou PT) e número, sem acento', () => {
     const rows = tradeRows(
       [{ ...CARDS[0]!, name_pt: 'Lagarto Ígneo' }, CARDS[2]!],
-      { 'base1-4|normal': 2, 'base1-6|normal': 2 },
-      [],
+      [
+        { id: 'a', cardId: CARDS[0]!.id, lang: '', variant: '', grade: '', price: null, available: 1 },
+        { id: 'b', cardId: CARDS[2]!.id, lang: '', variant: '', grade: '', price: null, available: 1 },
+      ],
     );
     expect(rows).toHaveLength(2);
     expect(filterTrade(rows, '').length).toBe(2);
@@ -397,7 +395,7 @@ describe('para trocar', () => {
     expect(filterTrade(rows, '4').map((r) => r.card.id)).toEqual(['base1-4']);
   });
 
-  it('sem sobras nem estoque, nada para trocar', () => {
-    expect(tradeRows(CARDS, { 'base1-4|normal': 1 }, [])).toEqual([]);
+  it('sem estoque, nada para trocar', () => {
+    expect(tradeRows(CARDS, [])).toEqual([]);
   });
 });
