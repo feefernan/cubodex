@@ -221,3 +221,55 @@ describe('coleção interna: marcar em lote', () => {
     expect(have()).toEqual([]);
   });
 });
+
+describe('coleção interna: estoque do Notion de um set', () => {
+  const item = (tcgdex: string, lang: string, variant: string, grade: { co: string; n: number } | null = null) =>
+    JSON.stringify({ kind: 'item', tcgdex, lang, variant, grade, created: null });
+  const product = (id: string, price: number | null, qty: number | null, active: number, def: string | null) =>
+    d1.sqlite
+      .prepare('INSERT INTO products (id, price, qty, active, def) VALUES (?, ?, ?, ?, ?)')
+      .run(id, price, qty, active, def);
+  const stock = async (query: string, email = 'dono@exemplo.com') =>
+    call(`/api/colecao/estoque${query}`, { headers: await login(email) });
+
+  beforeEach(() => {
+    product('p1', 5000, 1, 1, item('base1-4', 'EN', 'holo', { co: 'PSA', n: 8 }));
+    product('p2', 20, 3, 1, item('base1-5', 'PT', 'normal'));
+    product('p3', 15, 2, 0, item('base1-2', 'EN', 'normal')); // inativa
+    product('p4', 15, 0, 1, item('base1-6', 'EN', 'normal')); // esgotada
+    product('p5', 30, 1, 1, item('base2-11', 'EN', 'normal')); // outro set
+    product(
+      'p6',
+      40,
+      null,
+      1,
+      JSON.stringify({ kind: 'item', tcgdex: 'base1-6', lang: 'EN', variant: 'normal', grade: null, created: null }),
+    ); // sem controle de estoque
+    product('p7', 99, 1, 1, JSON.stringify({ kind: 'mini', name: 'Torre', n: 1, rar: 'comum', color: '#112233' }));
+    product('p8', 99, 1, 1, '{estragado');
+    product('p9', 99, 1, 1, null);
+  });
+
+  it('devolve só as cartas ativas e com estoque do set pedido, com idioma, variante, gradação, preço e unidades', async () => {
+    const res = await stock('?set=base1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { stock: { id: string }[] };
+    expect([...body.stock].sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: 'p1', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: 'PSA 8', price: 5000, available: 1 },
+      { id: 'p2', cardId: 'base1-5', lang: 'PT', variant: 'normal', grade: '', price: 20, available: 3 },
+      { id: 'p6', cardId: 'base1-6', lang: 'EN', variant: 'normal', grade: '', price: 40, available: null },
+    ]);
+    expect(await (await stock('?set=base2')).json()).toEqual({
+      stock: [{ id: 'p5', cardId: 'base2-11', lang: 'EN', variant: 'normal', grade: '', price: 30, available: 1 }],
+    });
+    expect(await (await stock('?set=nada')).json()).toEqual({ stock: [] });
+  });
+
+  it('só e-mail da lista lê o estoque; pedido sem set ou com set inválido é recusado', async () => {
+    expect((await stock('?set=base1', 'fora@exemplo.com')).status).toBe(404);
+    expect((await call('/api/colecao/estoque?set=base1')).status).toBe(404);
+    expect((await stock('')).status).toBe(400);
+    expect((await stock('?set=a%20b')).status).toBe(400);
+    expect((await stock('?set=base1')).status).toBe(200);
+  });
+});

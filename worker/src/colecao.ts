@@ -3,11 +3,13 @@
  * e-mails de OWNER_EMAILS. Quem não está na lista (ou não entrou) recebe o mesmo 404 de uma rota que não existe.
  * Nome, número, imagem e variantes da carta vêm de tcg_cards/tcg_sets (/api/tcg/*); aqui só a posse.
  */
+import { setOfCard } from '../../src/domain/colecao';
 import { OrderError } from '../../src/domain/order';
 import { currentUser, isOwner } from './account-routes';
 import type { User } from './accounts';
 import type { Env } from './env';
 import { handleError, json, readJson } from './http';
+import { parseStoredDef } from './notion';
 
 const ID = /^[\w.!%-]{1,80}$/;
 const MAX_QTY = 999;
@@ -117,6 +119,42 @@ const markSet = async (db: NonNullable<Env['DB']>, user: User, setId: string, bo
   return json({ on: body.on, count: rows.length });
 };
 
+/**
+ * GET /api/colecao/estoque?set=<id> — cartas do set à venda no Notion (já espelhado no D1): só as ativas e com estoque.
+ * Não chama o Notion; o cron de 10 minutos mantém `products` em dia. O `/api/catalog` é público, esta rota não.
+ */
+const stockOfSet = async (db: NonNullable<Env['DB']>, setId: string) => {
+  const rows = (
+    await db
+      .prepare(
+        'SELECT id, price, qty, def FROM products WHERE active = 1 AND (qty IS NULL OR qty > 0) AND def IS NOT NULL',
+      )
+      .all<{ id: string; price: number | null; qty: number | null; def: string }>()
+  ).results;
+  const stock = rows.flatMap((r) => {
+    let def: ReturnType<typeof parseStoredDef> = null;
+    try {
+      def = parseStoredDef(JSON.parse(r.def));
+    } catch {
+      // def estragado: a linha fica de fora
+    }
+    return def?.kind === 'item' && setOfCard(def.tcgdex) === setId
+      ? [
+          {
+            id: r.id,
+            cardId: def.tcgdex,
+            lang: def.lang,
+            variant: def.variant,
+            grade: def.grade ? `${def.grade.co} ${def.grade.n}` : '',
+            price: r.price,
+            available: r.qty,
+          },
+        ]
+      : [];
+  });
+  return json({ stock });
+};
+
 /** GET/PUT /api/colecao… Devolve null se o caminho não é da coleção. */
 export const colecaoRoutes = async (request: Request, env: Env, path: string): Promise<Response | null> => {
   if (path !== '/api/colecao' && !path.startsWith('/api/colecao/')) return null;
@@ -126,6 +164,11 @@ export const colecaoRoutes = async (request: Request, env: Env, path: string): P
   const { method } = request;
   try {
     if (path === '/api/colecao' && method === 'GET') return json(await state(db));
+    if (path === '/api/colecao/estoque' && method === 'GET') {
+      const set = new URL(request.url).searchParams.get('set') ?? '';
+      if (!ID.test(set)) throw new OrderError(400, 'Set inválido');
+      return await stockOfSet(db, set);
+    }
     const set = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})$/);
     if (set?.[1] && method === 'PUT') return await trackSet(db, set[1], await readJson(request));
     const mark = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})\/marcar$/);

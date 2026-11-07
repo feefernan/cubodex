@@ -26,6 +26,10 @@ const server = {
   sent: [] as { url: string; body: Record<string, unknown> }[],
   putFails: false,
   hold: null as Promise<void> | null,
+  /** Estoque da loja (GET /api/colecao/estoque): a resposta, quantos pedidos vieram e uma espera opcional. */
+  stock: () => Response.json({ stock: [] }) as Response,
+  stockCalls: 0,
+  stockHold: null as Promise<void> | null,
 };
 
 beforeAll(async () => {
@@ -43,6 +47,11 @@ beforeAll(async () => {
       const tcg = tcgApi(url);
       if (tcg) return Response.json(tcg.body, { status: tcg.status });
       if (url === '/api/colecao') return server.reply();
+      if (url.startsWith('/api/colecao/estoque')) {
+        server.stockCalls += 1;
+        await server.stockHold;
+        return server.stock();
+      }
       return Response.json({ error: 'Entre' }, { status: 401 });
     }),
   );
@@ -200,6 +209,7 @@ describe('coleção interna: página do set', () => {
       'todas 3',
       'tenho 1',
       'preciso 2',
+      'para trocar 1',
     ]);
     expect([state('base1-2'), state('base1-4'), state('base1-58')]).toEqual(['falta', 'repetida', 'falta']);
     expect(tile('base1-4').querySelector('.cx-qty')?.textContent).toBe('×2');
@@ -417,5 +427,81 @@ describe('coleção interna: página do set', () => {
     expect($('#cxSheet').hidden).toBe(false);
     await goHash('#/colecao');
     expect($('#cxSheet').hidden).toBe(true);
+  });
+
+  describe('aba "para trocar"', () => {
+    const STOCK = {
+      stock: [
+        { id: 'p1', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: 'PSA 8', price: 5000, available: 1 },
+        { id: 'p2', cardId: 'base1-58', lang: 'PT', variant: 'normal', grade: '', price: 12.5, available: null },
+      ],
+    };
+    const trocar = () => $('[data-action="cx-tab"][data-tab="trocar"]').click();
+    const rows = () => $$('.cx-trade').map((r) => r.textContent?.replace(/\s+/g, ' ').trim());
+
+    it('junta as sobras da coleção e o estoque da loja, com a origem de cada uma, e esconde as ações de marcar', async () => {
+      server.stock = () => Response.json(STOCK);
+      server.stockCalls = 0;
+      await open('base1', [['base1-4', 'holo', 3]]);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      expect(rows()).toEqual([
+        expect.stringMatching(/Charizard.*duplicada.*sobram 2/),
+        expect.stringMatching(/Charizard.*holo · EN · PSA 8.*estoque.*R\$\s?5\.000,00.*1 un\./),
+        expect.stringMatching(/Pikachu.*normal · PT.*estoque.*R\$\s?12,50/),
+      ]);
+      expect($$('.cx-trade').map((r) => r.dataset.origin)).toEqual(['duplicada', 'estoque', 'estoque']);
+      expect($('.cx-actions').hidden).toBe(true);
+      expect($$('#cxTabs .chip').map((c) => c.textContent?.replace(/\s+/g, ' '))).toContain('para trocar 3');
+      type('[data-input="cx-set-q"]', 'pika');
+      expect($$('.cx-trade')).toHaveLength(1);
+      type('[data-input="cx-set-q"]', 'zzz');
+      expect($('#cxGrid').textContent).toContain('nada para trocar');
+      type('[data-input="cx-set-q"]', '');
+      $('[data-action="cx-tab"][data-tab="todas"]').click();
+      expect($('.cx-actions').hidden).toBe(false);
+      expect($$('.cx-tile')).toHaveLength(3);
+      trocar();
+      expect($$('.cx-trade')).toHaveLength(3);
+      expect(server.stockCalls).toBe(1);
+    });
+
+    it('as sobras aparecem enquanto o estoque carrega', async () => {
+      let release = () => {};
+      server.stockHold = new Promise<void>((r) => {
+        release = r;
+      });
+      server.stock = () => Response.json(STOCK);
+      await open('base1', [['base1-2', 'normal', 2]]);
+      trocar();
+      expect($('#cxGrid').textContent).toContain('carregando o estoque da loja');
+      expect($$('.cx-trade')).toHaveLength(1);
+      release();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      expect($('#cxGrid').textContent).not.toContain('carregando');
+      server.stockHold = null;
+    });
+
+    it('se o estoque falha, as sobras continuam, o aviso diz o motivo e tentar de novo funciona', async () => {
+      server.stock = () => Response.json({ error: 'Notion fora do ar' }, { status: 502 });
+      await open('base1', [['base1-4', 'normal', 2]]);
+      trocar();
+      await vi.waitFor(() =>
+        expect($('#cxGrid').textContent).toContain('Estoque da loja indisponível: Notion fora do ar'),
+      );
+      expect($$('.cx-trade')).toHaveLength(1);
+      server.stock = () => Response.json(STOCK);
+      $('[data-action="cx-stock-retry"]').click();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(3));
+      expect($('#cxGrid').textContent).not.toContain('indisponível');
+    });
+
+    it('sem sobras nem estoque, avisa que não há nada para trocar', async () => {
+      server.stock = () => Response.json({ stock: [] });
+      await open('base1', [['base1-2', 'normal', 1]]);
+      trocar();
+      await vi.waitFor(() => expect($('#cxGrid').textContent).toContain('nada para trocar'));
+      expect($$('.cx-trade')).toHaveLength(0);
+    });
   });
 });

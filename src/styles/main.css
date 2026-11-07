@@ -499,3 +499,13 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-step button:disabled{opacity:.4;cursor:default}
 .cx-step output{min-width:32px;text-align:center;font:600 16px/1 var(--f-mono)}
 @media (min-width:700px){.cx-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.cx-stats{grid-template-columns:repeat(5,minmax(0,1fr))}}
+
+.cx-trade{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);grid-column:1/-1}
+.cx-trade-art{display:block;aspect-ratio:63/88;overflow:hidden;border-radius:4.5%/3.2%;background:var(--ph-a)}
+.cx-trade-art img{display:block;width:100%;height:100%;object-fit:cover}
+.cx-trade-info{display:flex;flex-direction:column;gap:2px;min-width:0;font:700 14px/1.25 var(--f-body)}
+.cx-trade-info .mono{font-size:11px;letter-spacing:.04em}
+.cx-trade-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font:800 14px/1.2 var(--f-body)}
+.cx-trade-side .mono{font-size:11px}
+.cx-origin{padding:2px 8px;border-radius:999px;border:1px solid var(--tag);color:var(--tag);font:600 10px/1.4 var(--f-mono);letter-spacing:.08em;text-transform:uppercase}
+.cx-trade[data-origin="duplicada"] .cx-origin{border-color:var(--action);color:var(--action)}
