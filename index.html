@@ -61,7 +61,33 @@
   </nav>
 </div>
 
+<!-- Cabeçalho de app da coleção interna (#80): só aparece em body.a-colecao; fica fora das .view para o sticky não herdar a animação de entrada. -->
+<header class="cx-head" id="cxHead"></header>
+
 <main>
+
+<!-- COLEÇÃO INTERNA -->
+<section class="view" id="v-colecao" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono" id="colecaoSub">coleção</span>
+    <h1 class="display">coleção<span class="dot">.</span></h1>
+  </div>
+  <div class="wrap" id="colecaoBody"></div>
+</section>
+<section class="view" id="v-colserie" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono" id="colserieSub">série</span>
+    <h1 class="display">coleções<span class="dot">.</span></h1>
+  </div>
+  <div class="wrap" id="colserieBody"></div>
+</section>
+<section class="view" id="v-colset" hidden>
+  <div class="wrap page-title">
+    <span class="eyebrow mono">coleção</span>
+    <h1 class="display">set<span class="dot">.</span></h1>
+  </div>
+  <div class="wrap" id="colsetBody"></div>
+</section>
 
 <!-- HOME -->
 <section class="view" id="v-home">

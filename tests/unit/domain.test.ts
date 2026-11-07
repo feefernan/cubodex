@@ -268,6 +268,16 @@ describe('rotas', () => {
     });
     expect(parseRoute('#/carrinho?x=1')).toEqual({ view: 'carrinho', id: null });
     expect(parseRoute('#/apoio/faq')).toEqual({ view: 'apoio', id: 'faq' });
+    expect(parseRoute('#/colset/sv03.5')).toEqual({ view: 'colset', id: 'sv03.5' });
+    expect(parseRoute('#/colserie/sv')).toEqual({ view: 'colserie', id: 'sv' });
+    expect(parseRoute('#/colecao')).toEqual({ view: 'colecao', id: null });
+    expect(['colecao', 'colserie', 'colset'].map((v) => areaOf(v as 'colecao'))).toEqual([
+      'colecao',
+      'colecao',
+      'colecao',
+    ]);
+    expect(navGroup('colecao')).toBeUndefined();
+    expect(subnavKey('colset')).toBeNull();
     expect(parseRoute('#tcg')).toEqual({ view: 'tcg', id: null });
     expect(parseRoute('')).toEqual({ view: 'home', id: null });
     expect(parseRoute('#/xyz/1')).toEqual({ view: 'home', id: null });

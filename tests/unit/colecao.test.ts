@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   filterTiles,
   groupSeries,
+  ownedBySet,
   ownKey,
   parseOwn,
   primaryVariant,
   progress,
+  releaseLabel,
   secretCount,
   serieColor,
+  setOfCard,
   statusOf,
   tiles,
   variantsOf,
@@ -228,5 +231,35 @@ describe('séries', () => {
       const [hi, lo] = [lum(c?.bg ?? '#000000'), lum(c?.fg ?? '#000000')].sort((a, b) => b - a) as [number, number];
       expect((hi + 0.05) / (lo + 0.05), id).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe('set da carta e datas', () => {
+  it('o set é o id sem o número da carta, mesmo com hífen ou ponto no id do set', () => {
+    expect(setOfCard('base1-4')).toBe('base1');
+    expect(setOfCard('sv03.5-006')).toBe('sv03.5');
+    expect(setOfCard('swsh12tg-TG01')).toBe('swsh12tg');
+    expect(setOfCard('promo-set-12')).toBe('promo-set');
+    expect(setOfCard('semhifen')).toBe('semhifen');
+    expect(setOfCard('-1')).toBe('-1');
+  });
+
+  it('conta cartas diferentes por set, não variantes nem quantidades', () => {
+    const own = { 'base1-4|normal': 3, 'base1-4|holo': 1, 'base1-5|normal': 1, 'sv03.5-006|holo': 2 };
+    expect(ownedBySet(own)).toEqual(
+      new Map([
+        ['base1', 2],
+        ['sv03.5', 1],
+      ]),
+    );
+    expect(ownedBySet({})).toEqual(new Map());
+  });
+
+  it('data de lançamento em dia/mês/ano; sem data válida, vazio', () => {
+    expect(releaseLabel('2023-09-22')).toBe('22/09/2023');
+    expect(releaseLabel('2023-09-22T00:00:00Z')).toBe('22/09/2023');
+    expect(releaseLabel('setembro')).toBe('');
+    expect(releaseLabel('2023-9-2')).toBe('');
+    expect(releaseLabel(null)).toBe('');
   });
 });
