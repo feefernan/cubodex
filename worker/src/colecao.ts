@@ -155,6 +155,29 @@ const stockOfSet = async (db: NonNullable<Env['DB']>, setId: string) => {
   return json({ stock });
 };
 
+/**
+ * PUT /api/colecao/estoque/:id — `{ delta: -1 | 1 }` ajusta as unidades de uma carta à venda. Por diferença, não por valor
+ * absoluto: uma venda que baixa o estoque ao mesmo tempo não é sobrescrita (mesma atualização atômica do `takeStock`).
+ * Fica pendente (`dirty`) e o cron de 10 minutos grava no Notion. Produto sem controle de estoque não muda.
+ */
+const adjustStock = async (db: NonNullable<Env['DB']>, id: string, body: Record<string, unknown>) => {
+  const { delta } = body;
+  if (delta !== 1 && delta !== -1) throw new OrderError(400, 'Pedido inválido');
+  const row = await db
+    .prepare(
+      'UPDATE products SET qty = qty + ?, dirty = 1 WHERE id = ? AND active = 1 AND def IS NOT NULL AND qty IS NOT NULL AND qty + ? BETWEEN 0 AND ? RETURNING qty',
+    )
+    .bind(delta, id, delta, MAX_QTY)
+    .first<{ qty: number }>();
+  if (row) return json({ id, available: row.qty });
+  const now = await db
+    .prepare('SELECT qty FROM products WHERE id = ? AND active = 1 AND def IS NOT NULL')
+    .bind(id)
+    .first<{ qty: number | null }>();
+  if (now?.qty == null) return notFound();
+  throw new OrderError(409, delta < 0 ? 'Não há mais unidades no estoque.' : 'Estoque no limite.');
+};
+
 /** GET/PUT /api/colecao… Devolve null se o caminho não é da coleção. */
 export const colecaoRoutes = async (request: Request, env: Env, path: string): Promise<Response | null> => {
   if (path !== '/api/colecao' && !path.startsWith('/api/colecao/')) return null;
@@ -169,6 +192,8 @@ export const colecaoRoutes = async (request: Request, env: Env, path: string): P
       if (!ID.test(set)) throw new OrderError(400, 'Set inválido');
       return await stockOfSet(db, set);
     }
+    const stockId = path.match(/^\/api\/colecao\/estoque\/([\w.!%-]{1,80})$/);
+    if (stockId?.[1] && method === 'PUT') return await adjustStock(db, stockId[1], await readJson(request));
     const set = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})$/);
     if (set?.[1] && method === 'PUT') return await trackSet(db, set[1], await readJson(request));
     const mark = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})\/marcar$/);

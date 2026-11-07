@@ -30,6 +30,8 @@ const server = {
   stock: () => Response.json({ stock: [] }) as Response,
   stockCalls: 0,
   stockHold: null as Promise<void> | null,
+  /** Ajuste de estoque (PUT /api/colecao/estoque/:id): quantas unidades ficam, ou o erro. */
+  adjust: (_delta: number): Response => Response.json({ available: 0 }),
 };
 
 beforeAll(async () => {
@@ -40,6 +42,7 @@ beforeAll(async () => {
       if (init?.method === 'PUT') {
         server.sent.push({ url, body: JSON.parse(String(init.body)) });
         await server.hold;
+        if (url.startsWith('/api/colecao/estoque/')) return server.adjust(JSON.parse(String(init.body)).delta);
         return server.putFails
           ? Response.json({ error: 'banco fora do ar' }, { status: 500 })
           : Response.json({ ok: true });
@@ -446,7 +449,7 @@ describe('coleção interna: página do set', () => {
       trocar();
       await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
       expect(rows()).toEqual([
-        expect.stringMatching(/Charizard.*holo · EN · PSA 8.*R\$\s?5\.000,00.*1 un\./),
+        expect.stringMatching(/Charizard.*holo · EN · PSA 8.*R\$\s?5\.000,00.*−1\+/),
         expect.stringMatching(/Pikachu.*normal · PT.*R\$\s?12,50/),
       ]);
       expect($('.cx-actions').hidden).toBe(true);
@@ -492,6 +495,42 @@ describe('coleção interna: página do set', () => {
       $('[data-action="cx-stock-retry"]').click();
       await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
       expect($('#cxGrid').textContent).not.toContain('indisponível');
+    });
+
+    it('− e + ajustam o estoque da loja; zerar pede confirmação e o + desfaz', async () => {
+      server.stock = () => Response.json(STOCK);
+      await open('base1', []);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
+      expect($$('.cx-trade')[1]?.querySelector('[data-action="cx-stock"]')).toBeNull(); // sem controle de estoque
+      const step = (d: string) => $(`.cx-trade [data-action="cx-stock"][data-d="${d}"]`);
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      server.sent.length = 0;
+      step('-1').click();
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('zera o estoque'));
+      expect(server.sent).toEqual([]);
+      confirm.mockReturnValue(true);
+      let hold = () => {};
+      server.hold = new Promise<void>((r) => {
+        hold = r;
+      });
+      step('-1').click();
+      expect(($('.cx-trade [data-action="cx-stock"]') as HTMLButtonElement).disabled).toBe(true);
+      step('-1').click(); // com um ajuste em andamento, o toque é ignorado
+      hold();
+      server.hold = null;
+      await vi.waitFor(() => expect($('.cx-trade output').textContent).toBe('0'));
+      expect(server.sent).toEqual([{ url: '/api/colecao/estoque/p1', body: { delta: -1 } }]);
+      server.adjust = () => Response.json({ available: 1 });
+      step('1').click();
+      await vi.waitFor(() => expect($('.cx-trade output').textContent).toBe('1'));
+      server.adjust = () => Response.json({ error: 'Não há mais unidades no estoque.' }, { status: 409 });
+      confirm.mockClear();
+      step('1').click();
+      await vi.waitFor(() => expect($('#toast').textContent).toContain('Não há mais unidades'));
+      expect($('.cx-trade output').textContent).toBe('1');
+      expect(($('.cx-trade [data-action="cx-stock"]') as HTMLButtonElement).disabled).toBe(false);
+      confirm.mockRestore();
     });
 
     it('sem estoque, avisa que não há nada para trocar', async () => {
