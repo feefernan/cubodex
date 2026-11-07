@@ -3,10 +3,12 @@ import {
   allMarked,
   bulkPairs,
   filterTiles,
+  filterTrade,
   groupSeries,
   ownedBySet,
   ownKey,
   parseOwn,
+  parseStockItems,
   primaryVariant,
   progress,
   releaseLabel,
@@ -16,6 +18,7 @@ import {
   setOfCard,
   statusOf,
   tiles,
+  tradeRows,
   variantsOf,
   withQty,
 } from '../../src/domain/colecao';
@@ -328,5 +331,73 @@ describe('marcação', () => {
       ['base1-6', 'normal'],
     ]);
     expect(bulkPairs([], false)).toEqual([]);
+  });
+});
+
+describe('para trocar', () => {
+  const stock = parseStockItems({
+    stock: [
+      { id: 'p1', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: 'PSA 8', price: 5000, available: 1 },
+      { id: 'p2', cardId: 'base1-4', lang: 'PT', variant: 'normal', grade: '', price: 20, available: null },
+      { id: 'p3', cardId: 'outro-1', lang: 'EN', variant: 'normal', grade: '', price: 1, available: 1 },
+    ],
+  });
+
+  it('lê o estoque e descarta o que está fora do formato', () => {
+    expect(stock).toHaveLength(3);
+    expect(stock[1]).toEqual({
+      id: 'p2',
+      cardId: 'base1-4',
+      lang: 'PT',
+      variant: 'normal',
+      grade: '',
+      price: 20,
+      available: null,
+    });
+    expect(
+      parseStockItems({
+        stock: [
+          { id: '', cardId: 'base1-4' },
+          { id: 'p', cardId: 'id inválido!' },
+          { id: 'p', cardId: 'base1-4', price: -1, available: 'x', lang: 5, variant: null },
+          'texto',
+          null,
+        ],
+      }),
+    ).toEqual([{ id: 'p', cardId: 'base1-4', lang: '', variant: '', grade: '', price: null, available: null }]);
+    expect(parseStockItems({})).toEqual([]);
+    expect(parseStockItems(null)).toEqual([]);
+    expect(parseStockItems({ stock: 'x' })).toEqual([]);
+  });
+
+  it('junta sobras da coleção e estoque da loja, na ordem das cartas, sobras antes', () => {
+    const own = { 'base1-4|normal': 3, 'base1-4|holo': 1, 'base1-6|normal': 2, 'base1-5|normal': 1 };
+    const rows = tradeRows(CARDS, own, stock);
+    expect(rows.map((r) => [r.card.id, r.origin, r.variant, r.qty])).toEqual([
+      ['base1-4', 'duplicada', 'normal', 2],
+      ['base1-4', 'estoque', 'holo', 1],
+      ['base1-4', 'estoque', 'normal', null],
+      ['base1-6', 'duplicada', 'normal', 1],
+    ]);
+    expect(rows[1]).toMatchObject({ lang: 'EN', grade: 'PSA 8', price: 5000 });
+    expect(rows[0]?.lang).toBeUndefined();
+  });
+
+  it('a busca da aba filtra por nome (EN ou PT) e número, sem acento', () => {
+    const rows = tradeRows(
+      [{ ...CARDS[0]!, name_pt: 'Lagarto Ígneo' }, CARDS[2]!],
+      { 'base1-4|normal': 2, 'base1-6|normal': 2 },
+      [],
+    );
+    expect(rows).toHaveLength(2);
+    expect(filterTrade(rows, '').length).toBe(2);
+    expect(filterTrade(rows, ' ignio ').length).toBe(0);
+    expect(filterTrade(rows, 'IGNEO').map((r) => r.card.id)).toEqual(['base1-4']);
+    expect(filterTrade(rows, 'gyar').map((r) => r.card.id)).toEqual(['base1-6']);
+    expect(filterTrade(rows, '4').map((r) => r.card.id)).toEqual(['base1-4']);
+  });
+
+  it('sem sobras nem estoque, nada para trocar', () => {
+    expect(tradeRows(CARDS, { 'base1-4|normal': 1 }, [])).toEqual([]);
   });
 });

@@ -6,19 +6,24 @@ import {
   allMarked,
   bulkPairs,
   filterTiles,
+  filterTrade,
   type Own,
   ownKey,
+  parseStockItems,
   progress,
   releaseLabel,
+  type StockItem,
   secretCount,
   type Tab,
   type Tile,
+  type TradeRow,
   tiles,
+  tradeRows,
   variantsOf,
   withQty,
 } from '../domain/colecao';
 import { cardImageUrl, numberLabel, type TcgCardInfo, type TcgSetInfo } from '../domain/enciclopedia';
-import { escapeHtml as esc } from '../domain/format';
+import { brl, escapeHtml as esc } from '../domain/format';
 import { VARIANT_PT } from '../domain/tcg';
 import { api } from '../infra/api';
 import { emptyState } from './art';
@@ -28,12 +33,19 @@ import { toast } from './toast';
 const PAGE = 60;
 const MAX_QTY = 999;
 
+/** As abas da grade (Tab) mais "Para trocar", que é uma lista à parte e não mexe em marcação. */
+type PageTab = Tab | 'trocar';
+
 interface Page {
   el: HTMLElement;
   set: TcgSetInfo;
   cards: TcgCardInfo[];
   own: Own;
-  tab: Tab;
+  tab: PageTab;
+  /** Estoque da loja (Notion) deste set, pedido na primeira vez que a aba "Para trocar" abre. */
+  stock: StockItem[] | null;
+  stockState: 'parado' | 'carregando' | 'erro';
+  stockError: string;
   q: string;
   variantsOn: boolean;
   shown: number;
@@ -44,7 +56,8 @@ let page: Page | null = null;
 let openedBy: string | null = null;
 
 const list = (p: Page): Tile[] => tiles(p.cards, p.own, p.variantsOn);
-const visibleTiles = (p: Page): Tile[] => filterTiles(list(p), p.tab, p.q);
+const visibleTiles = (p: Page): Tile[] => filterTiles(list(p), p.tab === 'trocar' ? 'todas' : p.tab, p.q);
+const trade = (p: Page): TradeRow[] => tradeRows(p.cards, p.own, p.stock ?? []);
 
 // ───────── desenho ─────────
 
@@ -71,15 +84,16 @@ const drawStats = (p: Page) => {
     stat(ICON.value, '—', 'valor em breve');
 };
 
-const TABS: [Tab, string][] = [
+const TABS: [PageTab, string][] = [
   ['todas', 'todas'],
   ['tenho', 'tenho'],
   ['preciso', 'preciso'],
+  ['trocar', 'para trocar'],
 ];
 
 const drawTabs = (p: Page) => {
   const all = list(p);
-  const count = (t: Tab) => filterTiles(all, t, '').length;
+  const count = (t: PageTab) => (t === 'trocar' ? trade(p).length : filterTiles(all, t, '').length);
   $('#cxTabs', p.el).innerHTML = TABS.map(
     ([tab, label]) =>
       `<button class="chip" type="button" data-action="cx-tab" data-tab="${tab}" aria-pressed="${p.tab === tab}">${label} <span class="num">${count(tab)}</span></button>`,
@@ -87,6 +101,8 @@ const drawTabs = (p: Page) => {
 };
 
 const drawBulk = (p: Page) => {
+  $('.cx-actions', p.el).hidden = p.tab === 'trocar';
+  if (p.tab === 'trocar') return;
   const shown = visibleTiles(p);
   const btn = $<HTMLButtonElement>('#cxBulk', p.el);
   const off = allMarked(shown);
@@ -115,7 +131,64 @@ const tileHtml = (p: Page, t: Tile) => {
   );
 };
 
+const money = (v: number | null | undefined) => (typeof v === 'number' ? brl(v) : '');
+
+const tradeHtml = (p: Page, r: TradeRow) => {
+  const c = r.card;
+  const img = c.image
+    ? `<img src="${cardImageUrl(c.image)}" alt="" width="245" height="337" loading="lazy" decoding="async">`
+    : '';
+  const detail = [VARIANT_PT[r.variant] ?? r.variant, r.lang, r.grade].filter(Boolean).map(esc).join(' · ');
+  const side =
+    r.origin === 'duplicada'
+      ? `<b class="num">sobram ${r.qty}</b>`
+      : `<b class="num">${esc(money(r.price))}</b><span class="mono muted">${r.qty === null ? '' : `${r.qty} un.`}</span>`;
+  return (
+    `<div class="cx-trade" data-origin="${r.origin}"><span class="cx-trade-art">${img}</span>` +
+    `<span class="cx-trade-info"><b>${esc(c.name)}</b><span class="mono muted">${esc(numberLabel(c, p.set))}${detail ? ` · ${detail}` : ''}</span></span>` +
+    `<span class="cx-trade-side"><span class="cx-origin">${r.origin}</span>${side}</span></div>`
+  );
+};
+
+/** Aba "Para trocar": as sobras já aparecem; o estoque da loja entra quando chega (e o erro dele não esconde as sobras). */
+const drawTrade = (p: Page) => {
+  const rows = filterTrade(trade(p), p.q);
+  const note =
+    p.stockState === 'carregando'
+      ? '<p class="soft" role="status">carregando o estoque da loja…</p>'
+      : p.stockState === 'erro'
+        ? `<div class="msg" role="alert">Estoque da loja indisponível: ${esc(p.stockError)} <button class="btn btn--ghost btn--sm" type="button" data-action="cx-stock-retry">tentar de novo</button></div>`
+        : '';
+  $('#cxGrid', p.el).innerHTML =
+    note +
+    (rows.length
+      ? rows.map((r) => tradeHtml(p, r)).join('')
+      : p.stockState === 'carregando'
+        ? ''
+        : emptyState('nada para trocar.', 'Sem sobras na coleção nem estoque da loja deste set.'));
+  $('#cxMore', p.el).hidden = true;
+  drawBulk(p);
+};
+
+const loadStock = async (p: Page) => {
+  if (p.stock || p.stockState === 'carregando') return;
+  p.stockState = 'carregando';
+  drawTrade(p);
+  try {
+    p.stock = parseStockItems(await api.colecaoEstoque(p.set.id));
+    p.stockState = 'parado';
+  } catch (e) {
+    p.stockState = 'erro';
+    p.stockError = (e as Error).message;
+  }
+  if (page === p && p.tab === 'trocar') {
+    drawTabs(p);
+    drawTrade(p);
+  }
+};
+
 const drawGrid = (p: Page) => {
+  if (p.tab === 'trocar') return drawTrade(p);
   const all = visibleTiles(p);
   const grid = $('#cxGrid', p.el);
   grid.innerHTML = all.length
@@ -283,7 +356,19 @@ const closeSheet = () => {
 
 export const openSetPage = (el: HTMLElement, set: TcgSetInfo, cards: TcgCardInfo[], own: Own) => {
   closeSheet();
-  const p: Page = { el, set, cards, own, tab: 'todas', q: '', variantsOn: false, shown: PAGE };
+  const p: Page = {
+    el,
+    set,
+    cards,
+    own,
+    tab: 'todas',
+    stock: null,
+    stockState: 'parado',
+    stockError: '',
+    q: '',
+    variantsOn: false,
+    shown: PAGE,
+  };
   page = p;
   el.innerHTML =
     '<div class="cx-stats" id="cxStats"></div>' +
@@ -315,10 +400,16 @@ export const initColecaoSet = () => {
   });
   onAction('cx-tab', (el) => {
     if (!page) return;
-    page.tab = (el.dataset.tab as Tab) ?? 'todas';
+    page.tab = (el.dataset.tab as PageTab) ?? 'todas';
     page.shown = PAGE;
     drawTabs(page);
     drawGrid(page);
+    if (page.tab === 'trocar') void loadStock(page);
+  });
+  onAction('cx-stock-retry', () => {
+    if (!page) return;
+    page.stockState = 'parado';
+    void loadStock(page);
   });
   onAction('cx-more', () => {
     if (!page) return;

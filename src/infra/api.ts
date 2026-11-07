@@ -85,6 +85,7 @@ export const api = {
   deleteMe: () => send<{ ok: true }>('DELETE', '/api/me', {}),
   /** Coleção interna (#80): só responde a e-mail autorizado; os outros recebem 404. */
   colecao: () => call<{ sets: string[]; items: unknown }>('/api/colecao'),
+  colecaoEstoque: (setId: string) => call<unknown>(`/api/colecao/estoque?set=${encodeURIComponent(setId)}`),
   colecaoItem: (cardId: string, variant: string, qty: number) =>
     send<{ qty: number }>('PUT', '/api/colecao/item', { cardId, variant, qty }),
   colecaoMarcar: (setId: string, on: boolean, items: [string, string][]) =>

@@ -128,6 +128,86 @@ export const secretCount = (set: Pick<TcgSetInfo, 'total' | 'official'>): number
 
 export type Tab = 'todas' | 'tenho' | 'preciso';
 
+/** Uma carta à venda no estoque do Notion, como /api/colecao/estoque devolve. */
+export interface StockItem {
+  id: string;
+  cardId: string;
+  lang: string;
+  variant: string;
+  /** "PSA 8"; vazio = sem gradação. */
+  grade: string;
+  price: number | null;
+  available: number | null;
+}
+
+const text = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
+
+/** Só aceita o formato esperado (a resposta passa pelo navegador antes de virar HTML). */
+export const parseStockItems = (data: unknown): StockItem[] => {
+  const list = (data as { stock?: unknown } | null)?.stock;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((v): StockItem[] => {
+    const o = (v ?? {}) as Record<string, unknown>;
+    const id = text(o.id, 80);
+    const cardId = text(o.cardId, 80);
+    if (!id || !CARD_ID.test(cardId)) return [];
+    const num = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n >= 0 ? n : null);
+    return [
+      {
+        id,
+        cardId,
+        lang: text(o.lang, 4),
+        variant: text(o.variant, 30),
+        grade: text(o.grade, 20),
+        price: num(o.price),
+        available: num(o.available),
+      },
+    ];
+  });
+};
+
+/** De onde vem uma carta da aba "Para trocar": sobra da coleção ou estoque da loja. */
+export interface TradeRow {
+  card: TcgCardInfo;
+  origin: 'duplicada' | 'estoque';
+  variant: string;
+  /** Duplicada: quantas sobram (tenho − 1). Estoque: unidades disponíveis, ou null se o Notion não controla. */
+  qty: number | null;
+  lang?: string;
+  grade?: string;
+  price?: number | null;
+}
+
+/** Busca da aba "Para trocar": nome em inglês ou português, ou número da carta. */
+export const filterTrade = (rows: TradeRow[], query: string): TradeRow[] => {
+  const q = normalize(query.trim());
+  return q
+    ? rows.filter((r) => normalize(`${r.card.name} ${r.card.name_pt ?? ''} ${r.card.local_id}`).includes(q))
+    : rows;
+};
+
+/** As cartas do set que dá para trocar: sobras da coleção e estoque da loja, na ordem das cartas (sobras antes do estoque). */
+export const tradeRows = (cards: TcgCardInfo[], own: Own, stock: StockItem[]): TradeRow[] =>
+  cards.flatMap((card): TradeRow[] => [
+    ...variantsOf(card).flatMap((variant): TradeRow[] => {
+      const have = own[ownKey(card.id, variant)] ?? 0;
+      return have > 1 ? [{ card, origin: 'duplicada', variant, qty: have - 1 }] : [];
+    }),
+    ...stock
+      .filter((s) => s.cardId === card.id)
+      .map(
+        (s): TradeRow => ({
+          card,
+          origin: 'estoque',
+          variant: s.variant,
+          qty: s.available,
+          lang: s.lang,
+          grade: s.grade,
+          price: s.price,
+        }),
+      ),
+  ]);
+
 /** Filtro da aba e da busca (nome em inglês ou português, ou o número da carta). */
 export const filterTiles = (list: Tile[], tab: Tab, query: string): Tile[] => {
   const q = normalize(query.trim());
