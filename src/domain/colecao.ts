@@ -168,6 +168,8 @@ export const parseStockItems = (data: unknown): StockItem[] => {
 
 /** Uma carta à venda no estoque da loja (Notion), listada na aba "Para trocar". */
 export interface TradeRow {
+  /** Id do produto no Notion/D1. */
+  id: string;
   card: TcgCardInfo;
   variant: string;
   /** Unidades disponíveis, ou null se o Notion não controla. */
@@ -192,6 +194,7 @@ export const tradeRows = (cards: TcgCardInfo[], stock: StockItem[]): TradeRow[] 
       .filter((s) => s.cardId === card.id)
       .map(
         (s): TradeRow => ({
+          id: s.id,
           card,
           variant: s.variant,
           qty: s.available,

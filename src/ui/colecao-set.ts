@@ -46,6 +46,8 @@ interface Page {
   stock: StockItem[] | null;
   stockState: 'parado' | 'carregando' | 'erro';
   stockError: string;
+  /** Produtos com ajuste em andamento: os botões ficam desligados até a resposta. */
+  busy: Set<string>;
   q: string;
   variantsOn: boolean;
   shown: number;
@@ -139,7 +141,14 @@ const tradeHtml = (p: Page, r: TradeRow) => {
     ? `<img src="${cardImageUrl(c.image)}" alt="" width="245" height="337" loading="lazy" decoding="async">`
     : '';
   const detail = [VARIANT_PT[r.variant] ?? r.variant, r.lang, r.grade].filter(Boolean).map(esc).join(' · ');
-  const side = `<b class="num">${esc(money(r.price))}</b><span class="mono muted">${r.qty === null ? '' : `${r.qty} un.`}</span>`;
+  const price = `<b class="num">${esc(money(r.price))}</b>`;
+  const off = p.busy.has(r.id) ? ' disabled' : '';
+  const side =
+    r.qty === null
+      ? price
+      : `${price}<span class="cx-step"><button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="-1" aria-label="Tirar uma unidade de ${esc(c.name)}"${off}>−</button>` +
+        `<output class="num" aria-label="${r.qty} unidades">${r.qty}</output>` +
+        `<button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="1" aria-label="Pôr uma unidade de ${esc(c.name)}"${off}>+</button></span>`;
   return (
     `<div class="cx-trade"><span class="cx-trade-art">${img}</span>` +
     `<span class="cx-trade-info"><b>${esc(c.name)}</b><span class="mono muted">${esc(numberLabel(c, p.set))}${detail ? ` · ${detail}` : ''}</span></span>` +
@@ -165,6 +174,27 @@ const drawTrade = (p: Page) => {
         : emptyState('nada para trocar.', 'A loja não tem estoque de cartas deste set.'));
   $('#cxMore', p.el).hidden = true;
   drawBulk(p);
+};
+
+/** Ajusta o estoque da loja em ±1. Zerar tira a carta de venda, então pede confirmação; o "+" desfaz. */
+const adjustStock = async (p: Page, id: string, delta: 1 | -1) => {
+  const item = p.stock?.find((s) => s.id === id);
+  if (!item || p.busy.has(id)) return;
+  if (
+    delta < 0 &&
+    item.available === 1 &&
+    !window.confirm('Isto zera o estoque e tira a carta de venda na loja. Continuar?')
+  )
+    return;
+  p.busy.add(id);
+  drawTrade(p);
+  try {
+    item.available = (await api.colecaoAjustaEstoque(id, delta)).available;
+  } catch (e) {
+    toast(`não deu para ajustar: ${(e as Error).message}`);
+  }
+  p.busy.delete(id);
+  if (page === p && p.tab === 'trocar') drawTrade(p);
 };
 
 const loadStock = async (p: Page) => {
@@ -361,6 +391,7 @@ export const openSetPage = (el: HTMLElement, set: TcgSetInfo, cards: TcgCardInfo
     tab: 'todas',
     stock: null,
     stockState: 'parado',
+    busy: new Set(),
     stockError: '',
     q: '',
     variantsOn: false,
@@ -403,6 +434,7 @@ export const initColecaoSet = () => {
     drawGrid(page);
     if (page.tab === 'trocar') void loadStock(page);
   });
+  onAction('cx-stock', (el) => page && void adjustStock(page, el.dataset.id ?? '', el.dataset.d === '-1' ? -1 : 1));
   onAction('cx-stock-retry', () => {
     if (!page) return;
     page.stockState = 'parado';

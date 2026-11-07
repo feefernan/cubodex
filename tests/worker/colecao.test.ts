@@ -273,3 +273,59 @@ describe('coleção interna: estoque do Notion de um set', () => {
     expect((await stock('?set=base1')).status).toBe(200);
   });
 });
+
+describe('coleção interna: ajuste do estoque', () => {
+  const def = JSON.stringify({
+    kind: 'item',
+    tcgdex: 'base1-4',
+    lang: 'EN',
+    variant: 'holo',
+    grade: null,
+    created: null,
+  });
+  const product = (id: string, qty: number | null, active = 1, d: string | null = def) =>
+    d1.sqlite
+      .prepare('INSERT INTO products (id, price, qty, active, def) VALUES (?, 10, ?, ?, ?)')
+      .run(id, qty, active, d);
+  const row = (id: string) => d1.sqlite.prepare('SELECT qty, dirty FROM products WHERE id = ?').get(id);
+  const adjust = async (id: string, delta: unknown, email = 'dono@exemplo.com') =>
+    put(`/api/colecao/estoque/${id}`, { delta }, await login(email));
+
+  beforeEach(() => {
+    product('a', 2);
+    product('zero', 0);
+    product('livre', null);
+    product('off', 2, 0);
+    product('semdef', 2, 1, null);
+    product('cheio', 999);
+  });
+
+  it('soma e subtrai uma unidade e marca para o Notion', async () => {
+    let res = await adjust('a', -1);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: 'a', available: 1 });
+    expect(row('a')).toMatchObject({ qty: 1, dirty: 1 });
+    res = await adjust('a', 1);
+    expect(await res.json()).toEqual({ id: 'a', available: 2 });
+    expect(row('a')).toMatchObject({ qty: 2 });
+  });
+
+  it('zera mas não passa de zero nem do limite', async () => {
+    expect((await adjust('zero', -1)).status).toBe(409);
+    expect(row('zero')).toMatchObject({ qty: 0, dirty: 0 });
+    expect((await adjust('cheio', 1)).status).toBe(409);
+    expect(row('cheio')).toMatchObject({ qty: 999 });
+    expect((await adjust('zero', 1)).status).toBe(200);
+  });
+
+  it('sem controle de estoque, inativo, sem def ou inexistente: não muda e responde 404', async () => {
+    for (const id of ['livre', 'off', 'semdef', 'nada']) expect((await adjust(id, 1)).status).toBe(404);
+    expect(row('livre')).toMatchObject({ qty: null, dirty: 0 });
+  });
+
+  it('só aceita delta 1 ou -1 e só e-mail da lista', async () => {
+    for (const d of [0, 2, -5, 1.5, '1', null]) expect((await adjust('a', d)).status).toBe(400);
+    expect((await adjust('a', 1, 'fora@exemplo.com')).status).toBe(404);
+    expect(row('a')).toMatchObject({ qty: 2, dirty: 0 });
+  });
+});
