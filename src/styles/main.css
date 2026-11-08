@@ -462,7 +462,6 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-stat b{font:800 15px/1.1 var(--f-body)}
 .cx-stat .mono{font-size:10px;letter-spacing:.06em}
 .cx-tools{position:sticky;top:calc(env(safe-area-inset-top,0px) + 65px);z-index:40;display:flex;flex-direction:column;gap:8px;margin-top:16px;padding-block:8px;background:var(--bg)}
-.cx-tools .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
 .cx-tools .chip{flex:none;min-height:40px}
 .cx-tools .chip .num{margin-left:6px;font-weight:500;opacity:.75}
 .cx-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -510,4 +509,3 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-trade-side{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font:800 14px/1.2 var(--f-body)}
 .cx-trade-side .mono{font-size:11px}
 .cx-trade-side .cx-step{gap:6px}
-.cx-trade-side .cx-step button{width:36px;height:36px;font-size:18px}

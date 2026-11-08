@@ -31,7 +31,7 @@ let ticket = 0;
 const load = async (): Promise<Data> => {
   const [sets, mine] = await Promise.all([api.tcgSets(), api.colecao()]);
   const own = parseOwn(mine.items);
-  return { groups: groupSeries(parseSets(sets)), owned: ownedBySet(own), own };
+  return { groups: groupSeries(parseSets(sets)), owned: ownedBySet({ ...own, ...parseOwn(mine.shop) }), own };
 };
 
 const pct = (have: number, total: number) => (total ? Math.floor((have / total) * 100) : 0);
@@ -58,13 +58,13 @@ interface Crumb {
 const head = (crumbs: Crumb[]) => {
   const up = crumbs[crumbs.length - 2];
   const back = up
-    ? `<a class="icon-link cx-back" href="${routeHref(up.view, up.id)}" data-action="go" data-view="${up.view}"${up.id ? ` data-id="${esc(up.id)}"` : ''} aria-label="Voltar para ${esc(up.label)}">${ARROW}</a>`
+    ? `<a class="icon-link cx-back" href="${esc(routeHref(up.view, up.id))}" data-action="go" data-view="${up.view}"${up.id ? ` data-id="${esc(up.id)}"` : ''} aria-label="Voltar para ${esc(up.label)}">${ARROW}</a>`
     : `<a class="icon-link cx-back" href="#/home" data-action="go" data-view="home" aria-label="Voltar à loja">${ARROW}</a>`;
   const trail = crumbs
     .map((c, i) =>
       i === crumbs.length - 1
         ? `<span aria-current="page">${esc(c.label)}</span>`
-        : `<a href="${routeHref(c.view, c.id)}" data-action="go" data-view="${c.view}"${c.id ? ` data-id="${esc(c.id)}"` : ''}>${esc(c.label)}</a>`,
+        : `<a href="${esc(routeHref(c.view, c.id))}" data-action="go" data-view="${c.view}"${c.id ? ` data-id="${esc(c.id)}"` : ''}>${esc(c.label)}</a>`,
     )
     .join('<span class="cx-sep" aria-hidden="true">›</span>');
   $('#cxHead').innerHTML =
@@ -83,7 +83,7 @@ const denied = (e: unknown) =>
       )
     : emptyState(
         'não deu para abrir.',
-        (e as Error).message,
+        esc((e as Error).message),
         '<button class="btn btn--ghost btn--sm" data-action="cx-retry">tentar de novo</button>',
       );
 
@@ -124,7 +124,7 @@ const serieCard = (g: SerieGroup, owned: Map<string, number>) => {
 const setCard = (s: TcgSetInfo, owned: Map<string, number>) => {
   const mine = owned.get(s.id) ?? 0;
   const logo = s.logo
-    ? `<img class="cx-set-logo" src="${logoUrl(s.logo)}" alt="" width="160" height="80" loading="lazy" decoding="async">`
+    ? `<img class="cx-set-logo" src="${esc(logoUrl(s.logo))}" alt="" width="160" height="80" loading="lazy" decoding="async">`
     : `<span class="cx-set-logo cx-set-logo--text display">${esc(s.name)}</span>`;
   const date = releaseLabel(s.released);
   return (

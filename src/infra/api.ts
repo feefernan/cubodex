@@ -89,7 +89,7 @@ export const api = {
   saveDex: (dex: Dex) => send<{ dex: Dex }>('PUT', '/api/dex', { dex }),
   deleteMe: () => send<{ ok: true }>('DELETE', '/api/me', {}),
   /** Coleção interna (#80): só responde a e-mail autorizado; os outros recebem 404. */
-  colecao: () => call<{ sets: string[]; items: unknown }>('/api/colecao'),
+  colecao: () => call<{ items: unknown; shop: unknown }>('/api/colecao'),
   colecaoEstoque: (setId: string) => call<unknown>(`/api/colecao/estoque?set=${encodeURIComponent(setId)}`),
   colecaoAjustaEstoque: (id: string, delta: 1 | -1) =>
     send<{ available: number }>('PUT', `/api/colecao/estoque/${encodeURIComponent(id)}`, { delta }),
