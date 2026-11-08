@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  allMarked,
   bulkPairs,
   filterTiles,
   filterTrade,
@@ -313,13 +312,19 @@ describe('marcação', () => {
     expect(withQty({}, 'a-1', 'normal', 0)).toEqual({});
   });
 
-  it('allMarked: só quando há quadrados e todos têm', () => {
-    const list = tiles(CARDS, { 'base1-4|normal': 1, 'base1-5|normal': 1 }, false);
-    expect(allMarked(list)).toBe(false);
-    expect(allMarked(tiles(CARDS, { 'base1-4|normal': 1, 'base1-5|normal': 1, 'base1-6|normal': 2 }, false))).toBe(
-      true,
-    );
-    expect(allMarked([])).toBe(false);
+  it('selecionar todas marca na coleção também o que só o estoque da loja cobre; desmarcar só o que está na coleção', () => {
+    const shop = [{ id: 'a', cardId: 'base1-5', lang: 'EN', variant: 'normal', grade: '', price: 1, available: 2 }];
+    const list = tiles(CARDS, { 'base1-4|normal': 1 }, false, shop);
+    expect(bulkPairs(list, true)).toEqual([
+      ['base1-5', 'normal'],
+      ['base1-6', 'normal'],
+    ]);
+    expect(bulkPairs(list, false)).toEqual([
+      ['base1-4', 'normal'],
+      ['base1-4', 'holo'],
+      ['base1-4', 'firstEdition'],
+    ]);
+    expect(bulkPairs(tiles(CARDS, {}, false, shop), false)).toEqual([]);
   });
 
   it('selecionar todas marca só o que falta: a variante principal no modo simples, cada variante no modo variantes', () => {

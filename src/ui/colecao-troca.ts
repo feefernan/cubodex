@@ -25,7 +25,8 @@ interface Trade {
   index: IndexEntry[] | null;
   busy: boolean;
   error: string;
-  done: (res: TradeResult) => void;
+  /** `current`: a folha ainda é esta troca (se foi fechada e outra abriu no meio, só os dados se aplicam). */
+  done: (res: TradeResult, current: boolean) => void;
 }
 
 const MAX_QTY = 999;
@@ -44,7 +45,7 @@ const drawGive = (tr: Trade) => {
     .map((r) => {
       const detail = [VARIANT_PT[r.variant] ?? r.variant, r.lang, r.grade].filter(Boolean).map(esc).join(' · ');
       const qty = tr.give.get(r.id) ?? 0;
-      return `<div class="cx-vrow"><span>${esc(r.card.name)} <span class="mono muted">${detail} · ${r.price === null ? 'sem preço' : esc(brl(r.price))}</span></span>${stepper('cx-t-give', `data-id="${esc(r.id)}"`, qty, r.qty as number, esc(r.card.name))}</div>`;
+      return `<div class="cx-vrow"><span>${esc(r.card.name)} <span class="mono muted">${detail} · ${r.price === null ? 'sem preço' : esc(brl(r.price))}</span></span>${stepper('cx-t-give', `data-id="${esc(r.id)}"`, qty, r.qty as number, esc(`${r.card.name}, ${VARIANT_PT[r.variant] ?? r.variant}`))}</div>`;
     })
     .join('');
 };
@@ -55,7 +56,7 @@ const drawGet = (tr: Trade) => {
       (g, i) =>
         `<div class="cx-vrow"><span>${esc(g.name)}</span>` +
         `<select class="input" data-input="cx-t-var" data-i="${i}" aria-label="Variante de ${esc(g.name)}">${g.variants.map((v) => `<option value="${esc(v)}"${v === g.variant ? ' selected' : ''}>${esc(VARIANT_PT[v] ?? v)}</option>`).join('')}</select>` +
-        `${stepper('cx-t-get', `data-i="${i}"`, g.qty, MAX_QTY, esc(g.name))}</div>`,
+        `${stepper('cx-t-get', `data-i="${i}"`, g.qty, MAX_QTY, esc(`${g.name}, ${VARIANT_PT[g.variant] ?? g.variant}`))}</div>`,
     )
     .join('');
 };
@@ -76,7 +77,7 @@ const drawAll = (tr: Trade) => {
 };
 
 /** `rows` só traz linhas com estoque controlado e maior que zero. */
-export const openTrade = (rows: TradeRow[], startId: string, done: (res: TradeResult) => void) => {
+export const openTrade = (rows: TradeRow[], startId: string, done: (res: TradeResult, current: boolean) => void) => {
   t = { rows, give: new Map([[startId, 1]]), got: [], index: null, busy: false, error: '', done };
   $('.cx-panel', layer()).innerHTML =
     '<div class="cx-sheet-top"><b class="display" id="cxSheetTitle">Registrar troca</b><button class="icon-link" type="button" data-action="cx-close" aria-label="Fechar">✕</button></div>' +
@@ -114,7 +115,12 @@ const found = async (q: string) => {
     : '<li class="soft">Nenhuma carta com esse nome.</li>';
 };
 
+/** Cartas sendo abertas: um segundo toque no mesmo resultado antes da resposta não soma outra unidade. */
+const picking = new Set<string>();
+
 const pick = async (id: string) => {
+  if (picking.has(id)) return;
+  picking.add(id);
   const tr = open();
   try {
     const card = parseCardInfo(((await api.tcgCard(id)) as { card?: unknown }).card) as TcgCardInfo;
@@ -129,12 +135,13 @@ const pick = async (id: string) => {
     drawFoot(tr);
   } catch (e) {
     toast(`não deu para abrir a carta: ${(e as Error).message}`);
+  } finally {
+    picking.delete(id);
   }
 };
 
 const submit = async () => {
   const tr = open();
-  if (tr.busy) return;
   tr.busy = true;
   tr.error = '';
   drawFoot(tr);
@@ -143,8 +150,9 @@ const submit = async () => {
       [...tr.give].filter(([, qty]) => qty > 0).map(([id, qty]) => ({ id, qty })),
       tr.got.map(({ cardId, variant, qty }) => ({ cardId, variant, qty })),
     );
-    t = null;
-    tr.done(res);
+    const current = t === tr;
+    if (current) t = null;
+    tr.done(res, current);
   } catch (e) {
     tr.busy = false;
     tr.error = (e as Error).message;

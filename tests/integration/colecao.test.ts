@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { tcgApi } from '../fixtures/tcg';
 
 const html = readFileSync(resolve(__dirname, '../../index.html'), 'utf-8');
@@ -21,7 +21,7 @@ const goHash = async (hash: string) => {
 
 /** A coleção do servidor: o que /api/colecao responde (ou o erro). */
 const server = {
-  reply: () => Response.json({ sets: [], items: [] }) as Response,
+  reply: () => Response.json({ items: [], shop: [] }) as Response,
   /** PUTs (marcar): o que o site mandou, se o servidor falha e, se houver, uma espera antes de responder. */
   sent: [] as { url: string; body: Record<string, unknown> }[],
   putFails: false,
@@ -81,11 +81,15 @@ describe('coleção interna: quem é autorizado', () => {
   it('landing com uma série por cartão, a cor da série e o progresso das cartas', async () => {
     server.reply = () =>
       Response.json({
-        sets: [],
         items: [
           ['base2-1', 'normal', 1],
           ['base2-2', 'normal', 2],
           ['base2-2', 'holo', 1],
+        ],
+        // estoque da loja: uma carta nova (conta) e uma que a coleção já tem (não conta de novo)
+        shop: [
+          ['base2-3', 'normal', 2],
+          ['base2-1', 'holo', 1],
         ],
       });
     await goHash('#/colecao');
@@ -93,11 +97,11 @@ describe('coleção interna: quem é autorizado', () => {
     expect(document.body.className).toBe('a-colecao');
     const base = $('.cx-card[data-id="base"]');
     expect(base.getAttribute('style')).toBe('--cx-bg:#F2C230;--cx-fg:#101419');
-    expect(base.querySelector('.cx-card-meta')?.textContent).toMatch(/· 2\/\d+ cartas/);
+    expect(base.querySelector('.cx-card-meta')?.textContent).toMatch(/· 3\/\d+ cartas/);
     expect($('.cx-card[data-id="sv"]').getAttribute('style')).toContain('#A62F87');
     // série fora da tabela de cores: sem estilo, o CSS usa o cinza do tema
     expect($('.cx-card[data-id="pop"]').hasAttribute('style')).toBe(false);
-    expect($('#colecaoSub').textContent).toMatch(/séries · 2\/\d+ cartas/);
+    expect($('#colecaoSub').textContent).toMatch(/séries · 3\/\d+ cartas/);
     expect($('#cxHead [aria-current="page"]').textContent).toBe('séries');
     // landing só com nomes: nenhum logo nos cartões das séries
     expect($$('.cx-card img')).toHaveLength(0);
@@ -131,8 +135,8 @@ describe('coleção interna: quem é autorizado', () => {
     expect(visible()).toEqual(['v-colserie']);
     const jungle = $('.cx-set[data-id="base2"]');
     expect(jungle.textContent).toContain('16/06/1999');
-    expect(jungle.textContent).toContain('2/64 cartas');
-    expect(jungle.querySelector('.cx-ring')?.getAttribute('style')).toBe('--p:3');
+    expect(jungle.textContent).toContain('3/64 cartas');
+    expect(jungle.querySelector('.cx-ring')?.getAttribute('style')).toBe('--p:4');
     expect($('#cxHead .cx-crumbs').textContent).toContain('Base');
     expect($('#cxHead .cx-back').getAttribute('href')).toBe('#/colecao');
 
@@ -172,7 +176,7 @@ describe('coleção interna: quem não é', () => {
     await goHash('#/colserie/sv');
     await goHash('#/colecao');
     expect($('#colecaoBody').textContent).toContain('não deu para abrir');
-    server.reply = () => Response.json({ sets: [], items: [] });
+    server.reply = () => Response.json({ items: [], shop: [] });
     $('[data-action="cx-retry"]').click();
     await settle();
     expect($$('#colecaoBody .cx-card').length).toBeGreaterThan(0);
@@ -192,7 +196,7 @@ describe('coleção interna: página do set', () => {
     tile(card, variant).querySelector<HTMLElement>('.cx-tile-main') as HTMLElement;
   const state = (card: string, variant = '') => tile(card, variant).dataset.state;
   const open = async (set = 'base1', items: unknown[] = [['base1-4', 'holo', 2]]) => {
-    server.reply = () => Response.json({ sets: [], items });
+    server.reply = () => Response.json({ items, shop: [] });
     server.sent = [];
     server.putFails = false;
     server.hold = null;
@@ -444,6 +448,135 @@ describe('coleção interna: página do set', () => {
     expect($('#cxSheet').hidden).toBe(true);
   });
 
+  describe('correções da revisão', () => {
+    beforeEach(() => {
+      server.stock = () => Response.json({ stock: [] });
+    });
+
+    const shopAll = () =>
+      Response.json({
+        stock: ['base1-2', 'base1-4', 'base1-58'].map((cardId, i) => ({
+          id: `s${i}`,
+          cardId,
+          lang: 'EN',
+          variant: 'normal',
+          grade: '',
+          price: 10,
+          available: 1,
+        })),
+      });
+
+    it('selecionar todas marca na coleção o que só o estoque cobre, em vez de virar "desmarcar" sem efeito', async () => {
+      server.stock = shopAll;
+      await open('base1', []);
+      await vi.waitFor(() => expect(stats()).toContain('3/3'));
+      const bulk = $<HTMLButtonElement>('#cxBulk');
+      expect(bulk.textContent).toBe('selecionar todas');
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      bulk.click();
+      expect(confirm).toHaveBeenCalledWith('Marcar 3 cartas de Base Set?');
+      await vi.waitFor(() => expect(server.sent).toHaveLength(1));
+      expect(server.sent[0]?.body.items).toHaveLength(3);
+      await vi.waitFor(() => expect($<HTMLButtonElement>('#cxBulk').textContent).toBe('desmarcar todas'));
+    });
+
+    it('falha do lote desfaz só o lote: um toque feito enquanto ele rodava continua marcado', async () => {
+      await open('base1', []);
+      const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      let release = () => {};
+      server.hold = new Promise<void>((r) => {
+        release = r;
+      });
+      server.putFails = true;
+      $('#cxBulk').click();
+      expect(confirm).toHaveBeenCalled();
+      expect(state('base1-4')).toBe('tenho');
+      server.putFails = false;
+      server.hold = null;
+      main('base1-4').click(); // desmarca durante o lote; o PUT dele é salvo à parte
+      await settle();
+      expect(puts()).toEqual([{ cardId: 'base1-4', variant: 'normal', qty: 0 }]);
+      server.putFails = true;
+      release();
+      await vi.waitFor(() => expect(state('base1-2')).toBe('falta')); // o lote voltou
+      expect($('#toast').textContent).toContain('não deu para salvar');
+      expect(state('base1-4')).toBe('falta'); // o toque individual (desmarcar) fica como foi feito
+    });
+
+    it('falha de um salvamento a caminho reverte na página que tocou por último (set reaberto)', async () => {
+      await open('base1', []);
+      let release = () => {};
+      server.hold = new Promise<void>((r) => {
+        release = r;
+      });
+      server.putFails = true;
+      main('base1-2').click();
+      await goHash('#/colecao');
+      await goHash('#/colset/base1');
+      await vi.waitFor(() => expect($$('.cx-tile').length).toBeGreaterThan(0));
+      main('base1-2').click(); // entra na fila da primeira; a página nova é a dona agora
+      expect(state('base1-2')).toBe('tenho');
+      release();
+      await vi.waitFor(() => expect(state('base1-2')).toBe('falta'));
+      server.hold = null;
+      server.putFails = false;
+    });
+
+    it('o foco do teclado fica na carta depois de marcar', async () => {
+      await open('base1', []);
+      main('base1-2').focus();
+      main('base1-2').click();
+      expect(document.activeElement).toBe(main('base1-2'));
+      tile('base1-2').querySelector<HTMLElement>('.cx-qty')?.focus();
+      tile('base1-2').querySelector<HTMLElement>('.cx-qty')?.click();
+      $('[data-action="cx-step"][data-d="1"]').click();
+      $('[data-action="cx-close"]').click();
+      expect(document.activeElement).toBe(tile('base1-2').querySelector('.cx-qty'));
+    });
+
+    it('com a folha aberta, o resto da página fica inerte (o Tab não escapa) e volta ao fechar', async () => {
+      await open();
+      tile('base1-4').querySelector<HTMLElement>('.cx-qty')?.click();
+      expect($('main').hasAttribute('inert')).toBe(true);
+      $('[data-action="cx-close"]').click();
+      expect($('main').hasAttribute('inert')).toBe(false);
+    });
+
+    it('linha de estoque zerada não oferece "−" nem "registrar troca"', async () => {
+      server.stock = () =>
+        Response.json({
+          stock: [{ id: 'z', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: '', price: 1, available: 1 }],
+        });
+      server.adjust = () => Response.json({ available: 0 });
+      await open('base1', []);
+      $('[data-action="cx-tab"][data-tab="trocar"]').click();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(1));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      $('[data-action="cx-stock"][data-d="-1"]').click();
+      await vi.waitFor(() => expect($('.cx-trade output').textContent).toBe('0'));
+      expect(($('[data-action="cx-stock"][data-d="-1"]') as HTMLButtonElement).disabled).toBe(true);
+      expect($$('[data-action="cx-trade"]')).toHaveLength(0);
+    });
+
+    it('rótulos dos botões citam a variante da carta', async () => {
+      server.stock = () =>
+        Response.json({
+          stock: [{ id: 'z', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: '', price: 1, available: 2 }],
+        });
+      await open('base1', []);
+      $('[data-action="cx-tab"][data-tab="trocar"]').click();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(1));
+      expect($('[data-action="cx-stock"][data-d="1"]').getAttribute('aria-label')).toMatch(/Charizard, holo/i);
+    });
+
+    it('erro do servidor com HTML aparece como texto, sem criar elementos', async () => {
+      server.reply = () => Response.json({ error: '<img src=x onerror=alert(1)>' }, { status: 502 });
+      await goHash('#/colecao');
+      await vi.waitFor(() => expect($('#colecaoBody').textContent).toContain('<img src=x'));
+      expect($('#colecaoBody img')).toBeNull();
+    });
+  });
+
   describe('aba "para trocar"', () => {
     const STOCK = {
       stock: [
@@ -635,6 +768,50 @@ describe('coleção interna: página do set', () => {
       });
       expect($('#toast').textContent).toContain('troca registrada');
       expect($('.cx-trade output').textContent).toBe('0');
+    });
+
+    it('registrar troca: a resposta de uma troca antiga não fecha a folha nova', async () => {
+      server.stock = () => Response.json(STOCK);
+      await open('base1', []);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
+      $('[data-action="cx-trade"][data-id="p1"]').click();
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      $('[data-action="cx-t-pick"]').click();
+      await vi.waitFor(() => expect($$('#cxTGet .cx-vrow')).toHaveLength(1));
+      let release = () => {};
+      server.trade = () => new Response(null); // trocado abaixo
+      const slow = new Promise<void>((r) => {
+        release = r;
+      });
+      server.trade = () => Response.json({ gave: [{ id: 'p1', available: 0 }], got: [] });
+      server.hold = slow;
+      $('#cxTGo').click(); // a resposta fica esperando
+      $('[data-action="cx-close"]').click();
+      $('[data-action="cx-trade"][data-id="p1"]').click(); // outra troca abre no meio
+      server.hold = null;
+      release();
+      await vi.waitFor(() => expect($('.cx-trade output').textContent).toBe('0')); // dados da antiga aplicados
+      expect($('#cxSheet').hidden).toBe(false); // a folha nova segue aberta
+      $('[data-action="cx-close"]').click();
+    });
+
+    it('registrar troca: dois toques seguidos no mesmo resultado somam uma unidade só', async () => {
+      server.stock = () => Response.json(STOCK);
+      await open('base1', []);
+      trocar();
+      await vi.waitFor(() => expect($$('.cx-trade')).toHaveLength(2));
+      $('[data-action="cx-trade"][data-id="p1"]').click();
+      type('[data-input="cx-t-q"]', 'pika');
+      await vi.waitFor(() => expect($$('[data-action="cx-t-pick"]').length).toBeGreaterThan(0));
+      const pickBtn = $('[data-action="cx-t-pick"]');
+      pickBtn.click();
+      pickBtn.click();
+      await vi.waitFor(() => expect($$('#cxTGet .cx-vrow')).toHaveLength(1));
+      await settle();
+      expect($('#cxTSum').textContent).toContain('entra 1 un.');
+      $('[data-action="cx-close"]').click();
     });
 
     it('registrar troca: se o servidor recusa, a folha fica aberta com o motivo e dá para tentar de novo', async () => {

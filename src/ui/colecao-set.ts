@@ -3,7 +3,6 @@
  * servidor mais as mudanças ainda a caminho (atualização otimista, com reversão se a API recusar).
  */
 import {
-  allMarked,
   bulkPairs,
   filterTiles,
   filterTrade,
@@ -61,7 +60,7 @@ let openedBy: string | null = null;
 
 const tilesOf = (p: Page, cards: TcgCardInfo[]): Tile[] => tiles(cards, p.own, p.variantsOn, p.stock ?? []);
 const list = (p: Page): Tile[] => tilesOf(p, p.cards);
-const visibleTiles = (p: Page): Tile[] => filterTiles(list(p), p.tab === 'trocar' ? 'todas' : p.tab, p.q);
+const visibleTiles = (p: Page): Tile[] => filterTiles(list(p), p.tab as Tab, p.q); // nunca chamada na aba "para trocar"
 const trade = (p: Page): TradeRow[] => tradeRows(p.cards, p.stock ?? []);
 
 // ───────── desenho ─────────
@@ -110,7 +109,7 @@ const drawBulk = (p: Page) => {
   if (p.tab === 'trocar') return;
   const shown = visibleTiles(p);
   const btn = $<HTMLButtonElement>('#cxBulk', p.el);
-  const off = allMarked(shown);
+  const off = shown.length > 0 && !bulkPairs(shown, true).length;
   btn.disabled = !shown.length;
   btn.dataset.on = String(!off);
   btn.textContent = off ? 'desmarcar todas' : 'selecionar todas';
@@ -123,7 +122,7 @@ const tileHtml = (p: Page, t: Tile) => {
   const state = t.qty <= 0 ? 'falta' : t.qty === 1 ? 'tenho' : 'repetida';
   const name = esc(c.name);
   const img = c.image
-    ? `<img src="${cardImageUrl(c.image)}" alt="" width="245" height="337" loading="lazy" decoding="async">`
+    ? `<img src="${esc(cardImageUrl(c.image))}" alt="" width="245" height="337" loading="lazy" decoding="async">`
     : '';
   const badge = t.qty <= 0 ? '+' : t.qty === 1 ? '✓' : `×${t.qty}`;
   const variant = t.variant ? `<span class="mono muted">${esc(VARIANT_PT[t.variant] ?? t.variant)}</span>` : '';
@@ -141,17 +140,18 @@ const money = (v: number | null | undefined) => (typeof v === 'number' ? brl(v) 
 const tradeHtml = (p: Page, r: TradeRow) => {
   const c = r.card;
   const img = c.image
-    ? `<img src="${cardImageUrl(c.image)}" alt="" width="245" height="337" loading="lazy" decoding="async">`
+    ? `<img src="${esc(cardImageUrl(c.image))}" alt="" width="245" height="337" loading="lazy" decoding="async">`
     : '';
   const detail = [VARIANT_PT[r.variant] ?? r.variant, r.lang, r.grade].filter(Boolean).map(esc).join(' · ');
+  const label = esc([c.name, VARIANT_PT[r.variant] ?? r.variant].filter(Boolean).join(', '));
   const price = `<b class="num">${esc(money(r.price))}</b>`;
   const off = p.busy.has(r.id) ? ' disabled' : '';
   const side =
     r.qty === null
       ? price
-      : `${price}<button class="btn btn--ghost btn--sm" type="button" data-action="cx-trade" data-id="${esc(r.id)}">registrar troca</button><span class="cx-step"><button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="-1" aria-label="Tirar uma unidade de ${esc(c.name)}"${off}>−</button>` +
+      : `${price}${r.qty > 0 ? `<button class="btn btn--ghost btn--sm" type="button" data-action="cx-trade" data-id="${esc(r.id)}">registrar troca</button>` : ''}<span class="cx-step"><button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="-1" aria-label="Tirar uma unidade de ${label}"${r.qty > 0 ? off : ' disabled'}>−</button>` +
         `<output class="num" aria-label="${r.qty} unidades">${r.qty}</output>` +
-        `<button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="1" aria-label="Pôr uma unidade de ${esc(c.name)}"${off}>+</button></span>`;
+        `<button type="button" data-action="cx-stock" data-id="${esc(r.id)}" data-d="1" aria-label="Pôr uma unidade de ${label}"${off}>+</button></span>`;
   return (
     `<div class="cx-trade"><span class="cx-trade-art">${img}</span>` +
     `<span class="cx-trade-info"><b>${esc(c.name)}</b><span class="mono muted">${esc(numberLabel(c, p.set))}${detail ? ` · ${detail}` : ''}</span></span>` +
@@ -182,10 +182,11 @@ const drawTrade = (p: Page) => {
 /** Abre a folha de troca; ao registrar, o estoque e a coleção da página já refletem o que mudou. */
 const startTrade = (p: Page, id: string) => {
   openedBy = null;
+  $('main').setAttribute('inert', '');
   openTrade(
     tradeRows(p.cards, p.stock ?? []).filter((r) => r.qty),
     id,
-    (res) => {
+    (res, current) => {
       for (const g of res.gave) {
         const item = p.stock?.find((s) => s.id === g.id);
         if (item) item.available = g.available;
@@ -197,7 +198,7 @@ const startTrade = (p: Page, id: string) => {
           g.variant,
           Math.min(MAX_QTY, (p.own[ownKey(g.cardId, g.variant)] ?? 0) + g.qty),
         );
-      closeSheet();
+      if (current) closeSheet();
       toast('troca registrada');
       if (page === p) drawAll(p);
     },
@@ -207,7 +208,7 @@ const startTrade = (p: Page, id: string) => {
 /** Ajusta o estoque da loja em ±1. Zerar tira a carta de venda, então pede confirmação; o "+" desfaz. */
 const adjustStock = async (p: Page, id: string, delta: 1 | -1) => {
   const item = p.stock?.find((s) => s.id === id);
-  if (!item || p.busy.has(id)) return;
+  if (!item) return; // os botões da linha ficam desligados enquanto o ajuste não responde
   if (
     delta < 0 &&
     item.available === 1 &&
@@ -264,13 +265,19 @@ const drawAll = (p: Page) => {
 
 /** Troca só os quadrados da carta (e os números do topo): a grade não é refeita a cada toque. */
 const refreshCard = (p: Page, cardId: string) => {
-  const card = p.cards.find((c) => c.id === cardId);
-  if (!card) return;
+  const card = p.cards.find((c) => c.id === cardId) as TcgCardInfo;
   const fresh = new Map(tilesOf(p, [card]).map((t) => [`${cardId}|${t.variant ?? ''}`, t]));
+  // O quadrado é refeito: quem navega por teclado não pode perder o lugar.
+  const active = document.activeElement as HTMLElement;
+  const focused = active.closest<HTMLElement>('.cx-tile');
+  const refocus = focused
+    ? `.cx-tile[data-key="${CSS.escape(focused.dataset.key as string)}"] .${active.classList.contains('cx-qty') ? 'cx-qty' : 'cx-tile-main'}`
+    : '';
   for (const el of $$('.cx-tile', p.el)) {
     const t = el.dataset.card === cardId ? fresh.get(el.dataset.key ?? '') : undefined;
     if (t) el.outerHTML = tileHtml(p, t);
   }
+  if (refocus) p.el.querySelector<HTMLElement>(refocus)?.focus();
   drawStats(p);
   drawTabs(p);
   drawBulk(p);
@@ -279,16 +286,18 @@ const refreshCard = (p: Page, cardId: string) => {
 // ───────── marcação e sincronização ─────────
 
 /** Um pedido por carta e variante de cada vez; toques que chegam no meio valem só pelo último. */
-const busy = new Map<string, { next?: number }>();
+const busy = new Map<string, { p: Page; next?: number }>();
 
 const sync = async (p: Page, cardId: string, variant: string, qty: number, saved: number) => {
   const key = ownKey(cardId, variant);
   const slot = busy.get(key);
   if (slot) {
+    // Reabriu o set com um pedido a caminho: a falha, se vier, reverte na página que tocou por último.
     slot.next = qty;
+    slot.p = p;
     return;
   }
-  busy.set(key, {});
+  busy.set(key, { p });
   let sent = qty;
   let known = saved;
   try {
@@ -298,13 +307,14 @@ const sync = async (p: Page, cardId: string, variant: string, qty: number, saved
       const next = busy.get(key)?.next;
       if (next === undefined || next === sent) break;
       sent = next;
-      busy.set(key, {});
+      busy.set(key, { p: busy.get(key)?.p ?? p });
     }
   } catch (e) {
-    p.own = withQty(p.own, cardId, variant, known);
-    if (page === p) {
-      refreshCard(p, cardId);
-      refreshSheet(p);
+    const cur = busy.get(key)?.p ?? p;
+    cur.own = withQty(cur.own, cardId, variant, known);
+    if (page === cur) {
+      refreshCard(cur, cardId);
+      refreshSheet(cur);
     }
     toast(`não deu para salvar: ${(e as Error).message}`);
   } finally {
@@ -341,10 +351,10 @@ const bulk = async (p: Page, on: boolean) => {
   const pairs = bulkPairs(shown, on);
   if (!pairs.length) return;
   // Conta o que o usuário vê (cartas, ou variantes no modo variantes), não os pares enviados.
-  const n = shown.filter((t) => (on ? t.qty <= 0 : t.col > 0)).length;
+  const n = shown.filter((t) => (on ? t.col <= 0 : t.col > 0)).length;
   const unit = p.variantsOn ? 'item' : 'carta';
   if (!window.confirm(`${on ? 'Marcar' : 'Desmarcar'} ${n} ${n === 1 ? unit : `${unit}s`} de ${p.set.name}?`)) return;
-  const before = p.own;
+  const before = pairs.map(([id, v]) => p.own[ownKey(id, v)] ?? 0);
   for (const [id, v] of pairs) p.own = withQty(p.own, id, v, on ? 1 : 0);
   drawAll(p);
   const btn = $<HTMLButtonElement>('#cxBulk', p.el);
@@ -352,7 +362,10 @@ const bulk = async (p: Page, on: boolean) => {
   try {
     await api.colecaoMarcar(p.set.id, on, pairs);
   } catch (e) {
-    p.own = before;
+    // Só os pares do lote voltam: um toque feito enquanto ele rodava já foi salvo à parte.
+    pairs.forEach(([id, v], i) => {
+      p.own = withQty(p.own, id, v, before[i] as number);
+    });
     if (page === p) drawAll(p);
     toast(`não deu para salvar: ${(e as Error).message}`);
   }
@@ -398,12 +411,14 @@ const openSheet = (p: Page, cardId: string) => {
   openedBy = cardId;
   $('.cx-panel', sheetLayer()).innerHTML = sheetBody(p, card);
   sheetLayer().hidden = false;
+  $('main').setAttribute('inert', '');
   $<HTMLButtonElement>('.cx-panel [data-action="cx-close"]').focus();
 };
 
 const closeSheet = () => {
   if (sheetLayer().hidden) return;
   sheetLayer().hidden = true;
+  $('main').removeAttribute('inert');
   sheetCard = null;
   const back = page?.el.querySelector<HTMLElement>(`.cx-tile[data-card="${CSS.escape(openedBy ?? '')}"] .cx-qty`);
   back?.focus();

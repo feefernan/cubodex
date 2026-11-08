@@ -53,15 +53,8 @@ describe('coleção interna: quem pode entrar', () => {
 });
 
 describe('coleção interna: sets e posse', () => {
-  it('acompanha e para de acompanhar um set da enciclopédia', async () => {
-    const h = await login('dono@exemplo.com');
-    expect((await put('/api/colecao/sets/base1', { track: true }, h)).status).toBe(200);
-    expect((await put('/api/colecao/sets/base1', { track: true }, h)).status).toBe(200);
-    expect(await (await call('/api/colecao', { headers: h })).json()).toEqual({ sets: ['base1'], items: [] });
-    expect((await put('/api/colecao/sets/inexistente', { track: true }, h)).status).toBe(404);
-    expect((await put('/api/colecao/sets/base1', { track: 'sim' }, h)).status).toBe(400);
-    await put('/api/colecao/sets/base1', { track: false }, h);
-    expect(rows('SELECT * FROM col_sets')).toEqual([]);
+  it('a rota de acompanhar set não existe mais', async () => {
+    expect((await put('/api/colecao/sets/base1', { track: true }, await login('dono@exemplo.com'))).status).toBe(404);
   });
 
   it('grava, atualiza e remove só a linha da variante, e a sociedade vê a mesma coleção', async () => {
@@ -265,6 +258,17 @@ describe('coleção interna: estoque do Notion de um set', () => {
     expect(await (await stock('?set=nada')).json()).toEqual({ stock: [] });
   });
 
+  it('GET /api/colecao traz também o estoque de todos os sets, para o total da landing', async () => {
+    const res = await call('/api/colecao', { headers: await login('dono@exemplo.com') });
+    const { shop } = (await res.json()) as { shop: [string, string, number][] };
+    expect(shop.sort((a, b) => a[0].localeCompare(b[0]))).toEqual([
+      ['base1-4', 'holo', 1],
+      ['base1-5', 'normal', 3],
+      ['base1-6', 'normal', 1], // sem controle de estoque conta como 1
+      ['base2-11', 'normal', 1],
+    ]);
+  });
+
   it('só e-mail da lista lê o estoque; pedido sem set ou com set inválido é recusado', async () => {
     expect((await stock('?set=base1', 'fora@exemplo.com')).status).toBe(404);
     expect((await call('/api/colecao/estoque?set=base1')).status).toBe(404);
@@ -316,6 +320,12 @@ describe('coleção interna: ajuste do estoque', () => {
     expect((await adjust('cheio', 1)).status).toBe(409);
     expect(row('cheio')).toMatchObject({ qty: 999 });
     expect((await adjust('zero', 1)).status).toBe(200);
+  });
+
+  it('estoque acima do teto (vindo do Notion) ainda pode baixar, mas não subir', async () => {
+    product('mil', 1001);
+    expect(await (await adjust('mil', -1)).json()).toEqual({ id: 'mil', available: 1000 });
+    expect((await adjust('mil', 1)).status).toBe(409);
   });
 
   it('sem controle de estoque, inativo, sem def ou inexistente: não muda e responde 404', async () => {

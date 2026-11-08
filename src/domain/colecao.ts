@@ -104,16 +104,14 @@ export const withQty = (own: Own, cardId: string, variant: string, qty: number):
   return next;
 };
 
-/** Todos os quadrados da lista já estão marcados (lista vazia não conta). */
-export const allMarked = (list: Tile[]): boolean => list.length > 0 && list.every((t) => t.qty > 0);
-
 /**
- * Pares [carta, variante] de "selecionar todas" (`on`) ou "desmarcar todas". Marcar só toca no que falta (a variante do
- * quadrado, ou a principal no modo simples); desmarcar limpa todas as variantes que o quadrado cobre.
+ * Pares [carta, variante] de "selecionar todas" (`on`) ou "desmarcar todas". Marcar toca no que falta na coleção (a
+ * variante do quadrado, ou a principal no modo simples), mesmo que o estoque da loja já cubra a carta; desmarcar limpa
+ * todas as variantes que o quadrado cobre.
  */
 export const bulkPairs = (list: Tile[], on: boolean): [string, string][] =>
   list.flatMap((t): [string, string][] => {
-    if (on) return t.qty > 0 ? [] : [[t.card.id, t.variant ?? primaryVariant(t.card)]];
+    if (on) return t.col > 0 ? [] : [[t.card.id, t.variant ?? primaryVariant(t.card)]];
     return t.col > 0 ? t.variants.map((v): [string, string] => [t.card.id, v]) : [];
   });
 

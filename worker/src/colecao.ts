@@ -1,5 +1,5 @@
 /**
- * Coleção interna (#80): sets que acompanhamos e quantas de cada variante temos. Uma coleção só, compartilhada pelos
+ * Coleção interna (#80): quantas de cada variante da enciclopédia temos. Uma coleção só, compartilhada pelos
  * e-mails de OWNER_EMAILS. Quem não está na lista (ou não entrou) recebe o mesmo 404 de uma rota que não existe.
  * Nome, número, imagem e variantes da carta vêm de tcg_cards/tcg_sets (/api/tcg/*); aqui só a posse.
  */
@@ -15,28 +15,20 @@ const ID = /^[\w.!%-]{1,80}$/;
 const MAX_QTY = 999;
 const notFound = () => json({ error: 'Não encontrado' }, 404);
 
+/**
+ * GET /api/colecao — a coleção (`items`) e o estoque da loja de todos os sets (`shop`, só para o total "tenho" da landing e
+ * das séries: coleção + estoque). `items` é só o que foi marcado.
+ */
 const state = async (db: NonNullable<Env['DB']>) => {
-  const sets = (await db.prepare('SELECT set_id FROM col_sets ORDER BY added_at, set_id').all<{ set_id: string }>())
-    .results;
   const items = (
     await db
       .prepare('SELECT card_id, variant, qty FROM col_items')
       .all<{ card_id: string; variant: string; qty: number }>()
   ).results;
-  return { sets: sets.map((s) => s.set_id), items: items.map((i) => [i.card_id, i.variant, i.qty]) };
-};
-
-/** PUT /api/colecao/sets/:id — `{ track: boolean }` começa ou para de acompanhar um set da enciclopédia. */
-const trackSet = async (db: NonNullable<Env['DB']>, setId: string, body: Record<string, unknown>) => {
-  if (typeof body.track !== 'boolean') throw new OrderError(400, 'Pedido inválido');
-  if (body.track) {
-    if (!(await db.prepare('SELECT id FROM tcg_sets WHERE id = ?').bind(setId).first())) return notFound();
-    await db
-      .prepare('INSERT INTO col_sets (set_id, added_at) VALUES (?, ?) ON CONFLICT(set_id) DO NOTHING')
-      .bind(setId, new Date().toISOString())
-      .run();
-  } else await db.prepare('DELETE FROM col_sets WHERE set_id = ?').bind(setId).run();
-  return json({ set: setId, track: body.track });
+  return {
+    items: items.map((i) => [i.card_id, i.variant, i.qty]),
+    shop: (await stockRows(db)).map((r) => [r.cardId, r.variant || 'normal', r.available ?? 1]),
+  };
 };
 
 /** PUT /api/colecao/item — `{ cardId, variant, qty }` grava só essa linha; qty 0 = não temos. */
@@ -119,11 +111,8 @@ const markSet = async (db: NonNullable<Env['DB']>, user: User, setId: string, bo
   return json({ on: body.on, count: rows.length });
 };
 
-/**
- * GET /api/colecao/estoque?set=<id> — cartas do set à venda no Notion (já espelhado no D1): só as ativas e com estoque.
- * Não chama o Notion; o cron de 10 minutos mantém `products` em dia. O `/api/catalog` é público, esta rota não.
- */
-const stockOfSet = async (db: NonNullable<Env['DB']>, setId: string) => {
+/** As cartas à venda no Notion (já espelhado no D1): só as ativas e com estoque (ou sem controle de estoque). */
+const stockRows = async (db: NonNullable<Env['DB']>) => {
   const rows = (
     await db
       .prepare(
@@ -131,14 +120,14 @@ const stockOfSet = async (db: NonNullable<Env['DB']>, setId: string) => {
       )
       .all<{ id: string; price: number | null; qty: number | null; def: string }>()
   ).results;
-  const stock = rows.flatMap((r) => {
+  return rows.flatMap((r) => {
     let def: ReturnType<typeof parseStoredDef> = null;
     try {
       def = parseStoredDef(JSON.parse(r.def));
     } catch {
       // def estragado: a linha fica de fora
     }
-    return def?.kind === 'item' && setOfCard(def.tcgdex) === setId
+    return def?.kind === 'item'
       ? [
           {
             id: r.id,
@@ -152,8 +141,14 @@ const stockOfSet = async (db: NonNullable<Env['DB']>, setId: string) => {
         ]
       : [];
   });
-  return json({ stock });
 };
+
+/**
+ * GET /api/colecao/estoque?set=<id> — as cartas do set à venda. Não chama o Notion; o cron de 10 minutos mantém
+ * `products` em dia. O `/api/catalog` é público, esta rota não.
+ */
+const stockOfSet = async (db: NonNullable<Env['DB']>, setId: string) =>
+  json({ stock: (await stockRows(db)).filter((r) => setOfCard(r.cardId) === setId) });
 
 /**
  * PUT /api/colecao/estoque/:id — `{ delta: -1 | 1 }` ajusta as unidades de uma carta à venda. Por diferença, não por valor
@@ -165,9 +160,9 @@ const adjustStock = async (db: NonNullable<Env['DB']>, id: string, body: Record<
   if (delta !== 1 && delta !== -1) throw new OrderError(400, 'Pedido inválido');
   const row = await db
     .prepare(
-      'UPDATE products SET qty = qty + ?, dirty = 1 WHERE id = ? AND active = 1 AND def IS NOT NULL AND qty IS NOT NULL AND qty + ? BETWEEN 0 AND ? RETURNING qty',
+      'UPDATE products SET qty = qty + ?, dirty = 1 WHERE id = ? AND active = 1 AND def IS NOT NULL AND qty IS NOT NULL AND qty + ? >= 0 AND (? < 0 OR qty + ? <= ?) RETURNING qty',
     )
-    .bind(delta, id, delta, MAX_QTY)
+    .bind(delta, id, delta, delta, delta, MAX_QTY)
     .first<{ qty: number }>();
   if (row) return json({ id, available: row.qty });
   const now = await db
@@ -217,22 +212,37 @@ const registerTrade = async (db: NonNullable<Env['DB']>, user: User, body: Recor
     const prev = inn.get(key);
     inn.set(key, { cardId: g.cardId, variant: g.variant, qty: Math.min(MAX_QTY, (prev?.qty ?? 0) + qtyOf(g.qty)) });
   }
+  // Duas consultas para qualquer tamanho de troca: o plano gratuito do D1 limita as consultas por chamada.
+  const ids = JSON.stringify([...out.keys()]);
+  const products = new Map(
+    (
+      await db
+        .prepare(
+          'SELECT id, price, qty, def FROM products WHERE active = 1 AND def IS NOT NULL AND id IN (SELECT value FROM json_each(?))',
+        )
+        .bind(ids)
+        .all<{ id: string; price: number | null; qty: number | null; def: string }>()
+    ).results.map((p) => [p.id, p]),
+  );
   const gave = [];
   for (const [id, qty] of out) {
-    const p = await db
-      .prepare('SELECT id, price, qty, def FROM products WHERE id = ? AND active = 1 AND def IS NOT NULL')
-      .bind(id)
-      .first<{ id: string; price: number | null; qty: number | null; def: string }>();
+    const p = products.get(id);
     if (!p || p.qty === null) return notFound();
     gave.push({ id, qty, price: p.price, def: p.def });
   }
+  const variants = new Map(
+    (
+      await db
+        .prepare('SELECT id, variants FROM tcg_cards WHERE id IN (SELECT value FROM json_each(?))')
+        .bind(JSON.stringify([...new Set([...inn.values()].map((g) => g.cardId))]))
+        .all<{ id: string; variants: string | null }>()
+    ).results.map((c) => [c.id, c.variants]),
+  );
   for (const { cardId, variant } of inn.values()) {
-    const card = await db
-      .prepare('SELECT variants FROM tcg_cards WHERE id = ?')
-      .bind(cardId)
-      .first<{ variants: string | null }>();
-    if (!card) return notFound();
-    if (!(card.variants ?? 'normal').split(',').includes(variant)) throw new OrderError(400, 'Variante inválida');
+    if (!variants.has(cardId)) return notFound();
+    // Carta sem variantes informadas pelo TCGdex vale como uma só: normal.
+    if (!(variants.get(cardId) ?? 'normal').split(',').includes(variant))
+      throw new OrderError(400, 'Variante inválida');
   }
   const now = new Date().toISOString();
   const outJson = JSON.stringify([...out].map(([id, qty]) => ({ id, qty })));
@@ -294,8 +304,6 @@ export const colecaoRoutes = async (request: Request, env: Env, path: string): P
       return await registerTrade(db, user, await readJson(request));
     const stockId = path.match(/^\/api\/colecao\/estoque\/([\w.!%-]{1,80})$/);
     if (stockId?.[1] && method === 'PUT') return await adjustStock(db, stockId[1], await readJson(request));
-    const set = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})$/);
-    if (set?.[1] && method === 'PUT') return await trackSet(db, set[1], await readJson(request));
     const mark = path.match(/^\/api\/colecao\/sets\/([\w.!%-]{1,80})\/marcar$/);
     if (mark?.[1] && method === 'PUT') return await markSet(db, user, mark[1], await readJson(request));
     if (path === '/api/colecao/item' && method === 'PUT') return await setItem(db, user, await readJson(request));
