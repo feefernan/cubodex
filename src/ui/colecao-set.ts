@@ -6,6 +6,7 @@ import {
   bulkPairs,
   filterTiles,
   filterTrade,
+  MAX_QTY,
   type Own,
   ownKey,
   parseStockItems,
@@ -14,6 +15,8 @@ import {
   releaseLabel,
   type StockItem,
   secretCount,
+  shopCount,
+  statusOf,
   type Tab,
   type Tile,
   type TradeRow,
@@ -32,7 +35,6 @@ import { $, $$, onAction, onInput } from './dom';
 import { toast } from './toast';
 
 const PAGE = 60;
-const MAX_QTY = 999;
 
 /** As abas da grade (Tab) mais "Para trocar", que é uma lista à parte e não mexe em marcação. */
 type PageTab = Tab | 'trocar';
@@ -119,7 +121,7 @@ const stateLabel = (qty: number) => (qty <= 0 ? 'falta' : qty === 1 ? 'tenho' : 
 
 const tileHtml = (p: Page, t: Tile) => {
   const c = t.card;
-  const state = t.qty <= 0 ? 'falta' : t.qty === 1 ? 'tenho' : 'repetida';
+  const state = statusOf(t.qty);
   const name = esc(c.name);
   const img = c.image
     ? `<img src="${esc(cardImageUrl(c.image))}" alt="" width="245" height="337" loading="lazy" decoding="async">`
@@ -382,9 +384,7 @@ const sheetBody = (p: Page, card: TcgCardInfo) =>
   variantsOf(card)
     .map((v) => {
       const qty = p.own[ownKey(card.id, v)] ?? 0;
-      const shop = (p.stock ?? [])
-        .filter((s) => s.cardId === card.id && s.variant === v)
-        .reduce((n, s) => n + (s.available ?? 1), 0);
+      const shop = shopCount(p.stock ?? [], card.id, v);
       return `<div class="cx-vrow"><span>${esc(VARIANT_PT[v] ?? v)}${shop ? ` <span class="mono muted">+${shop} na loja</span>` : ''}</span><span class="cx-step"><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="-1" aria-label="Menos uma ${esc(VARIANT_PT[v] ?? v)}"${qty <= 0 ? ' disabled' : ''}>−</button><output class="num" aria-live="polite">${qty}</output><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="1" aria-label="Mais uma ${esc(VARIANT_PT[v] ?? v)}"${qty >= MAX_QTY ? ' disabled' : ''}>+</button></span></div>`;
     })
     .join('');

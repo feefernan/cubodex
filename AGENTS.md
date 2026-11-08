@@ -46,7 +46,7 @@ issues `precisa-de-você`.
 | End-to-end | `npm run test:e2e` (Playwright, desktop + mobile) |
 | Testes de mutação | `npm run test:mutation` (Stryker, só `src/domain`) |
 | API local (Worker junto do site) | `npm run dev` (o plugin do Cloudflare roda o Worker em `/api/*`) |
-| Banco das contas local (D1) | `npm run db:local` (aplica `worker/migrations`; o link de login aparece no log do `npm run dev`) |
+| Banco das contas local (D1) | `npm run db:local` (aplica `worker/migrations`; o login local é só o Entrar com Google, que precisa de `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`) |
 | Tipos do Worker | `npm run typecheck` (inclui `cf workers types` + `tsc -p worker`) |
 | Deploy (só pelo CI) | `npx cf deploy` com `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` da conta do Cubodex |
 
