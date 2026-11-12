@@ -3,6 +3,9 @@ import type { TcgCardInfo, TcgSetInfo } from './enciclopedia';
 import { normalize } from './format';
 
 /** Posse por carta e variante: `${cardId}|${variant}` → quantidade (só entra quem tem). */
+/** Máximo de unidades de uma carta e variante, na coleção e no estoque da loja. */
+export const MAX_QTY = 999;
+
 export type Own = Record<string, number>;
 
 const CARD_ID = /^[\w.!%-]{1,80}$/;
@@ -70,7 +73,7 @@ export interface Tile {
   variant: string | null;
   /** Variantes que o quadrado cobre: todas no modo simples, só a sua no modo variantes. */
   variants: string[];
-  /** Total que temos: coleção + estoque da loja (o estoque do Notion é só sobra, a cópia da coleção não está nele). */
+  /** Total que temos: coleção + estoque da loja. */
   qty: number;
   /** Só a parte da coleção: é o que marcar, desmarcar e o seletor mexem. */
   col: number;
@@ -82,10 +85,7 @@ export interface Tile {
  * coleção (`col`): quem tem a carta só no estoque aparece como "tenho", e a coleção continua desmarcada.
  */
 export const tiles = (cards: TcgCardInfo[], own: Own, variantsOn: boolean, stock: StockItem[] = []): Tile[] => {
-  const shop = (cardId: string, variant: string | null) =>
-    stock
-      .filter((s) => s.cardId === cardId && (variant === null || s.variant === variant))
-      .reduce((n, s) => n + (s.available ?? 1), 0);
+  const shop = (cardId: string, variant: string | null) => shopCount(stock, cardId, variant);
   return cards.flatMap((card): Tile[] => {
     const all = variantsOf(card);
     const tile = (variant: string | null, variants: string[]): Tile => {
@@ -95,6 +95,12 @@ export const tiles = (cards: TcgCardInfo[], own: Own, variantsOn: boolean, stock
     return variantsOn ? all.map((v) => tile(v, [v])) : [tile(null, all)];
   });
 };
+
+/** Unidades da carta à venda na loja (de uma variante, ou de todas se `variant` é null); sem controle de estoque vale 1. */
+export const shopCount = (stock: StockItem[], cardId: string, variant: string | null): number =>
+  stock
+    .filter((s) => s.cardId === cardId && (variant === null || s.variant === variant))
+    .reduce((n, s) => n + (s.available ?? 1), 0);
 
 /** Posse com uma variante a mais ou a menos; quantidade 0 tira a entrada. Não altera o mapa recebido. */
 export const withQty = (own: Own, cardId: string, variant: string, qty: number): Own => {
@@ -118,10 +124,12 @@ export const bulkPairs = (list: Tile[], on: boolean): [string, string][] =>
 export type Status = 'falta' | 'tenho' | 'repetida';
 export const statusOf = (qty: number): Status => (qty <= 0 ? 'falta' : qty === 1 ? 'tenho' : 'repetida');
 
+/** Inteiro, arredondado para baixo: 99,6% não vira 100% antes de completar. */
+export const percent = (have: number, total: number): number => (total ? Math.floor((have / total) * 100) : 0);
+
 export interface Progress {
   have: number;
   total: number;
-  /** Inteiro, arredondado para baixo: 99,6% não vira 100% antes de completar. */
   pct: number;
   complete: boolean;
 }
@@ -129,7 +137,7 @@ export interface Progress {
 export const progress = (list: Tile[]): Progress => {
   const have = list.filter((t) => t.qty > 0).length;
   const total = list.length;
-  return { have, total, pct: total ? Math.floor((have / total) * 100) : 0, complete: total > 0 && have === total };
+  return { have, total, pct: percent(have, total), complete: total > 0 && have === total };
 };
 
 /** Cartas fora das numeradas do set (secretas), pelos números da própria enciclopédia. */

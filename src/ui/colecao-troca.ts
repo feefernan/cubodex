@@ -2,7 +2,7 @@
  * Folha "Registrar troca" da coleção interna (#100): o que sai do estoque da loja e o que entra na coleção, sem exigir
  * 1:1. Mostra só o valor do que sai (referência); a gravação é tudo ou nada no servidor.
  */
-import { primaryVariant, type TradeRow, variantsOf } from '../domain/colecao';
+import { MAX_QTY, primaryVariant, type TradeRow, variantsOf } from '../domain/colecao';
 import { type IndexEntry, parseCardInfo, parseIndex, searchIndex, type TcgCardInfo } from '../domain/enciclopedia';
 import { brl, escapeHtml as esc } from '../domain/format';
 import { VARIANT_PT } from '../domain/tcg';
@@ -29,7 +29,6 @@ interface Trade {
   done: (res: TradeResult, current: boolean) => void;
 }
 
-const MAX_QTY = 999;
 /** A troca aberta. Só os botões da folha chamam os ajustes abaixo, e a folha só existe com ela aberta. */
 let t: Trade | null = null;
 const open = () => t as Trade;

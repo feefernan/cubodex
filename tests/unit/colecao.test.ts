@@ -8,6 +8,7 @@ import {
   ownKey,
   parseOwn,
   parseStockItems,
+  percent,
   primaryVariant,
   progress,
   releaseLabel,
@@ -15,6 +16,7 @@ import {
   secretCount,
   serieColor,
   setOfCard,
+  shopCount,
   statusOf,
   tiles,
   tradeRows,
@@ -94,6 +96,26 @@ describe('variantes', () => {
   it('a variante principal é a primeira disponível', () => {
     expect(primaryVariant({ variants: 'holo,firstEdition' })).toBe('holo');
     expect(primaryVariant({ variants: null })).toBe('normal');
+  });
+});
+
+describe('contas pequenas', () => {
+  it('shopCount soma as unidades à venda; sem controle de estoque vale 1; null soma todas as variantes', () => {
+    const shop = [
+      { id: 'a', cardId: 'base1-4', lang: 'EN', variant: 'holo', grade: '', price: 1, available: 2 },
+      { id: 'b', cardId: 'base1-4', lang: 'PT', variant: 'normal', grade: '', price: 1, available: null },
+      { id: 'c', cardId: 'base1-5', lang: 'EN', variant: 'normal', grade: '', price: 1, available: 5 },
+    ];
+    expect(shopCount(shop, 'base1-4', 'holo')).toBe(2);
+    expect(shopCount(shop, 'base1-4', null)).toBe(3);
+    expect(shopCount(shop, 'base1-9', null)).toBe(0);
+  });
+
+  it('percent arredonda para baixo e não divide por zero', () => {
+    expect(percent(0, 0)).toBe(0);
+    expect(percent(1, 3)).toBe(33);
+    expect(percent(299, 300)).toBe(99);
+    expect(percent(3, 3)).toBe(100);
   });
 });
 

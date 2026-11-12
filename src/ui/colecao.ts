@@ -1,9 +1,10 @@
-/** Coleção interna (#80): landing de séries, coleções de cada série e (nas próximas fases) a página do set. */
+/** Coleção interna (#80): landing de séries e coleções de cada série; a página do set fica em colecao-set.ts. */
 import {
   groupSeries,
   type Own,
   ownedBySet,
   parseOwn,
+  percent,
   releaseLabel,
   type SerieGroup,
   searchColecao,
@@ -11,7 +12,7 @@ import {
 } from '../domain/colecao';
 import { logoUrl, parseCardInfo, parseSet, parseSets, setTitle, type TcgSetInfo } from '../domain/enciclopedia';
 import { escapeHtml as esc } from '../domain/format';
-import { routeHref, type View } from '../domain/routes';
+import { parseRoute, routeHref, type View } from '../domain/routes';
 import { ApiError, api } from '../infra/api';
 import { emptyState } from './art';
 import { closeSetPage, initColecaoSet, openSetPage } from './colecao-set';
@@ -34,7 +35,6 @@ const load = async (): Promise<Data> => {
   return { groups: groupSeries(parseSets(sets)), owned: ownedBySet({ ...own, ...parseOwn(mine.shop) }), own };
 };
 
-const pct = (have: number, total: number) => (total ? Math.floor((have / total) * 100) : 0);
 const cards = (sets: TcgSetInfo[]) => sets.reduce((n, s) => n + s.total, 0);
 const have = (sets: TcgSetInfo[], owned: Map<string, number>) => sets.reduce((n, s) => n + (owned.get(s.id) ?? 0), 0);
 
@@ -117,7 +117,7 @@ const serieCard = (g: SerieGroup, owned: Map<string, number>) => {
     `<a class="cx-card" href="#/colserie/${esc(g.id)}" data-action="go" data-view="colserie" data-id="${esc(g.id)}"${style}>` +
     `<span class="cx-card-name display">${esc(g.name)}</span>` +
     `<span class="cx-card-meta mono">${g.sets.length} ${g.sets.length === 1 ? 'coleção' : 'coleções'} · ${mine}/${total} cartas</span>` +
-    `<span class="cx-bar" role="img" aria-label="${pct(mine, total)}% completa"><i style="width:${pct(mine, total)}%"></i></span></a>`
+    `<span class="cx-bar" role="img" aria-label="${percent(mine, total)}% completa"><i style="width:${percent(mine, total)}%"></i></span></a>`
   );
 };
 
@@ -130,7 +130,7 @@ const setCard = (s: TcgSetInfo, owned: Map<string, number>) => {
   return (
     `<a class="cx-set" href="#/colset/${esc(s.id)}" data-action="go" data-view="colset" data-id="${esc(s.id)}">${logo}` +
     `<span class="cx-set-name">${esc(setTitle(s))}</span>` +
-    `<span class="cx-set-foot"><span class="mono muted">${date ? `${date} · ` : ''}${mine}/${s.total} cartas</span>${ring(pct(mine, s.total))}</span></a>`
+    `<span class="cx-set-foot"><span class="mono muted">${date ? `${date} · ` : ''}${mine}/${s.total} cartas</span>${ring(percent(mine, s.total))}</span></a>`
   );
 };
 
@@ -163,12 +163,7 @@ const renderLanding = () => {
   });
 };
 
-const routeId = () =>
-  location.hash
-    .replace(/^#\/?/, '')
-    .split('?')[0]
-    ?.split('/')[1]
-    ?.replace(/[^\w.-]/g, '') ?? '';
+const routeId = () => parseRoute(location.hash).id ?? '';
 
 const renderSerie = () => {
   const id = routeId();

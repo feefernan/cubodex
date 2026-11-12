@@ -3,7 +3,7 @@
  * e-mails de OWNER_EMAILS. Quem não está na lista (ou não entrou) recebe o mesmo 404 de uma rota que não existe.
  * Nome, número, imagem e variantes da carta vêm de tcg_cards/tcg_sets (/api/tcg/*); aqui só a posse.
  */
-import { setOfCard } from '../../src/domain/colecao';
+import { MAX_QTY, setOfCard } from '../../src/domain/colecao';
 import { OrderError } from '../../src/domain/order';
 import { currentUser, isOwner } from './account-routes';
 import type { User } from './accounts';
@@ -12,7 +12,6 @@ import { handleError, json, readJson } from './http';
 import { parseStoredDef } from './notion';
 
 const ID = /^[\w.!%-]{1,80}$/;
-const MAX_QTY = 999;
 const notFound = () => json({ error: 'Não encontrado' }, 404);
 
 /**
