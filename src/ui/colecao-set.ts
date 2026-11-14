@@ -54,6 +54,15 @@ interface Page {
   q: string;
   variantsOn: boolean;
   shown: number;
+  /** Valor estimado da coleção neste set, pedido ao tocar no ícone (em blocos). */
+  value: {
+    state: 'parado' | 'calculando' | 'pronto' | 'erro';
+    done: number;
+    total: number;
+    brl: number;
+    missing: number;
+    date: string;
+  };
 }
 
 let page: Page | null = null;
@@ -87,7 +96,23 @@ const drawStats = (p: Page) => {
     stat(ICON.cards, String(p.cards.length), 'cartas') +
     stat(ICON.secret, String(secretCount(p.set)), 'secretas') +
     `<div class="cx-stat"><span class="cx-ring" style="--p:${pr.pct}" role="img" aria-label="${pr.pct}% completa"><b class="num">${pr.pct}%</b></span><b class="num">${pr.have}/${pr.total}</b><span class="mono muted">${pr.complete ? 'completa ✓' : 'progresso'}</span></div>` +
-    stat(ICON.value, '—', 'valor em breve');
+    valueStat(p);
+};
+
+/** O valor só é calculado quando se toca (um pedido por carta no servidor); tocar de novo recalcula. */
+const valueStat = (p: Page) => {
+  const v = p.value;
+  const text =
+    v.state === 'pronto'
+      ? [v.missing ? `${v.missing} sem preço` : '', `cotação ${v.date.split('-').reverse().slice(0, 2).join('/')}`]
+          .filter(Boolean)
+          .join(' · ')
+      : v.state === 'calculando'
+        ? `calculando ${v.done}/${v.total}`
+        : v.state === 'erro'
+          ? 'não deu · tentar de novo'
+          : 'toque para estimar';
+  return `<button class="cx-stat" type="button" data-action="cx-value" aria-label="Valor estimado da coleção neste set: ${esc(text)}"${v.state === 'calculando' ? ' disabled' : ''}>${ICON.value}<b class="num">${v.state === 'pronto' ? esc(brl(v.brl)) : '—'}</b><span class="mono muted">${esc(text)}</span></button>`;
 };
 
 const TABS: [PageTab, string][] = [
@@ -226,6 +251,29 @@ const adjustStock = async (p: Page, id: string, delta: 1 | -1) => {
   }
   p.busy.delete(id);
   if (page === p) drawAll(p);
+};
+
+const estimate = async (p: Page) => {
+  const v = p.value;
+  Object.assign(v, { state: 'calculando', done: 0, total: 0, brl: 0, missing: 0 });
+  drawStats(p);
+  try {
+    for (let next: number | null = 0; next !== null; ) {
+      const part = await api.colecaoValor(p.set.id, next);
+      v.brl += part.brl;
+      v.missing += part.missing;
+      v.total = part.total;
+      v.date = part.date;
+      next = part.next;
+      v.done = next ?? part.total;
+      if (page === p) drawStats(p);
+    }
+    v.state = 'pronto';
+  } catch (e) {
+    v.state = 'erro';
+    toast(`não deu para estimar o valor: ${(e as Error).message}`);
+  }
+  if (page === p) drawStats(p);
 };
 
 const loadStock = async (p: Page) => {
@@ -442,6 +490,7 @@ export const openSetPage = (el: HTMLElement, set: TcgSetInfo, cards: TcgCardInfo
     q: '',
     variantsOn: false,
     shown: PAGE,
+    value: { state: 'parado', done: 0, total: 0, brl: 0, missing: 0, date: '' },
   };
   page = p;
   el.innerHTML =
@@ -494,6 +543,7 @@ export const initColecaoSet = () => {
     page.shown += PAGE;
     drawGrid(page);
   });
+  onAction('cx-value', () => page && void estimate(page));
   onAction('cx-bulk', (el) => page && void bulk(page, el.dataset.on === 'true'));
   onInput('cx-variants', (el) => {
     if (!page) return;

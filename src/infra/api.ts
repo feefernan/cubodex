@@ -73,6 +73,14 @@ export interface TradeResult {
   got: { cardId: string; variant: string; qty: number }[];
 }
 
+export interface ValueChunk {
+  total: number;
+  next: number | null;
+  brl: number;
+  missing: number;
+  date: string;
+}
+
 export const api = {
   catalog: () => call<unknown>('/api/catalog'),
   quote: (cep: string, items: CartEntry[], owned = false) =>
@@ -93,6 +101,8 @@ export const api = {
   colecaoEstoque: (setId: string) => call<unknown>(`/api/colecao/estoque?set=${encodeURIComponent(setId)}`),
   colecaoAjustaEstoque: (id: string, delta: 1 | -1) =>
     send<{ available: number }>('PUT', `/api/colecao/estoque/${encodeURIComponent(id)}`, { delta }),
+  colecaoValor: (setId: string, offset: number) =>
+    call<ValueChunk>(`/api/colecao/valor?set=${encodeURIComponent(setId)}&offset=${offset}`),
   colecaoTroca: (give: { id: string; qty: number }[], get: { cardId: string; variant: string; qty: number }[]) =>
     post<TradeResult>('/api/colecao/troca', { give, get }),
   colecaoItem: (cardId: string, variant: string, qty: number) =>

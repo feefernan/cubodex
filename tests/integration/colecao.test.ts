@@ -35,6 +35,9 @@ const server = {
   /** Troca (POST /api/colecao/troca): o corpo recebido e a resposta. */
   trade: (_body: Record<string, unknown>): Response => Response.json({ gave: [], got: [] }),
   tradeSent: [] as Record<string, unknown>[],
+  /** Valor estimado (GET /api/colecao/valor): a resposta de cada bloco, pelo deslocamento pedido. */
+  value: (_offset: number): Response => Response.json({ total: 0, next: null, brl: 0, missing: 0, date: '2026-11-13' }),
+  valueCalls: [] as number[],
   /** Prefixo de /api/tcg/… que falha (para testar a busca e a abertura da carta recebida). */
   tcgDown: null as string | null,
 };
@@ -62,6 +65,11 @@ beforeAll(async () => {
       const tcg = tcgApi(url);
       if (tcg) return Response.json(tcg.body, { status: tcg.status });
       if (url === '/api/colecao') return server.reply();
+      if (url.startsWith('/api/colecao/valor')) {
+        const offset = Number(new URL(url, 'http://x').searchParams.get('offset'));
+        server.valueCalls.push(offset);
+        return server.value(offset);
+      }
       if (url.startsWith('/api/colecao/estoque')) {
         server.stockCalls += 1;
         await server.stockHold;
@@ -143,7 +151,7 @@ describe('coleção interna: quem é autorizado', () => {
     jungle.click();
     await settle();
     expect(visible()).toEqual(['v-colset']);
-    expect($('#colsetBody').textContent).toContain('em breve');
+    expect($('#colsetBody').textContent).toContain('toque para estimar');
     expect($$('#cxHead .cx-crumbs a')).toHaveLength(2);
   });
 
@@ -223,7 +231,7 @@ describe('coleção interna: página do set', () => {
     expect(stats()).toContain('09/01/1999');
     expect(stats()).toContain('1/3');
     expect(stats()).toContain('33%');
-    expect(stats()).toContain('valor em breve');
+    expect(stats()).toContain('toque para estimar');
     expect($$('#cxTabs .chip').map((c) => c.textContent?.replace(/\s+/g, ' '))).toEqual([
       'todas 3',
       'tenho 1',
@@ -574,6 +582,54 @@ describe('coleção interna: página do set', () => {
       await goHash('#/colecao');
       await vi.waitFor(() => expect($('#colecaoBody').textContent).toContain('<img src=x'));
       expect($('#colecaoBody img')).toBeNull();
+    });
+  });
+
+  describe('valor estimado', () => {
+    const valueBtn = () => $<HTMLButtonElement>('[data-action="cx-value"]');
+
+    it('só calcula ao tocar: mostra o andamento, soma os blocos e deixa recalcular', async () => {
+      await open();
+      server.valueCalls = [];
+      expect(valueBtn().textContent).toContain('toque para estimar');
+      expect(server.valueCalls).toEqual([]);
+      let release = () => {};
+      const gate = new Promise<void>((r) => {
+        release = r;
+      });
+      server.value = (offset) => {
+        if (offset === 0) return Response.json({ total: 25, next: 20, brl: 1000, missing: 1, date: '2026-11-13' });
+        return Response.json({ total: 25, next: null, brl: 234.5, missing: 2, date: '2026-11-13' });
+      };
+      const realFetch = globalThis.fetch;
+      vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input).includes('offset=20')) await gate;
+        return realFetch(input, init);
+      });
+      valueBtn().click();
+      await vi.waitFor(() => expect(valueBtn().textContent).toContain('calculando 20/25'));
+      expect(valueBtn().disabled).toBe(true);
+      release();
+      await vi.waitFor(() => expect(valueBtn().textContent).toMatch(/1\.234,50/));
+      expect(valueBtn().textContent).toContain('3 sem preço · cotação 13/11');
+      expect(valueBtn().disabled).toBe(false);
+      expect(server.valueCalls).toEqual([0, 20]);
+      vi.stubGlobal('fetch', realFetch);
+      valueBtn().click();
+      await vi.waitFor(() => expect(server.valueCalls).toEqual([0, 20, 0, 20]));
+    });
+
+    it('sem nada em falta no preço não fala em "sem preço"; falha mostra o aviso e deixa tentar de novo', async () => {
+      await open();
+      server.value = () => Response.json({ total: 1, next: null, brl: 50, missing: 0, date: '2026-11-13' });
+      valueBtn().click();
+      await vi.waitFor(() => expect(valueBtn().textContent).toMatch(/50,00/));
+      expect(valueBtn().textContent).not.toContain('sem preço');
+      server.value = () => Response.json({ error: 'Não deu para pegar a cotação do câmbio.' }, { status: 502 });
+      valueBtn().click();
+      await vi.waitFor(() => expect(valueBtn().textContent).toContain('tentar de novo'));
+      expect($('#toast').textContent).toContain('cotação do câmbio');
+      expect(valueBtn().disabled).toBe(false);
     });
   });
 

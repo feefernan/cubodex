@@ -454,3 +454,97 @@ describe('coleção interna: registrar troca', () => {
     expect(prod('a')).toMatchObject({ qty: 3, dirty: 0 });
   });
 });
+
+describe('coleção interna: valor estimado', () => {
+  const pricing = {
+    'base1-4': { cardmarket: { trend: 300, 'trend-holo': 100 } },
+    'base1-5': null,
+  } as Record<string, unknown>;
+  let seen: string[];
+  let down: { ptax?: boolean; card?: string };
+
+  const f = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    seen.push(url);
+    if (url.includes('olinda')) {
+      if (down.ptax) return new Response('fora', { status: 500 });
+      const cur = url.includes('USD') ? 5 : 6;
+      return Response.json({
+        value: [
+          { cotacaoVenda: 1, dataHoraCotacao: '2026-11-12 13:00:00.1' },
+          { cotacaoVenda: cur, dataHoraCotacao: '2026-11-13 13:03:27.37' },
+        ],
+      });
+    }
+    const id = decodeURIComponent(url.split('/cards/')[1] ?? '');
+    if (id === down.card) return new Response('fora', { status: 503 });
+    return Response.json({ id, pricing: id in pricing ? pricing[id] : { cardmarket: { trend: 2 } } });
+  }) as typeof fetch;
+
+  const value = async (query: string, email = 'dono@exemplo.com') =>
+    handle(new Request(`https://cubodex.test/api/colecao/valor${query}`, { headers: await login(email) }), E, ctx, f);
+  const own = (card: string, variant: string, qty: number) =>
+    d1.sqlite
+      .prepare("INSERT INTO col_items (card_id, variant, qty, updated_at, updated_by) VALUES (?, ?, ?, '', '')")
+      .run(card, variant, qty);
+
+  beforeEach(() => {
+    seen = [];
+    down = {};
+  });
+
+  it('soma em reais o que a coleção tem do set (holo e normal), conta a carta sem preço e informa a data da cotação', async () => {
+    own('base1-4', 'holo', 2); // 100 × 6 × 2
+    own('base1-4', 'normal', 1); // 300 × 6
+    own('base1-5', 'normal', 1); // sem preço no TCGdex
+    own('base2-1', 'normal', 9); // outro set: fora
+    const res = await value('?set=base1');
+    expect(await res.json()).toEqual({ total: 2, next: null, brl: 3000, missing: 1, date: '2026-11-13' });
+    expect(seen.filter((u) => u.includes('/cards/')).sort()).toEqual([
+      'https://api.tcgdex.net/v2/en/cards/base1-4',
+      'https://api.tcgdex.net/v2/en/cards/base1-5',
+    ]);
+  });
+
+  it('anda em blocos de 20 cartas, com o câmbio pedido em cada um, e o último não tem próximo', async () => {
+    for (let i = 1; i <= 25; i++) {
+      d1.sqlite
+        .prepare("INSERT INTO tcg_cards (id, set_id, local_id, num, name, h) VALUES (?, 'base1', ?, ?, 'X', '')")
+        .run(`base1-x${String(i).padStart(2, '0')}`, String(i), i);
+      own(`base1-x${String(i).padStart(2, '0')}`, 'normal', 1); // cada uma: 2 € × 6
+    }
+    const first = (await (await value('?set=base1')).json()) as Record<string, unknown>;
+    expect(first).toMatchObject({ total: 25, next: 20, brl: 240, missing: 0 });
+    expect(seen.length).toBeLessThanOrEqual(22);
+    const last = (await (await value('?set=base1&offset=20')).json()) as Record<string, unknown>;
+    expect(last).toMatchObject({ total: 25, next: null, brl: 60, missing: 0 });
+  });
+
+  it('set sem nada marcado vale zero e não chama o TCGdex', async () => {
+    expect(await (await value('?set=base1')).json()).toMatchObject({ total: 0, next: null, brl: 0, missing: 0 });
+    expect(seen.some((u) => u.includes('/cards/'))).toBe(false);
+  });
+
+  it('carta cujo preço não veio entra como "sem preço", sem derrubar o bloco', async () => {
+    own('base1-4', 'normal', 1);
+    own('base1-5', 'normal', 1);
+    down.card = 'base1-5';
+    expect(await (await value('?set=base1')).json()).toMatchObject({ brl: 1800, missing: 1 });
+  });
+
+  it('sem cotação do Banco Central responde 502 em vez de inventar um valor', async () => {
+    own('base1-4', 'normal', 1);
+    down.ptax = true;
+    const res = await value('?set=base1');
+    expect(res.status).toBe(502);
+    expect(((await res.json()) as { error: string }).error).toMatch(/cotação/);
+  });
+
+  it('recusa set ou deslocamento inválido e quem não é da lista', async () => {
+    expect((await value('')).status).toBe(400);
+    expect((await value('?set=a%20b')).status).toBe(400);
+    for (const offset of ['-1', '1.5', 'x']) expect((await value(`?set=base1&offset=${offset}`)).status).toBe(400);
+    expect((await value('?set=base1', 'fora@exemplo.com')).status).toBe(404);
+    expect(seen).toEqual([]);
+  });
+});

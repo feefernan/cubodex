@@ -287,3 +287,50 @@ export const searchColecao = (groups: SerieGroup[], query: string): { series: Se
     sets: groups.flatMap((g) => g.sets).filter((s) => normalize(`${s.name} ${s.name_pt ?? ''} ${s.id}`).includes(q)),
   };
 };
+
+// ───────── valor estimado (#108) ─────────
+
+export interface Rates {
+  EUR: number;
+  USD: number;
+}
+
+const positive = (v: unknown): number | null => (typeof v === 'number' && v > 0 ? v : null);
+const field = (o: unknown, key: string): unknown =>
+  o && typeof o === 'object' ? (o as Record<string, unknown>)[key] : null;
+
+/** Chaves do TCGplayer no `pricing` do TCGdex, por variante. */
+const TCGPLAYER_KEY: Record<string, string> = {
+  normal: 'normal',
+  holo: 'holofoil',
+  reverse: 'reverse-holofoil',
+  firstEdition: '1st-edition-holofoil',
+};
+
+/**
+ * Preço de uma unidade na moeda de origem, a partir do `pricing` do TCGdex: tendência do Cardmarket (euro; a "holo" para
+ * holo e reverse, quando existe) e, sem ela, o preço de mercado do TCGplayer (dólar). Sem nenhum dos dois: null.
+ * shortcut: a 1ª edição usa a tendência normal, o TCGdex não separa; melhorar se uma carta dessas pesar no total.
+ */
+export const unitPrice = (pricing: unknown, variant: string): { cur: keyof Rates; value: number } | null => {
+  const cm = field(pricing, 'cardmarket');
+  const eur =
+    (variant === 'holo' || variant === 'reverse' ? positive(field(cm, 'trend-holo')) : null) ??
+    positive(field(cm, 'trend'));
+  if (eur) return { cur: 'EUR', value: eur };
+  const tp = field(field(pricing, 'tcgplayer'), TCGPLAYER_KEY[variant] ?? 'normal');
+  const usd = positive(field(tp, 'marketPrice'));
+  return usd ? { cur: 'USD', value: usd } : null;
+};
+
+/** Soma em reais de linhas `[pricing, variante, quantidade]`; `missing` conta as linhas sem preço. */
+export const chunkValue = (rows: [unknown, string, number][], rates: Rates): { brl: number; missing: number } => {
+  let brl = 0;
+  let missing = 0;
+  for (const [pricing, variant, qty] of rows) {
+    const p = unitPrice(pricing, variant);
+    if (p) brl += p.value * rates[p.cur] * qty;
+    else missing++;
+  }
+  return { brl: Math.round(brl * 100) / 100, missing };
+};

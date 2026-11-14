@@ -3,7 +3,7 @@
  * e-mails de OWNER_EMAILS. Quem não está na lista (ou não entrou) recebe o mesmo 404 de uma rota que não existe.
  * Nome, número, imagem e variantes da carta vêm de tcg_cards/tcg_sets (/api/tcg/*); aqui só a posse.
  */
-import { MAX_QTY, setOfCard } from '../../src/domain/colecao';
+import { chunkValue, MAX_QTY, type Rates, setOfCard } from '../../src/domain/colecao';
 import { OrderError } from '../../src/domain/order';
 import { currentUser, isOwner } from './account-routes';
 import type { User } from './accounts';
@@ -285,8 +285,89 @@ const registerTrade = async (db: NonNullable<Env['DB']>, user: User, body: Recor
   return json({ gave: left.map((r) => ({ id: r.id, available: r.qty })), got: [...inn.values()] });
 };
 
+/** Cartas por pedido: cada uma é uma subrequisição do Worker (limite de 50 no plano gratuito), mais 2 do câmbio. */
+const VALUE_CHUNK = 20;
+const DAY = 86400;
+
+/** GET na borda com cache de um dia: o preço do TCGdex e a cotação mudam uma vez por dia. */
+const daily = (f: typeof fetch, url: string) => f(url, { cf: { cacheEverything: true, cacheTtl: DAY } } as RequestInit);
+
+/** Última cotação de venda do PTAX (Banco Central) na janela de uma semana: cobre fim de semana e feriado. */
+const ptax = async (f: typeof fetch, cur: string, now: Date) => {
+  const day = (back: number) => {
+    const d = new Date(now.getTime() - back * DAY * 1000);
+    return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}-${d.getUTCFullYear()}`;
+  };
+  const q = new URLSearchParams({
+    '@moeda': `'${cur}'`,
+    '@dataInicial': `'${day(7)}'`,
+    '@dataFinalCotacao': `'${day(0)}'`,
+    $select: 'cotacaoVenda,dataHoraCotacao',
+    $format: 'json',
+  });
+  const res = await daily(
+    f,
+    `https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?${q}`,
+  );
+  const last = ((await res.json()) as { value?: { cotacaoVenda: number; dataHoraCotacao: string }[] }).value?.at(-1);
+  if (!res.ok || !last || !(last.cotacaoVenda > 0)) throw new Error('sem cotação');
+  return { rate: last.cotacaoVenda, date: last.dataHoraCotacao.slice(0, 10) };
+};
+
+/**
+ * GET /api/colecao/valor?set=<id>&offset=<n> — valor em reais, a preço de mercado, do que a coleção tem do set (o estoque
+ * da loja não entra). Só sob demanda, e em blocos de VALUE_CHUNK cartas: a tela repete com `next` até acabar e soma.
+ */
+const setValue = async (db: NonNullable<Env['DB']>, f: typeof fetch, setId: string, offsetParam: string | null) => {
+  const offset = Number(offsetParam ?? 0);
+  if (!Number.isInteger(offset) || offset < 0) throw new OrderError(400, 'Pedido inválido');
+  const owned = (
+    await db
+      .prepare(
+        `SELECT i.card_id, i.variant, i.qty FROM col_items i JOIN tcg_cards c ON c.id = i.card_id WHERE c.set_id = ? ORDER BY i.card_id, i.variant`,
+      )
+      .bind(setId)
+      .all<{ card_id: string; variant: string; qty: number }>()
+  ).results;
+  const ids = [...new Set(owned.map((r) => r.card_id))];
+  const part = ids.slice(offset, offset + VALUE_CHUNK);
+  let rates: Rates;
+  let date: string;
+  try {
+    const now = new Date();
+    const [eur, usd] = await Promise.all([ptax(f, 'EUR', now), ptax(f, 'USD', now)]);
+    rates = { EUR: eur.rate, USD: usd.rate };
+    date = eur.date;
+  } catch {
+    throw new OrderError(502, 'Não deu para pegar a cotação do câmbio. Tente de novo em instantes.');
+  }
+  const pricing = new Map(
+    await Promise.all(
+      part.map(async (id): Promise<[string, unknown]> => {
+        try {
+          const res = await daily(f, `https://api.tcgdex.net/v2/en/cards/${encodeURIComponent(id)}`);
+          return [id, res.ok ? ((await res.json()) as { pricing?: unknown }).pricing : null];
+        } catch {
+          return [id, null];
+        }
+      }),
+    ),
+  );
+  const { brl, missing } = chunkValue(
+    owned.filter((r) => pricing.has(r.card_id)).map((r) => [pricing.get(r.card_id), r.variant, r.qty]),
+    rates,
+  );
+  const end = offset + part.length;
+  return json({ total: ids.length, next: end < ids.length ? end : null, brl, missing, date });
+};
+
 /** GET/PUT /api/colecao… Devolve null se o caminho não é da coleção. */
-export const colecaoRoutes = async (request: Request, env: Env, path: string): Promise<Response | null> => {
+export const colecaoRoutes = async (
+  request: Request,
+  env: Env,
+  path: string,
+  f: typeof fetch,
+): Promise<Response | null> => {
   if (path !== '/api/colecao' && !path.startsWith('/api/colecao/')) return null;
   const user = await currentUser(request, env);
   if (!env.DB || !isOwner(env, user) || !user) return notFound();
@@ -298,6 +379,12 @@ export const colecaoRoutes = async (request: Request, env: Env, path: string): P
       const set = new URL(request.url).searchParams.get('set') ?? '';
       if (!ID.test(set)) throw new OrderError(400, 'Set inválido');
       return await stockOfSet(db, set);
+    }
+    if (path === '/api/colecao/valor' && method === 'GET') {
+      const params = new URL(request.url).searchParams;
+      const set = params.get('set') ?? '';
+      if (!ID.test(set)) throw new OrderError(400, 'Set inválido');
+      return await setValue(db, f, set, params.get('offset'));
     }
     if (path === '/api/colecao/troca' && method === 'POST')
       return await registerTrade(db, user, await readJson(request));

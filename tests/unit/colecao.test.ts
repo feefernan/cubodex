@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bulkPairs,
+  chunkValue,
   filterTiles,
   filterTrade,
   groupSeries,
@@ -20,6 +21,7 @@ import {
   statusOf,
   tiles,
   tradeRows,
+  unitPrice,
   variantsOf,
   withQty,
 } from '../../src/domain/colecao';
@@ -444,5 +446,57 @@ describe('para trocar', () => {
 
   it('sem estoque, nada para trocar', () => {
     expect(tradeRows(CARDS, [])).toEqual([]);
+  });
+});
+
+describe('valor estimado: preço de uma unidade', () => {
+  const pricing = {
+    cardmarket: { trend: 300, 'trend-holo': 120 },
+    tcgplayer: { normal: { marketPrice: 10 }, holofoil: { marketPrice: 40 }, 'reverse-holofoil': { marketPrice: 12 } },
+  };
+
+  it('usa a tendência do Cardmarket (a holo para holo e reverse) em euro', () => {
+    expect(unitPrice(pricing, 'normal')).toEqual({ cur: 'EUR', value: 300 });
+    expect(unitPrice(pricing, 'holo')).toEqual({ cur: 'EUR', value: 120 });
+    expect(unitPrice(pricing, 'reverse')).toEqual({ cur: 'EUR', value: 120 });
+    expect(unitPrice(pricing, 'firstEdition')).toEqual({ cur: 'EUR', value: 300 });
+  });
+
+  it('sem tendência holo (ou zerada) cai na normal', () => {
+    expect(unitPrice({ cardmarket: { trend: 7.76, 'trend-holo': 0 } }, 'holo')).toEqual({ cur: 'EUR', value: 7.76 });
+    expect(unitPrice({ cardmarket: { trend: 5, 'trend-holo': null } }, 'reverse')).toEqual({ cur: 'EUR', value: 5 });
+  });
+
+  it('sem Cardmarket usa o preço de mercado do TCGplayer da variante, em dólar', () => {
+    const tp = { tcgplayer: pricing.tcgplayer };
+    expect(unitPrice(tp, 'normal')).toEqual({ cur: 'USD', value: 10 });
+    expect(unitPrice(tp, 'holo')).toEqual({ cur: 'USD', value: 40 });
+    expect(unitPrice(tp, 'reverse')).toEqual({ cur: 'USD', value: 12 });
+    expect(unitPrice(tp, 'wPromo')).toEqual({ cur: 'USD', value: 10 });
+  });
+
+  it('sem nenhum preço (ou dado estranho) devolve null', () => {
+    for (const bad of [null, undefined, 'x', {}, { cardmarket: { trend: 0 } }, { tcgplayer: { normal: {} } }])
+      expect(unitPrice(bad, 'normal')).toBeNull();
+    expect(unitPrice({ tcgplayer: { holofoil: { marketPrice: 9 } } }, 'normal')).toBeNull();
+  });
+});
+
+describe('valor estimado: soma em reais', () => {
+  const rates = { EUR: 6, USD: 5 };
+
+  it('soma quantidade × preço × câmbio de cada moeda e conta as linhas sem preço', () => {
+    const rows: [unknown, string, number][] = [
+      [{ cardmarket: { trend: 10 } }, 'normal', 2], // 10 × 6 × 2 = 120
+      [{ tcgplayer: { holofoil: { marketPrice: 4 } } }, 'holo', 1], // 4 × 5 = 20
+      [null, 'normal', 3],
+      [{}, 'holo', 1],
+    ];
+    expect(chunkValue(rows, rates)).toEqual({ brl: 140, missing: 2 });
+  });
+
+  it('arredonda para centavos e aceita lista vazia', () => {
+    expect(chunkValue([[{ cardmarket: { trend: 1.005 } }, 'normal', 1]], { EUR: 3.3333, USD: 1 }).brl).toBe(3.35);
+    expect(chunkValue([], rates)).toEqual({ brl: 0, missing: 0 });
   });
 });
