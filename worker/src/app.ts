@@ -575,7 +575,7 @@ export const handle = async (request: Request, env: Env, ctx: Ctx, f: typeof fet
   if (path === '/api/vault/ship' && method === 'POST') return shipVault(request, env, f);
   const account = await accountRoutes(request, env, path, f);
   if (account) return account;
-  const colecao = await colecaoRoutes(request, env, path);
+  const colecao = await colecaoRoutes(request, env, path, f);
   if (colecao) return colecao;
   const status = path.match(/^\/api\/orders\/([^/]+)\/status$/);
   if (status && method === 'GET') return orderStatus(request, status[1], env, f);

@@ -458,6 +458,7 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 /* coleção interna: página do set (#80) */
 .cx-stats{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));margin-top:20px}
 .cx-stat{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 8px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);text-align:center}
+button.cx-stat{font:inherit;color:inherit;cursor:pointer;min-height:44px}
 .cx-stat svg{width:26px;height:26px;color:var(--tag)}
 .cx-stat b{font:800 15px/1.1 var(--f-body)}
 .cx-stat .mono{font-size:10px;letter-spacing:.06em}
