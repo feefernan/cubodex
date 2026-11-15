@@ -301,6 +301,49 @@ export const searchColecao = (groups: SerieGroup[], query: string): { series: Se
   };
 };
 
+// ───────── cópias de segurança ─────────
+
+export interface BackupInfo {
+  id: string;
+  at: string;
+  cards: number;
+  units: number;
+  kind: 'dia' | 'antes';
+}
+
+/** Só aceita o formato esperado (a resposta passa pelo navegador antes de virar HTML). */
+export const parseBackups = (data: unknown): BackupInfo[] =>
+  (Array.isArray(data) ? data : []).flatMap((v): BackupInfo[] => {
+    const o = (v ?? {}) as Record<string, unknown>;
+    const n = (x: unknown) => (typeof x === 'number' && Number.isInteger(x) && x >= 0 ? x : 0);
+    return typeof o.id === 'string' && /^[\w-]{1,40}$/.test(o.id) && typeof o.at === 'string'
+      ? [
+          {
+            id: o.id,
+            at: o.at.slice(0, 30),
+            cards: n(o.cards),
+            units: n(o.units),
+            kind: o.kind === 'antes' ? 'antes' : 'dia',
+          },
+        ]
+      : [];
+  });
+
+/** "2026-11-15T12:30:00Z" → "15/11/2026 12:30" (horário de Brasília). */
+export const backupLabel = (backup: BackupInfo): string => {
+  const d = new Date(backup.at);
+  if (Number.isNaN(d.getTime())) return backup.id;
+  const p = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+  return `${backup.kind === 'antes' ? 'antes de restaurar · ' : ''}${p.replace(',', '')}`;
+};
+
 // ───────── valor estimado (#108) ─────────
 
 export interface Rates {

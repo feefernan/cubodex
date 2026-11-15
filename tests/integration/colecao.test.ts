@@ -38,6 +38,10 @@ const server = {
   /** Valor estimado (GET /api/colecao/valor): a resposta de cada bloco, pelo deslocamento pedido. */
   value: (_offset: number): Response => Response.json({ total: 0, next: null, brl: 0, missing: 0, date: '2026-11-13' }),
   valueCalls: [] as number[],
+  /** Cópias de segurança (GET /api/colecao/backups) e a restauração (POST …/restaurar). */
+  backups: (): Response => Response.json({ enabled: true, backups: [] }),
+  restore: (_id: string): Response => Response.json({ restored: 1, saved: null }),
+  restoreSent: [] as string[],
   /** Prefixo de /api/tcg/… que falha (para testar a busca e a abertura da carta recebida). */
   tcgDown: null as string | null,
 };
@@ -60,6 +64,12 @@ beforeAll(async () => {
         server.tradeSent.push(body);
         return server.trade(body);
       }
+      if (init?.method === 'POST' && url === '/api/colecao/backups/restaurar') {
+        const { id } = JSON.parse(String(init.body));
+        server.restoreSent.push(id);
+        return server.restore(id);
+      }
+      if (url === '/api/colecao/backups') return server.backups();
       if (server.tcgDown && url.startsWith(`/api/tcg/${server.tcgDown}`))
         return Response.json({ error: 'TCGdex fora do ar' }, { status: 502 });
       const tcg = tcgApi(url);
@@ -167,6 +177,86 @@ describe('coleção interna: quem é autorizado', () => {
     const before = document.documentElement.dataset.tema;
     $('[data-action="cx-theme"]').click();
     expect(document.documentElement.dataset.tema).not.toBe(before);
+  });
+});
+
+describe('coleção interna: cópias de segurança', () => {
+  const list = [
+    { id: '2026-11-15', at: '2026-11-15T15:30:00.000Z', cards: 12, units: 15, kind: 'dia' },
+    { id: 'antes-restaurar-20261114T120000Z', at: '2026-11-14T12:00:00.000Z', cards: 3, units: 3, kind: 'antes' },
+  ];
+  beforeEach(() => {
+    server.restoreSent.length = 0;
+    server.reply = () => Response.json({ items: [], shop: [] });
+    server.backups = () => Response.json({ enabled: true, backups: list });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+
+  it('o botão só aparece para quem abre a coleção, lista as cópias e restaura a escolhida', async () => {
+    await goHash('#/colecao');
+    expect($('#colecaoBackup').hidden).toBe(false);
+    expect($('#colecaoBackupList').hidden).toBe(true);
+    $('[data-action="cx-backups"]').click();
+    await settle();
+    expect($('[data-action="cx-backups"]').getAttribute('aria-expanded')).toBe('true');
+    const rows = $$('#colecaoBackupList li');
+    expect(rows.map((r) => r.textContent)).toEqual([
+      '15/11/2026 12:30 12 cartas · 15 un.restaurar',
+      'antes de restaurar · 14/11/2026 09:00 3 cartas · 3 un.restaurar',
+    ]);
+    $('[data-action="cx-restore"]').click();
+    await settle();
+    await settle();
+    expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Restaurar a coleção de 15/11/2026 12:30?'));
+    expect(server.restoreSent).toEqual(['2026-11-15']);
+    expect($('#toast').textContent).toBe('Coleção restaurada: 1 item.');
+    // A landing recarrega e a lista continua aberta.
+    expect($('#colecaoBackupList').hidden).toBe(false);
+  });
+
+  it('cancelar a confirmação não restaura; erro do servidor mostra o motivo e libera o botão', async () => {
+    await goHash('#/colecao');
+    $('[data-action="cx-backups"]').click();
+    await settle();
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    $('[data-action="cx-restore"]').click();
+    await settle();
+    expect(server.restoreSent).toEqual([]);
+    server.restore = () =>
+      Response.json({ error: 'Essa cópia está danificada e não foi restaurada.' }, { status: 422 });
+    const btn = $<HTMLButtonElement>('[data-action="cx-restore"]');
+    btn.click();
+    await settle();
+    await settle();
+    expect($('#toast').textContent).toBe('Essa cópia está danificada e não foi restaurada.');
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('sem cópias, sem balde ou com erro, a lista explica; fechar e reabrir recarrega', async () => {
+    await goHash('#/colecao');
+    const open = () => $('[data-action="cx-backups"]').click();
+    server.backups = () => Response.json({ enabled: true, backups: [] });
+    open();
+    await settle();
+    expect($('#colecaoBackupList').textContent).toContain('Ainda não há cópias');
+    open();
+    expect($('#colecaoBackupList').hidden).toBe(true);
+    server.backups = () => Response.json({ enabled: false, backups: [] });
+    open();
+    await settle();
+    expect($('#colecaoBackupList').textContent).toContain('ainda não estão ligadas');
+    open();
+    server.backups = () => Response.json({ error: 'banco fora do ar' }, { status: 500 });
+    open();
+    await settle();
+    expect($('#colecaoBackupList').textContent).toContain('banco fora do ar');
+  });
+
+  it('quem não é autorizado não vê o botão', async () => {
+    server.reply = () => Response.json({ error: 'Não encontrado' }, { status: 404 });
+    await goHash('#/colserie/sv');
+    await goHash('#/colecao');
+    expect($('#colecaoBackup').hidden).toBe(true);
   });
 });
 
