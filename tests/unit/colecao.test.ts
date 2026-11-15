@@ -108,9 +108,24 @@ describe('contas pequenas', () => {
       { id: 'b', cardId: 'base1-4', lang: 'PT', variant: 'normal', grade: '', price: 1, available: null },
       { id: 'c', cardId: 'base1-5', lang: 'EN', variant: 'normal', grade: '', price: 1, available: 5 },
     ];
-    expect(shopCount(shop, 'base1-4', 'holo')).toBe(2);
-    expect(shopCount(shop, 'base1-4', null)).toBe(3);
-    expect(shopCount(shop, 'base1-9', null)).toBe(0);
+    expect(shopCount(shop, CARDS[0], 'holo')).toBe(2);
+    expect(shopCount(shop, CARDS[0], null)).toBe(3);
+    expect(shopCount(shop, card('base1-9', 'X', 'normal'), null)).toBe(0);
+  });
+
+  it('estoque com variante que a carta não tem conta na variante principal, nos dois modos', () => {
+    const holoOnly = [card('30th-001', 'Exeggcute', 'holo')];
+    const shop = [{ id: 'a', cardId: '30th-001', lang: 'PT', variant: 'normal', grade: '', price: 1, available: 2 }];
+    expect(shopCount(shop, holoOnly[0], 'holo')).toBe(2);
+    expect(tiles(holoOnly, {}, true, shop).map((t) => [t.variant, t.qty, t.col])).toEqual([['holo', 2, 0]]);
+    expect(tiles(holoOnly, {}, false, shop).map((t) => [t.qty, t.col])).toEqual([[2, 0]]);
+    // Carta com várias variantes: o que não existe nela vai para a principal (a primeira), sem duplicar.
+    const multi = [card('x-1', 'Y', 'holo,reverse')];
+    const other = [{ ...shop[0], cardId: 'x-1', variant: 'normal', available: 1 }];
+    expect(tiles(multi, {}, true, other).map((t) => [t.variant, t.qty])).toEqual([
+      ['reverse', 1],
+      ['holo', 0],
+    ]);
   });
 
   it('percent arredonda para baixo e não divide por zero', () => {
