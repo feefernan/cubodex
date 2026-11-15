@@ -432,7 +432,7 @@ const sheetBody = (p: Page, card: TcgCardInfo) =>
   variantsOf(card)
     .map((v) => {
       const qty = p.own[ownKey(card.id, v)] ?? 0;
-      const shop = shopCount(p.stock ?? [], card.id, v);
+      const shop = shopCount(p.stock ?? [], card, v);
       return `<div class="cx-vrow"><span>${esc(VARIANT_PT[v] ?? v)}${shop ? ` <span class="mono muted">+${shop} na loja</span>` : ''}</span><span class="cx-step"><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="-1" aria-label="Menos uma ${esc(VARIANT_PT[v] ?? v)}"${qty <= 0 ? ' disabled' : ''}>−</button><output class="num" aria-live="polite">${qty}</output><button type="button" data-action="cx-step" data-card="${esc(card.id)}" data-variant="${esc(v)}" data-d="1" aria-label="Mais uma ${esc(VARIANT_PT[v] ?? v)}"${qty >= MAX_QTY ? ' disabled' : ''}>+</button></span></div>`;
     })
     .join('');

@@ -85,21 +85,34 @@ export interface Tile {
  * coleção (`col`): quem tem a carta só no estoque aparece como "tenho", e a coleção continua desmarcada.
  */
 export const tiles = (cards: TcgCardInfo[], own: Own, variantsOn: boolean, stock: StockItem[] = []): Tile[] => {
-  const shop = (cardId: string, variant: string | null) => shopCount(stock, cardId, variant);
+  const shop = (card: TcgCardInfo, variant: string | null) => shopCount(stock, card, variant);
   return cards.flatMap((card): Tile[] => {
     const all = variantsOf(card);
     const tile = (variant: string | null, variants: string[]): Tile => {
       const col = variants.reduce((n, v) => n + (own[ownKey(card.id, v)] ?? 0), 0);
-      return { card, variant, variants, col, qty: col + shop(card.id, variant) };
+      return { card, variant, variants, col, qty: col + shop(card, variant) };
     };
     return variantsOn ? all.map((v) => tile(v, [v])) : [tile(null, all)];
   });
 };
 
+/**
+ * Variante do item à venda, na ótica da carta: a que o Notion informou, ou a principal quando a carta não tem essa
+ * (o Notion traz "normal" por padrão, mesmo em carta que o TCGdex lista só como holo; sem isso ela some do modo variantes).
+ */
+const shopVariant = (card: Pick<TcgCardInfo, 'variants'>, variant: string): string => {
+  const all = variantsOf(card);
+  return all.includes(variant) ? variant : (all[0] ?? 'normal');
+};
+
 /** Unidades da carta à venda na loja (de uma variante, ou de todas se `variant` é null); sem controle de estoque vale 1. */
-export const shopCount = (stock: StockItem[], cardId: string, variant: string | null): number =>
+export const shopCount = (
+  stock: StockItem[],
+  card: Pick<TcgCardInfo, 'id' | 'variants'>,
+  variant: string | null,
+): number =>
   stock
-    .filter((s) => s.cardId === cardId && (variant === null || s.variant === variant))
+    .filter((s) => s.cardId === card.id && (variant === null || shopVariant(card, s.variant) === variant))
     .reduce((n, s) => n + (s.available ?? 1), 0);
 
 /** Posse com uma variante a mais ou a menos; quantidade 0 tira a entrada. Não altera o mapa recebido. */
