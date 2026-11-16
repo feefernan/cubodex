@@ -452,6 +452,9 @@ footer a:hover{color:var(--fg);text-decoration:underline}
 .cx-series,.cx-sets,.cx-skels{margin-top:20px}
 .cx-search{max-width:none;margin-top:4px}
 .cx-sub{font-size:22px;margin-top:28px}
+.cx-backup{padding-bottom:calc(32px + env(safe-area-inset-bottom,0px))}
+.cx-backups{list-style:none;padding:0;margin:12px 0 0;display:grid;gap:8px}
+.cx-backups li{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 14px;border:1px solid var(--line,#d9dde3);border-radius:12px}
 @media (min-width:700px){.cx-sets{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
 @media (max-width:700px){.cx-head-row .cx-shop{display:none}}
 

@@ -1,8 +1,11 @@
 /** Coleção interna (#80): landing de séries e coleções de cada série; a página do set fica em colecao-set.ts. */
 import {
+  type BackupInfo,
+  backupLabel,
   groupSeries,
   type Own,
   ownedBySet,
+  parseBackups,
   parseOwn,
   percent,
   releaseLabel,
@@ -18,6 +21,7 @@ import { emptyState } from './art';
 import { closeSetPage, initColecaoSet, openSetPage } from './colecao-set';
 import { $, onAction, onInput } from './dom';
 import { currentView, registerView } from './router';
+import { toast } from './toast';
 
 interface Data {
   groups: SerieGroup[];
@@ -153,10 +157,65 @@ const drawLanding = () => {
       : emptyState('nenhuma série.', 'A enciclopédia ainda não tem sets carregados.'));
 };
 
+const backupBox = () => $('#colecaoBackup');
+const backupList = () => $('#colecaoBackupList');
+
+const drawBackups = (list: BackupInfo[], enabled: boolean) => {
+  backupList().innerHTML = !enabled
+    ? '<p class="soft">As cópias de segurança ainda não estão ligadas.</p>'
+    : list.length
+      ? `<p class="soft">Uma cópia por dia, guardada por 30 dias. Restaurar troca a coleção inteira; a de agora fica guardada para desfazer.</p><ul class="cx-backups">${list
+          .map(
+            (b) =>
+              `<li><span>${esc(backupLabel(b))} <span class="mono muted">${b.cards} cartas · ${b.units} un.</span></span><button class="btn btn--ghost btn--sm" type="button" data-action="cx-restore" data-id="${esc(b.id)}">restaurar</button></li>`,
+          )
+          .join('')}</ul>`
+      : '<p class="soft">Ainda não há cópias. A primeira sai no próximo dia de uso da coleção.</p>';
+};
+
+const loadBackups = async () => {
+  backupList().innerHTML = '<p class="soft" role="status">carregando…</p>';
+  try {
+    const r = await api.colecaoBackups();
+    drawBackups(parseBackups(r.backups), r.enabled === true);
+  } catch (e) {
+    backupList().innerHTML = `<div class="msg" role="alert">${esc((e as Error).message)}</div>`;
+  }
+};
+
+const toggleBackups = () => {
+  const open = backupList().hidden;
+  backupList().hidden = !open;
+  $('[data-action="cx-backups"]', backupBox()).setAttribute('aria-expanded', String(open));
+  if (open) void loadBackups();
+};
+
+const restore = async (el: HTMLElement) => {
+  const id = el.dataset.id ?? '';
+  const label = el.closest('li')?.querySelector('span')?.firstChild?.textContent?.trim() ?? id;
+  if (!window.confirm(`Restaurar a coleção de ${label}? A coleção atual é substituída (uma cópia dela fica guardada).`))
+    return;
+  (el as HTMLButtonElement).disabled = true;
+  try {
+    const r = await api.colecaoRestaurar(id);
+    toast(`Coleção restaurada: ${r.restored} ${r.restored === 1 ? 'item' : 'itens'}.`);
+    await renderLanding();
+    backupList().hidden = false;
+    await loadBackups();
+  } catch (e) {
+    (el as HTMLButtonElement).disabled = false;
+    toast((e as Error).message);
+  }
+};
+
 const renderLanding = () => {
   landing = null;
+  backupBox().hidden = true;
   return openView('#colecaoBody', [{ label: 'séries', view: 'colecao' }], 6, (data) => {
     landing = data;
+    backupBox().hidden = false;
+    backupList().hidden = true;
+    $('[data-action="cx-backups"]', backupBox()).setAttribute('aria-expanded', 'false');
     const all = data.groups.flatMap((g) => g.sets);
     $('#colecaoSub').textContent = `${data.groups.length} séries · ${have(all, data.owned)}/${cards(all)} cartas`;
     drawLanding();
@@ -240,6 +299,8 @@ export const initColecao = () => {
   for (const [view, render] of Object.entries(RENDER) as [View, () => Promise<void>][])
     registerView(view, () => void render());
   onAction('cx-theme', () => $('#themeBtn').click());
+  onAction('cx-backups', toggleBackups);
+  onAction('cx-restore', (el) => void restore(el));
   onInput('cx-search', drawLanding);
   onAction('cx-retry', () => void RENDER[currentView()]?.());
 };

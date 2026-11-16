@@ -7,6 +7,7 @@ import { chunkValue, MAX_QTY, type Rates, setOfCard } from '../../src/domain/col
 import { OrderError } from '../../src/domain/order';
 import { currentUser, isOwner } from './account-routes';
 import type { User } from './accounts';
+import { listBackups, restoreBackup } from './colecao-backup';
 import type { Env } from './env';
 import { handleError, json, readJson } from './http';
 import { parseStoredDef } from './notion';
@@ -385,6 +386,12 @@ export const colecaoRoutes = async (
       const set = params.get('set') ?? '';
       if (!ID.test(set)) throw new OrderError(400, 'Set inválido');
       return await setValue(db, f, set, params.get('offset'));
+    }
+    if (path === '/api/colecao/backups' && method === 'GET')
+      return json({ enabled: !!env.FOTOS, backups: env.FOTOS ? await listBackups(env.FOTOS) : [] });
+    if (path === '/api/colecao/backups/restaurar' && method === 'POST') {
+      if (!env.FOTOS) throw new OrderError(503, 'As cópias de segurança ainda não estão ligadas.');
+      return json(await restoreBackup(db, env.FOTOS, user.email, (await readJson(request)).id));
     }
     if (path === '/api/colecao/troca' && method === 'POST')
       return await registerTrade(db, user, await readJson(request));

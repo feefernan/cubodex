@@ -41,6 +41,7 @@ import {
 } from './accounts';
 import { flushStock, readProducts, refreshCatalog, takeStock } from './catalog-db';
 import { colecaoRoutes } from './colecao';
+import { backupColecao } from './colecao-backup';
 import type { Ctx, Env } from './env';
 import { cacheKey, handleError, json, limited, log, notice, page, readJson, unavailable } from './http';
 import { quoteShipping } from './melhor-envio';
@@ -79,6 +80,11 @@ export const scheduled = (env: Env, ctx: Ctx, f: typeof fetch = fetch) => {
   const { DB } = env;
   if (!DB) return;
   ctx.waitUntil(refreshCatalog(DB, env, f).catch((e) => log('error', 'sync do catálogo falhou', { error: String(e) })));
+  const { FOTOS } = env;
+  if (FOTOS)
+    ctx.waitUntil(
+      backupColecao(DB, FOTOS).catch((e) => log('error', 'cópia de segurança da coleção falhou', { error: String(e) })),
+    );
   ctx.waitUntil(
     expireUnpaid(DB, env, f).catch((e) => log('error', 'cancelamento de pedidos parados falhou', { error: String(e) })),
   );
